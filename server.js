@@ -202,15 +202,18 @@ function playwrightMarkBlocked() {
 }
 
 function curlFetch(url) {
+  const args = [
+    '-sL',
+    '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
+    '--max-time', '20',
+  ];
+  if (process.env.PROXY_URL) args.push('--proxy', process.env.PROXY_URL);
+  args.push(url);
+
   return new Promise((resolve, reject) => {
-    execFile('curl', [
-      '-sL',
-      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
-      '--max-time', '15',
-      url,
-    ], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+    execFile('curl', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
       if (err) return reject(new Error(err.message));
       if (!stdout || !stdout.includes('__NEXT_DATA__')) return reject(new Error('BLOCKED'));
       resolve(stdout);
@@ -256,19 +259,20 @@ async function playwrightFetch(url) {
 async function fetchFalabella(sku) {
   const url = `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
   try {
+    // Con proxy residencial, curl es suficiente y mucho más rápido
     return await curlFetch(url);
   } catch (e) {
-    if (e.message === 'BLOCKED' || e.message.includes('403')) {
-      if (playwrightIsBlocked()) throw new Error('BLOCKED');
-      console.log(`curl bloqueado para ${sku}, usando playwright...`);
-      try {
-        return await playwrightFetch(url);
-      } catch (pe) {
-        playwrightMarkBlocked();
-        throw new Error('BLOCKED');
-      }
+    if (e.message !== 'BLOCKED' && !e.message.includes('403')) throw e;
+    // Sin proxy: intentar Playwright como fallback
+    if (process.env.PROXY_URL) throw new Error('BLOCKED'); // proxy falló, no reintentar
+    if (playwrightIsBlocked()) throw new Error('BLOCKED');
+    console.log(`curl bloqueado para ${sku}, usando playwright...`);
+    try {
+      return await playwrightFetch(url);
+    } catch (pe) {
+      playwrightMarkBlocked();
+      throw new Error('BLOCKED');
     }
-    throw e;
   }
 }
 

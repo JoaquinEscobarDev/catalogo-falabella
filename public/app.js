@@ -16,6 +16,7 @@ const CATEGORIAS = [
 let categoriaActiva = null;
 let skusGuardados   = [];
 let productosCache  = {};
+let stockCache      = {};
 let todoItems       = JSON.parse(localStorage.getItem('todoList') || '[]');
 
 // ── Elementos ──
@@ -87,7 +88,7 @@ async function abrirCategoria(nombre) {
   actualizarFab();
   renderGrid();
   const skusCat = skusGuardados.filter(s => s.categoria === nombre);
-  await Promise.all(skusCat.map(s => cargarProducto(s.sku)));
+  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
 }
 
 btnBack.addEventListener('click', () => {
@@ -104,11 +105,11 @@ btnBack.addEventListener('click', () => {
 btnRefreshAll.addEventListener('click', async () => {
   if (!categoriaActiva) return;
   const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
-  skusCat.forEach(s => delete productosCache[s.sku]);
+  skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
   btnRefreshAll.innerHTML = '<span class="spinning">↻</span> Actualizando…';
   btnRefreshAll.disabled = true;
   renderGrid();
-  await Promise.all(skusCat.map(s => cargarProducto(s.sku)));
+  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
   btnRefreshAll.innerHTML = '↻ Actualizar precios';
   btnRefreshAll.disabled = false;
 });
@@ -133,7 +134,7 @@ formAgregar.addEventListener('submit', async (e) => {
   inputAlias.value = '';
   skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva });
   renderGrid();
-  await cargarProducto(sku);
+  await Promise.all([cargarProducto(sku), cargarStock(sku)]);
 });
 
 // ══════════════════════════════════════════
@@ -152,7 +153,20 @@ async function cargarProducto(sku) {
     productosCache[sku] = { error: 'Error de red' };
   }
   renderGrid();
-  renderTodo(); // actualizar precios en el todo si el producto estaba ahí
+  renderTodo();
+}
+
+async function cargarStock(sku) {
+  if (stockCache[sku] !== undefined) return;
+  stockCache[sku] = null;
+  try {
+    const r = await fetch(`/api/stock/${sku}`);
+    const data = await r.json();
+    stockCache[sku] = r.ok ? data : { stock: null };
+  } catch {
+    stockCache[sku] = { stock: null };
+  }
+  renderGrid();
 }
 
 function renderGrid() {
@@ -179,6 +193,16 @@ function renderGrid() {
   grid.querySelectorAll('.btn-cambiar').forEach(btn => {
     btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
   });
+}
+
+function badgeStock(sku) {
+  const info = stockCache[sku];
+  if (info === undefined || info === null) return '<span class="stock-badge stock-loading">Stock…</span>';
+  const n = info.stock;
+  if (n === null || n === undefined) return '<span class="stock-badge stock-unknown">Sin info</span>';
+  if (n === 0) return `<span class="stock-badge stock-zero">Stock: 0</span>`;
+  if (n === 1) return `<span class="stock-badge stock-low">Stock: 1</span>`;
+  return `<span class="stock-badge stock-ok">Stock: ${n}</span>`;
 }
 
 function tarjeta({ sku, alias }) {
@@ -250,6 +274,7 @@ function tarjeta({ sku, alias }) {
         <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
         <span class="card-sku">SKU: ${sku}</span>
         <div class="card-precios">${bloquePrecio}</div>
+        ${badgeStock(sku)}
       </div>
       <div class="card-footer">
         ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}
@@ -262,6 +287,7 @@ async function eliminarSku(sku) {
   if (!confirm(`¿Eliminar el SKU ${sku}?`)) return;
   await fetch(`/api/skus/${sku}`, { method: 'DELETE' });
   delete productosCache[sku];
+  delete stockCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
   // Quitar del todo también
   todoItems = todoItems.filter(s => s !== sku);

@@ -186,6 +186,38 @@ app.get('/api/producto/:sku', async (req, res) => {
   }
 });
 
+// Stock en tienda Los Dominicos (ID: 2617)
+const STORE_ID   = '2617';
+const STORE_LAT  = '-33.394';
+const STORE_LON  = '-70.551';
+
+app.get('/api/stock/:sku', async (req, res) => {
+  const sku = req.params.sku;
+  try {
+    const url = `https://www.falabella.com/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`;
+    const { execFile } = require('child_process');
+    const html = await new Promise((resolve, reject) => {
+      execFile('curl', [
+        '-s', url,
+        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        '-H', 'Accept: application/json',
+        '-H', 'Referer: https://www.falabella.com/',
+        '--max-time', '10',
+      ], { maxBuffer: 2 * 1024 * 1024 }, (err, stdout) => {
+        if (err) return reject(err);
+        resolve(stdout);
+      });
+    });
+    const data   = JSON.parse(html);
+    const stores = data?.stores || [];
+    const tienda = stores.find(s => s.id === STORE_ID);
+    if (!tienda) return res.json({ stock: null, storeName: 'Los Dominicos' });
+    res.json({ stock: tienda.stockQuantity?.number ?? null, storeName: tienda.storeName });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ══════════════════════════════════════════
 // PARSING HTML
 // ══════════════════════════════════════════

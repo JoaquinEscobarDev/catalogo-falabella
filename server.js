@@ -172,6 +172,21 @@ app.delete('/api/skus/:sku', async (req, res) => {
 // SCRAPING FALABELLA
 // ══════════════════════════════════════════
 
+// Limita Playwright a un browser a la vez para no explotar RAM en Railway
+let playwrightBusy = false;
+const playwrightQueue = [];
+function playwrightSlot() {
+  return new Promise(resolve => {
+    if (!playwrightBusy) { playwrightBusy = true; resolve(); }
+    else playwrightQueue.push(resolve);
+  });
+}
+function playwrightRelease() {
+  const next = playwrightQueue.shift();
+  if (next) next();
+  else playwrightBusy = false;
+}
+
 function curlFetch(url) {
   return new Promise((resolve, reject) => {
     execFile('curl', [
@@ -190,6 +205,7 @@ function curlFetch(url) {
 }
 
 async function playwrightFetch(url) {
+  await playwrightSlot();
   const proxyServer = process.env.PROXY_URL;
   const launchOpts = {
     headless: true,
@@ -219,6 +235,7 @@ async function playwrightFetch(url) {
     return await page.content();
   } finally {
     await browser.close();
+    playwrightRelease();
   }
 }
 

@@ -26,6 +26,19 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS producto_cache (
+        sku         TEXT PRIMARY KEY,
+        nombre      TEXT,
+        marca       TEXT,
+        precio      INTEGER,
+        precio_oferta INTEGER,
+        precio_cmr  INTEGER,
+        imagen      TEXT,
+        url         TEXT,
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     console.log('Conectado a PostgreSQL');
   } else {
     console.log('Sin DATABASE_URL — usando archivo JSON local');
@@ -40,6 +53,52 @@ function leerJSON() {
 }
 function guardarJSON(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// ── Caché de productos (local JSON) ──
+const CACHE_FILE = process.env.CACHE_PATH || path.join(__dirname, 'productos-cache.json');
+function leerCache() {
+  if (!fs.existsSync(CACHE_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch { return {}; }
+}
+function guardarCache(data) {
+  fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// ── Caché de productos — DB ──
+async function dbGetProductoCache(sku) {
+  if (db) {
+    const r = await db.query('SELECT * FROM producto_cache WHERE sku = $1', [sku]);
+    if (!r.rowCount) return null;
+    const row = r.rows[0];
+    return {
+      nombre: row.nombre, sku: row.sku, marca: row.marca,
+      precio: row.precio, precioOferta: row.precio_oferta, precioCMR: row.precio_cmr,
+      imagen: row.imagen, url: row.url,
+      cached: true, updatedAt: row.updated_at,
+    };
+  }
+  const c = leerCache();
+  return c[sku] || null;
+}
+
+async function dbSetProductoCache(sku, product) {
+  if (db) {
+    await db.query(`
+      INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+      ON CONFLICT (sku) DO UPDATE SET
+        nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
+        precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
+        precio_cmr=EXCLUDED.precio_cmr, imagen=EXCLUDED.imagen,
+        url=EXCLUDED.url, updated_at=NOW()
+    `, [sku, product.nombre, product.marca, product.precio,
+        product.precioOferta, product.precioCMR, product.imagen, product.url]);
+  } else {
+    const c = leerCache();
+    c[sku] = { ...product, cached: false, updatedAt: new Date().toISOString() };
+    guardarCache(c);
+  }
 }
 
 // ── Operaciones unificadas ──
@@ -177,11 +236,31 @@ async function fetchFalabella(sku) {
 app.get('/api/producto/:sku', async (req, res) => {
   const sku = req.params.sku;
   try {
-    const html    = await fetchFalabella(sku);
-    const product = extraerDeHTML(html, sku);
-    if (!product) return res.status(404).json({ error: 'Producto no encontrado para ese SKU' });
-    res.json(product);
+    let product = null;
+    try {
+      const html = await fetchFalabella(sku);
+      product = extraerDeHTML(html, sku);
+    } catch (e) {
+      console.log(`Scraping falló para ${sku}: ${e.message}`);
+    }
+
+    if (product) {
+      // Guardar/actualizar caché en background (no bloquea la respuesta)
+      dbSetProductoCache(sku, product).catch(() => {});
+      return res.json(product);
+    }
+
+    // Fallback: datos del caché
+    const cached = await dbGetProductoCache(sku);
+    if (cached) return res.json(cached);
+
+    res.status(404).json({ error: 'Producto no encontrado para ese SKU' });
   } catch (e) {
+    // Último recurso: intentar caché ante cualquier error inesperado
+    try {
+      const cached = await dbGetProductoCache(sku);
+      if (cached) return res.json(cached);
+    } catch {}
     res.status(500).json({ error: e.message });
   }
 });

@@ -271,6 +271,19 @@ main {
 .stock-unknown { background: #f3f4f6; color: #9ca3af; font-weight:400; }
 .stock-loading { background: #f3f4f6; color: #9ca3af; font-weight:400; animation: pulse 1.2s infinite; }
 
+.card.cached { border: 1.5px solid #fcd34d; }
+.cache-badge {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: .68rem;
+  font-weight: 600;
+  background: #fef9c3;
+  color: #92400e;
+  width: fit-content;
+}
+
 .card-footer { padding:9px 13px 12px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .card-link { font-size:.76rem; color:var(--verde-dark); text-decoration:none; font-weight:600; }
 .card-link:hover { text-decoration:underline; }

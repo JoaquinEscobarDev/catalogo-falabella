@@ -275,8 +275,16 @@ function tarjeta({ sku, alias }) {
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
   const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
 
+  let cacheBadge = '';
+  if (prod.cached && prod.updatedAt) {
+    const d = new Date(prod.updatedAt);
+    const fecha = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+    const hora  = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    cacheBadge = `<span class="cache-badge" title="Precio guardado el ${fecha} a las ${hora}">⚠ ${fecha} ${hora}</span>`;
+  }
+
   return `
-    <div class="card">
+    <div class="card${prod.cached ? ' cached' : ''}">
       <div class="card-top-actions">
         <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
       </div>
@@ -288,6 +296,7 @@ function tarjeta({ sku, alias }) {
           <span class="card-sku">SKU: ${sku}</span>
           <div class="card-precios">${bloquePrecio}</div>
           ${badgeStock(sku)}
+          ${cacheBadge}
         </div>
         <div class="card-footer">
           ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}

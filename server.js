@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'skus.json');
+const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'skus.json');
 
 // ── Base de datos JSON simple ──
 function leerDB() {

@@ -9,6 +9,7 @@ const CATEGORIAS = [
   { nombre: 'Consolas',           icono: '🎮' },
   { nombre: 'Línea Blanca',       icono: '🫧' },
   { nombre: 'Electrodomésticos',  icono: '⚡' },
+  { nombre: 'Relojes',            icono: '⌚' },
 ];
 
 // ── Estado ──

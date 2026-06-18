@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
+const { chromium } = require('playwright');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,7 +45,7 @@ app.delete('/api/skus/:sku', (req, res) => {
   res.json({ ok: true });
 });
 
-// Usa curl para evitar el bloqueo de TLS fingerprinting de Cloudflare
+// ── Estrategia de fetch: curl primero (rápido), playwright como fallback ──
 function curlFetch(url) {
   return new Promise((resolve, reject) => {
     execFile('curl', [
@@ -54,46 +55,48 @@ function curlFetch(url) {
       '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
       '--max-time', '15',
       url,
-    ], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    ], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
       if (err) return reject(new Error(err.message));
-      if (!stdout || stdout.length < 100) return reject(new Error('Respuesta vacía de Falabella'));
+      if (!stdout || !stdout.includes('__NEXT_DATA__')) return reject(new Error('BLOCKED'));
       resolve(stdout);
     });
   });
 }
 
-// Debug: ver qué HTML recibe el servidor
-app.get('/api/debug/:sku', async (req, res) => {
-  const sku = req.params.sku;
+async function playwrightFetch(url) {
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
   try {
-    const html = await curlFetch(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
-    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    let parseError = null, pdKeys = null;
-    if (m) {
-      try {
-        const data = JSON.parse(m[1]);
-        const pd = data?.props?.pageProps?.productData;
-        pdKeys = pd ? Object.keys(pd).slice(0, 10) : 'no productData';
-      } catch(e) { parseError = e.message; }
-    }
-    res.json({
-      length: html.length,
-      hasNextData: html.includes('__NEXT_DATA__'),
-      regexMatch: !!m,
-      matchLength: m ? m[1].length : 0,
-      parseError,
-      pdKeys,
-    });
-  } catch (e) {
-    res.json({ error: e.message });
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-CL,es;q=0.9' });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    const html = await page.content();
+    return html;
+  } finally {
+    await browser.close();
   }
-});
+}
 
-// Scraping de la página de búsqueda de Falabella
+async function fetchFalabella(sku) {
+  const url = `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
+  try {
+    return await curlFetch(url);
+  } catch (e) {
+    if (e.message === 'BLOCKED' || e.message.includes('403')) {
+      console.log(`curl bloqueado para ${sku}, usando playwright...`);
+      return await playwrightFetch(url);
+    }
+    throw e;
+  }
+}
+
+// Obtener producto
 app.get('/api/producto/:sku', async (req, res) => {
   const sku = req.params.sku;
   try {
-    const html = await curlFetch(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
+    const html = await fetchFalabella(sku);
     const product = extraerDeHTML(html, sku);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado para ese SKU' });
     res.json(product);
@@ -104,20 +107,17 @@ app.get('/api/producto/:sku', async (req, res) => {
 
 function extraerDeHTML(html, skuBuscado) {
   try {
-    // Extraer __NEXT_DATA__
     const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
     if (!m) return null;
 
     const data = JSON.parse(m[1]);
     const pageProps = data?.props?.pageProps;
 
-    // Caso 1: página de producto directo (cuando redirige al producto)
     const pd = pageProps?.productData;
     if (pd && (pd.id === skuBuscado || pd.variants?.some(v => v.id === skuBuscado))) {
       return extraerDeProductData(pd, skuBuscado);
     }
 
-    // Caso 2: página de resultados de búsqueda
     const searchResults = pageProps?.initialData?.state?.results
       || pageProps?.searchResult?.state?.results
       || pageProps?.results;
@@ -128,7 +128,6 @@ function extraerDeHTML(html, skuBuscado) {
           return extraerDeSearchResult(item, skuBuscado);
         }
       }
-      // Si no matchea exacto, tomar el primero
       if (searchResults[0]) return extraerDeSearchResult(searchResults[0], skuBuscado);
     }
 
@@ -140,22 +139,15 @@ function extraerDeHTML(html, skuBuscado) {
 }
 
 function extraerDeProductData(pd, skuBuscado) {
-  // Encontrar la variante exacta o usar la primera
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};
-
   const precios = variante.prices || [];
   const normal = precios.find(p => p.type === 'normalPrice');
   const oferta = precios.find(p => p.type === 'internetPrice' || p.type === 'offerPrice');
   const cmr = precios.find(p => p.type === 'cmrPrice');
-
   const precioNormal = parsePrecio(normal?.price?.[0]);
   const precioOferta = parsePrecio(oferta?.price?.[0]) || parsePrecio(cmr?.price?.[0]);
-
-  // Imagen: primera media de tipo image
   const imagenes = (variante.medias || []).filter(m => m.mediaType === 'image');
-  const imagen = imagenes[0]?.url
-    ? `${imagenes[0].url}?width=500&height=500&fit=inside`
-    : null;
+  const imagen = imagenes[0]?.url ? `${imagenes[0].url}?width=500&height=500&fit=inside` : null;
 
   return {
     nombre: pd.name,
@@ -164,9 +156,7 @@ function extraerDeProductData(pd, skuBuscado) {
     precio: precioNormal,
     precioOferta: precioOferta !== precioNormal ? precioOferta : null,
     imagen,
-    url: pd.slug
-      ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}`
-      : null,
+    url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
   };
 }
 
@@ -174,7 +164,6 @@ function extraerDeSearchResult(item, skuBuscado) {
   const precios = item.prices || [];
   const normal = precios.find(p => p.type === 'normalPrice');
   const oferta = precios.find(p => p.type === 'internetPrice' || p.type === 'offerPrice' || p.type === 'cmrPrice');
-
   return {
     nombre: item.displayName || item.name,
     sku: item.id || skuBuscado,

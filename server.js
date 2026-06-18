@@ -131,12 +131,30 @@ function curlFetch(url) {
 async function playwrightFetch(url) {
   const browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    args: [
+      '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-infobars',
+      '--window-size=1920,1080',
+    ],
   });
   try {
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-CL,es;q=0.9' });
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'es-CL',
+      extraHTTPHeaders: { 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8' },
+    });
+    // Remover señales de webdriver que Cloudflare detecta
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      window.chrome = { runtime: {} };
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+    });
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Esperar a que cargue __NEXT_DATA__
+    await page.waitForFunction(() => document.getElementById('__NEXT_DATA__') !== null, { timeout: 10000 }).catch(() => {});
     return await page.content();
   } finally {
     await browser.close();

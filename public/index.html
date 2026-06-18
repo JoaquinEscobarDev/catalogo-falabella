@@ -10,34 +10,47 @@
 
   <header>
     <div class="header-inner">
-      <h1>🛒 Catálogo Falabella</h1>
-      <div class="header-actions">
+      <div class="header-left">
+        <button id="btnBack" class="btn-back" style="display:none">← Categorías</button>
+        <h1 id="headerTitle">🛒 Catálogo Falabella</h1>
+      </div>
+      <div class="header-actions" id="headerActions" style="display:none">
         <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
       </div>
     </div>
   </header>
 
   <main>
-    <!-- Panel agregar SKU -->
-    <section class="add-panel">
-      <h2>Agregar producto</h2>
-      <form id="formAgregar">
-        <input type="text" id="inputSku" placeholder="SKU (ej: 88888888)" required />
-        <input type="text" id="inputAlias" placeholder="Alias opcional (ej: TV Samsung 55)" />
-        <button type="submit" class="btn-primary">Agregar</button>
-      </form>
-      <p id="msgAgregar" class="msg"></p>
+
+    <!-- ── Vista: Selección de categoría ── -->
+    <section id="viewCategorias">
+      <p class="subtitle">Seleccioná una zona para revisar sus precios</p>
+      <div class="categorias-grid" id="categoriasGrid"></div>
     </section>
 
-    <!-- Búsqueda rápida -->
-    <section class="search-panel">
-      <input type="text" id="filtro" placeholder="🔍 Filtrar por nombre, SKU o alias…" />
+    <!-- ── Vista: Productos de una categoría ── -->
+    <section id="viewProductos" style="display:none">
+
+      <div class="add-panel">
+        <h2>Agregar producto</h2>
+        <form id="formAgregar">
+          <input type="text" id="inputSku" placeholder="SKU (ej: 17461845)" required />
+          <input type="text" id="inputAlias" placeholder="Alias opcional (ej: Notebook Samsung)" />
+          <button type="submit" class="btn-primary">Agregar</button>
+        </form>
+        <p id="msgAgregar" class="msg"></p>
+      </div>
+
+      <div class="search-panel">
+        <input type="text" id="filtro" placeholder="🔍 Filtrar por nombre, SKU o alias…" />
+      </div>
+
+      <div id="grid" class="grid">
+        <div class="empty-state">Cargando productos…</div>
+      </div>
+
     </section>
 
-    <!-- Grid de productos -->
-    <section id="grid" class="grid">
-      <div class="empty-state">Cargando productos…</div>
-    </section>
   </main>
 
   <script src="app.js"></script>

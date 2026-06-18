@@ -26,6 +26,9 @@ header {
   color: #fff;
   padding: 0 24px;
   box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .header-inner {
   max-width: 1400px;
@@ -34,6 +37,11 @@ header {
   align-items: center;
   justify-content: space-between;
   height: 62px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.3px; }
 
@@ -48,6 +56,7 @@ header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.3px; }
   font-weight: 600;
   cursor: pointer;
   transition: background .18s;
+  white-space: nowrap;
 }
 .btn-primary:hover { background: var(--verde-dark); }
 
@@ -61,8 +70,23 @@ header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.3px; }
   font-weight: 600;
   cursor: pointer;
   transition: background .18s;
+  white-space: nowrap;
 }
 .btn-secondary:hover { background: rgba(255,255,255,.35); }
+
+.btn-back {
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,.4);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s;
+  white-space: nowrap;
+}
+.btn-back:hover { background: rgba(255,255,255,.3); }
 
 .btn-delete {
   background: none;
@@ -81,7 +105,75 @@ header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.3px; }
 main {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: 28px 24px 48px;
+}
+
+/* ── Vista categorías ── */
+.subtitle {
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: 1rem;
+  margin-bottom: 28px;
+}
+
+.categorias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.categoria-card {
+  background: var(--blanco);
+  border-radius: var(--radius);
+  box-shadow: var(--sombra);
+  padding: 28px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+  border: 2px solid transparent;
+  text-align: center;
+  position: relative;
+}
+.categoria-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  border-color: var(--verde);
+}
+
+.categoria-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+}
+
+.categoria-nombre {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+
+.categoria-count {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--verde);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  min-width: 24px;
+  text-align: center;
+}
+.categoria-count.empty {
+  background: var(--gris-borde);
+  color: var(--texto-suave);
+}
+
+/* ── Vista productos ── */
+#viewProductos {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -129,7 +221,7 @@ main {
 }
 .search-panel input:focus { border-color: var(--verde); }
 
-/* ── Grid ── */
+/* ── Grid productos ── */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -144,7 +236,7 @@ main {
   font-size: 1.05rem;
 }
 
-/* ── Tarjeta ── */
+/* ── Tarjeta producto ── */
 .card {
   background: var(--blanco);
   border-radius: var(--radius);
@@ -156,19 +248,16 @@ main {
   position: relative;
 }
 .card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+.card.loading .card-img-placeholder { animation: pulse 1.2s infinite; }
+.card.error { border: 1.5px solid #fca5a5; }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
 
 .card-delete {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 2;
-}
-
-/* Estado cargando / error */
-.card.loading .card-img { background: #eee; animation: pulse 1.2s infinite; }
-.card.error { border: 1.5px solid #fca5a5; }
-@keyframes pulse {
-  0%,100% { opacity: 1; } 50% { opacity: .5; }
 }
 
 .card-img {
@@ -230,22 +319,10 @@ main {
   gap: 2px;
 }
 
-.precio-normal {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--texto);
-}
-
-.precio-oferta {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--rojo);
-}
-
-.precio-label {
-  font-size: .75rem;
-  color: var(--texto-suave);
-}
+.precio-normal { font-size: 1.2rem; font-weight: 700; color: var(--texto); }
+.precio-tachado { font-size: .95rem; font-weight: 600; color: #999; text-decoration: line-through; }
+.precio-oferta  { font-size: 1.2rem; font-weight: 700; color: var(--rojo); }
+.precio-label   { font-size: .75rem; color: var(--texto-suave); }
 
 .card-link {
   margin-top: 10px;
@@ -255,13 +332,7 @@ main {
   font-weight: 600;
 }
 .card-link:hover { text-decoration: underline; }
+.card-error-msg { font-size: .85rem; color: var(--rojo); padding: 20px 16px; }
 
-.card-error-msg {
-  font-size: .85rem;
-  color: var(--rojo);
-  padding: 20px 16px;
-}
-
-/* Spinner en botón refresh */
 .spinning { animation: spin .8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }

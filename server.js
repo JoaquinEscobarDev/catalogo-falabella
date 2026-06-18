@@ -27,13 +27,13 @@ app.get('/api/skus', (req, res) => {
 
 // Agregar un SKU
 app.post('/api/skus', (req, res) => {
-  const { sku, alias } = req.body;
+  const { sku, alias, categoria } = req.body;
   if (!sku) return res.status(400).json({ error: 'SKU requerido' });
   const lista = leerDB();
   if (lista.find(s => s.sku === sku.trim())) {
     return res.status(409).json({ error: 'El SKU ya existe' });
   }
-  lista.unshift({ sku: sku.trim(), alias: alias || null, created_at: new Date().toISOString() });
+  lista.unshift({ sku: sku.trim(), alias: alias || null, categoria: categoria || 'Sin categoría', created_at: new Date().toISOString() });
   guardarDB(lista);
   res.json({ ok: true });
 });

@@ -16,21 +16,34 @@ const CATEGORIAS = [
 let categoriaActiva = null;
 let skusGuardados   = [];
 let productosCache  = {};
+let todoList        = JSON.parse(localStorage.getItem('todoList') || '[]');
 
 // ── Elementos ──
-const viewCategorias  = document.getElementById('viewCategorias');
-const viewProductos   = document.getElementById('viewProductos');
-const categoriasGrid  = document.getElementById('categoriasGrid');
-const grid            = document.getElementById('grid');
-const filtroInput     = document.getElementById('filtro');
-const formAgregar     = document.getElementById('formAgregar');
-const inputSku        = document.getElementById('inputSku');
-const inputAlias      = document.getElementById('inputAlias');
-const msgAgregar      = document.getElementById('msgAgregar');
-const btnBack         = document.getElementById('btnBack');
-const btnRefreshAll   = document.getElementById('btnRefreshAll');
-const headerTitle     = document.getElementById('headerTitle');
-const headerActions   = document.getElementById('headerActions');
+const viewCategorias   = document.getElementById('viewCategorias');
+const viewProductos    = document.getElementById('viewProductos');
+const categoriasGrid   = document.getElementById('categoriasGrid');
+const grid             = document.getElementById('grid');
+const filtroInput      = document.getElementById('filtro');
+const formAgregar      = document.getElementById('formAgregar');
+const inputSku         = document.getElementById('inputSku');
+const inputAlias       = document.getElementById('inputAlias');
+const msgAgregar       = document.getElementById('msgAgregar');
+const btnBack          = document.getElementById('btnBack');
+const btnRefreshAll    = document.getElementById('btnRefreshAll');
+const headerTitle      = document.getElementById('headerTitle');
+const headerActions    = document.getElementById('headerActions');
+// ToDo
+const todoBadge        = document.getElementById('todoBadge');
+const todoEmptyState   = document.getElementById('todoEmptyState');
+const todoList         = document.getElementById('todoList');
+const todoClear        = document.getElementById('todoClear');
+const todoFab          = document.getElementById('todoFab');
+const todoFabCount     = document.getElementById('todoFabCount');
+const todoOverlay      = document.getElementById('todoOverlay');
+const todoListModal    = document.getElementById('todoListModal');
+const todoModalClose   = document.getElementById('todoModalClose');
+const todoClearModal   = document.getElementById('todoClearModal');
+const todoModalEmpty   = document.getElementById('todoModalEmpty');
 
 // ── Arranque ──
 init();
@@ -39,9 +52,13 @@ async function init() {
   const r = await fetch('/api/skus');
   skusGuardados = await r.json();
   renderCategorias();
+  renderTodo();
 }
 
-// ── Render de la pantalla de categorías ──
+// ══════════════════════════════════════════
+// CATEGORÍAS
+// ══════════════════════════════════════════
+
 function renderCategorias() {
   categoriasGrid.innerHTML = CATEGORIAS.map(c => {
     const count = skusGuardados.filter(s => s.categoria === c.nombre).length;
@@ -58,27 +75,21 @@ function renderCategorias() {
   });
 }
 
-// ── Abrir una categoría ──
 async function abrirCategoria(nombre) {
   categoriaActiva = nombre;
-
-  // Cambiar vistas
-  viewCategorias.style.display = 'none';
-  viewProductos.style.display  = 'flex';
-  btnBack.style.display        = 'inline-block';
-  headerActions.style.display  = 'flex';
-
+  viewCategorias.style.display  = 'none';
+  viewProductos.style.display   = 'flex';
+  btnBack.style.display         = 'inline-block';
+  headerActions.style.display   = 'flex';
   const cat = CATEGORIAS.find(c => c.nombre === nombre);
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
-
+  actualizarFab();
   renderGrid();
-  // Cargar productos de esta categoría que no estén en caché
   const skusCat = skusGuardados.filter(s => s.categoria === nombre);
   await Promise.all(skusCat.map(s => cargarProducto(s.sku)));
 }
 
-// ── Volver a categorías ──
 btnBack.addEventListener('click', () => {
   categoriaActiva = null;
   viewProductos.style.display  = 'none';
@@ -86,10 +97,10 @@ btnBack.addEventListener('click', () => {
   btnBack.style.display        = 'none';
   headerActions.style.display  = 'none';
   headerTitle.textContent      = '🛒 Catálogo Falabella';
+  todoFab.style.display        = 'none';
   renderCategorias();
 });
 
-// ── Refresh ──
 btnRefreshAll.addEventListener('click', async () => {
   if (!categoriaActiva) return;
   const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
@@ -102,16 +113,13 @@ btnRefreshAll.addEventListener('click', async () => {
   btnRefreshAll.disabled = false;
 });
 
-// ── Filtro ──
 filtroInput.addEventListener('input', renderGrid);
 
-// ── Formulario agregar ──
 formAgregar.addEventListener('submit', async (e) => {
   e.preventDefault();
   const sku   = inputSku.value.trim();
   const alias = inputAlias.value.trim();
   if (!sku || !categoriaActiva) return;
-
   mostrarMsg('Agregando…', '');
   const r = await fetch('/api/skus', {
     method: 'POST',
@@ -119,19 +127,19 @@ formAgregar.addEventListener('submit', async (e) => {
     body: JSON.stringify({ sku, alias, categoria: categoriaActiva }),
   });
   const data = await r.json();
-
   if (!r.ok) { mostrarMsg(data.error || 'Error al agregar', 'err'); return; }
-
   mostrarMsg('SKU agregado ✓', 'ok');
   inputSku.value = '';
   inputAlias.value = '';
-
   skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva });
   renderGrid();
   await cargarProducto(sku);
 });
 
-// ── Cargar producto desde API ──
+// ══════════════════════════════════════════
+// PRODUCTOS
+// ══════════════════════════════════════════
+
 async function cargarProducto(sku) {
   if (productosCache[sku] !== undefined) return;
   productosCache[sku] = null;
@@ -144,15 +152,13 @@ async function cargarProducto(sku) {
     productosCache[sku] = { error: 'Error de red' };
   }
   renderGrid();
+  renderTodo(); // actualizar precios en el todo si el producto estaba ahí
 }
 
-// ── Render del grid ──
 function renderGrid() {
   if (!categoriaActiva) return;
-
-  const filtro   = filtroInput.value.toLowerCase();
-  const skusCat  = skusGuardados.filter(s => s.categoria === categoriaActiva);
-
+  const filtro  = filtroInput.value.toLowerCase();
+  const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
   const lista = skusCat.filter(s => {
     if (!filtro) return true;
     const prod = productosCache[s.sku];
@@ -166,16 +172,18 @@ function renderGrid() {
     grid.innerHTML = '<div class="empty-state">No hay productos en esta categoría.<br>Agregá un SKU arriba.</div>';
     return;
   }
-
   grid.innerHTML = lista.map(s => tarjeta(s)).join('');
   grid.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', () => eliminarSku(btn.dataset.sku));
   });
+  grid.querySelectorAll('.btn-cambiar').forEach(btn => {
+    btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
+  });
 }
 
-// ── Tarjeta producto ──
 function tarjeta({ sku, alias }) {
-  const prod = productosCache[sku];
+  const prod    = productosCache[sku];
+  const enLista = todoList.includes(sku);
 
   if (prod === undefined || prod === null) {
     return `
@@ -184,9 +192,11 @@ function tarjeta({ sku, alias }) {
         <div class="card-body">
           ${alias ? `<span class="card-alias">${alias}</span>` : ''}
           <span class="card-sku">SKU: ${sku}</span>
-          <p style="color:#6b7280;font-size:.85rem;margin-top:8px">Cargando…</p>
+          <p style="color:#6b7280;font-size:.83rem;margin-top:6px">Cargando…</p>
         </div>
-        <button class="btn-delete card-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        <div class="card-top-actions">
+          <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        </div>
       </div>`;
   }
 
@@ -198,9 +208,10 @@ function tarjeta({ sku, alias }) {
           ${alias ? `<span class="card-alias">${alias}</span>` : ''}
           <span class="card-sku">SKU: ${sku}</span>
           <p class="card-error-msg">${prod.error}</p>
-          <button onclick="reintentarSku('${sku}')" class="btn-primary" style="margin-top:8px;font-size:.82rem;padding:6px 12px">Reintentar</button>
         </div>
-        <button class="btn-delete card-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        <div class="card-top-actions">
+          <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        </div>
       </div>`;
   }
 
@@ -213,9 +224,9 @@ function tarjeta({ sku, alias }) {
   let bloquePrecio = '';
   if (prod.precioOferta) {
     bloquePrecio = `
-      <div class="precio-label">Precio normal</div>
+      <div class="precio-label">Normal</div>
       <div class="precio-tachado">${fmt(prod.precio) || '—'}</div>
-      <div class="precio-label">Precio oferta</div>
+      <div class="precio-label">Oferta</div>
       <div class="precio-oferta">${fmt(prod.precioOferta)}</div>`;
   } else if (prod.precio) {
     bloquePrecio = `
@@ -225,32 +236,39 @@ function tarjeta({ sku, alias }) {
     bloquePrecio = `<div class="precio-normal" style="color:#999">Sin precio</div>`;
   }
 
-  const linkFalabella = prod.url
-    ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver en Falabella →</a>`
-    : '';
+  const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
+  const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
 
   return `
     <div class="card">
+      <div class="card-top-actions">
+        <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
+      </div>
       ${img}
       <div class="card-body">
         ${alias ? `<span class="card-alias">${alias}</span>` : ''}
         <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
         <span class="card-sku">SKU: ${sku}</span>
         <div class="card-precios">${bloquePrecio}</div>
-        ${linkFalabella}
       </div>
-      <button class="btn-delete card-delete" data-sku="${sku}" title="Eliminar">✕</button>
+      <div class="card-footer">
+        ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}
+        <button class="${btnClass}" data-sku="${sku}">${btnLabel}</button>
+      </div>
     </div>`;
 }
 
-// ── Eliminar SKU ──
 async function eliminarSku(sku) {
   if (!confirm(`¿Eliminar el SKU ${sku}?`)) return;
   await fetch(`/api/skus/${sku}`, { method: 'DELETE' });
   delete productosCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
+  // Quitar del todo también
+  todoList = todoList.filter(s => s !== sku);
+  guardarTodo();
   renderGrid();
-  renderCategorias(); // actualizar contadores
+  renderTodo();
+  renderCategorias();
 }
 
 function reintentarSku(sku) {
@@ -263,3 +281,110 @@ function mostrarMsg(msg, tipo) {
   msgAgregar.className = 'msg ' + tipo;
   if (tipo === 'ok') setTimeout(() => { msgAgregar.textContent = ''; }, 3000);
 }
+
+// ══════════════════════════════════════════
+// TODO
+// ══════════════════════════════════════════
+
+function guardarTodo() {
+  localStorage.setItem('todoList', JSON.stringify(todoList));
+}
+
+function toggleTodo(sku) {
+  if (todoList.includes(sku)) {
+    todoList = todoList.filter(s => s !== sku);
+  } else {
+    todoList.push(sku);
+  }
+  guardarTodo();
+  renderTodo();
+  renderGrid();
+}
+
+function limpiarTodo() {
+  todoList = [];
+  guardarTodo();
+  renderTodo();
+  renderGrid();
+}
+
+function renderTodo() {
+  const count = todoList.length;
+
+  // Badge y estado vacío
+  todoBadge.textContent = count;
+  todoBadge.classList.toggle('zero', count === 0);
+  todoEmptyState.style.display  = count === 0 ? 'block' : 'none';
+  todoModalEmpty.style.display  = count === 0 ? 'block' : 'none';
+  todoClearModal.style.display  = count === 0 ? 'none'  : 'block';
+
+  // FAB
+  actualizarFab();
+
+  // Construir items
+  const itemsHTML = todoList.map(sku => {
+    const prod  = productosCache[sku];
+    const datos = skusGuardados.find(s => s.sku === sku);
+    const alias = datos?.alias || '';
+
+    const thumb = prod?.imagen
+      ? `<img class="todo-thumb" src="${prod.imagen}" alt="" />`
+      : `<div class="todo-thumb-placeholder">📦</div>`;
+
+    const nombre = prod?.nombre || alias || sku;
+    const fmt    = n => n ? `$${Number(n).toLocaleString('es-CL')}` : null;
+    const precio = prod?.precioOferta
+      ? fmt(prod.precioOferta)
+      : (prod?.precio ? fmt(prod.precio) : '—');
+
+    return `
+      <li class="todo-item">
+        ${thumb}
+        <div class="todo-info">
+          <span class="todo-nombre" title="${nombre}">${nombre}</span>
+          <span class="todo-sku">SKU: ${sku}</span>
+          <span class="todo-precio">${precio}</span>
+        </div>
+        <button class="todo-remove" data-sku="${sku}" title="Quitar">✕</button>
+      </li>`;
+  }).join('');
+
+  todoList.innerHTML    = itemsHTML;
+  todoListModal.innerHTML = itemsHTML;
+
+  // Eventos de quitar
+  document.querySelectorAll('.todo-remove').forEach(btn => {
+    btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
+  });
+}
+
+function actualizarFab() {
+  const count = todoList.length;
+  todoFabCount.textContent = count;
+  if (categoriaActiva) {
+    todoFab.style.display = 'flex';
+  }
+}
+
+// Abrir/cerrar modal móvil
+todoFab.addEventListener('click', () => {
+  todoOverlay.classList.add('open');
+});
+todoModalClose.addEventListener('click', () => {
+  todoOverlay.classList.remove('open');
+});
+todoOverlay.addEventListener('click', (e) => {
+  if (e.target === todoOverlay) todoOverlay.classList.remove('open');
+});
+
+// Limpiar
+todoClear.addEventListener('click', () => {
+  if (todoList.length === 0) return;
+  if (confirm('¿Limpiar toda la lista?')) limpiarTodo();
+});
+todoClearModal.addEventListener('click', () => {
+  if (confirm('¿Limpiar toda la lista?')) {
+    limpiarTodo();
+    todoOverlay.classList.remove('open');
+  }
+});

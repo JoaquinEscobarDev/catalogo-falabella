@@ -35,7 +35,7 @@
         <h2>Agregar producto</h2>
         <form id="formAgregar">
           <input type="text" id="inputSku" placeholder="SKU (ej: 17461845)" required />
-          <input type="text" id="inputAlias" placeholder="Alias opcional (ej: Notebook Samsung)" />
+          <input type="text" id="inputAlias" placeholder="Alias opcional" />
           <button type="submit" class="btn-primary">Agregar</button>
         </form>
         <p id="msgAgregar" class="msg"></p>
@@ -45,13 +45,52 @@
         <input type="text" id="filtro" placeholder="🔍 Filtrar por nombre, SKU o alias…" />
       </div>
 
-      <div id="grid" class="grid">
-        <div class="empty-state">Cargando productos…</div>
-      </div>
+      <!-- Grid + ToDo sidebar -->
+      <div class="content-row">
 
+        <div id="grid" class="grid">
+          <div class="empty-state">Cargando productos…</div>
+        </div>
+
+        <!-- ToDo sidebar (desktop) -->
+        <aside class="todo-sidebar" id="todoSidebar">
+          <div class="todo-header">
+            <div class="todo-title">
+              <span>📋 Cambios de precio</span>
+              <span class="todo-badge" id="todoBadge">0</span>
+            </div>
+            <button class="todo-clear" id="todoClear" title="Limpiar lista">Limpiar</button>
+          </div>
+          <div class="todo-empty-state" id="todoEmptyState">
+            Presioná <strong>Cambiar</strong> en un producto para agregarlo acá.
+          </div>
+          <ul class="todo-list" id="todoList"></ul>
+        </aside>
+
+      </div>
     </section>
 
   </main>
+
+  <!-- FAB móvil -->
+  <button class="todo-fab" id="todoFab" style="display:none">
+    📋 Lista <span class="todo-fab-count" id="todoFabCount">0</span>
+  </button>
+
+  <!-- Modal móvil -->
+  <div class="todo-overlay" id="todoOverlay">
+    <div class="todo-modal">
+      <div class="todo-modal-header">
+        <span>📋 Cambios de precio</span>
+        <button class="todo-modal-close" id="todoModalClose">✕</button>
+      </div>
+      <div class="todo-modal-empty" id="todoModalEmpty">
+        Presioná <strong>Cambiar</strong> en un producto para agregarlo acá.
+      </div>
+      <ul class="todo-list" id="todoListModal"></ul>
+      <button class="todo-clear-modal" id="todoClearModal">Limpiar lista</button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

@@ -16,7 +16,7 @@ const CATEGORIAS = [
 let categoriaActiva = null;
 let skusGuardados   = [];
 let productosCache  = {};
-let todoList        = JSON.parse(localStorage.getItem('todoList') || '[]');
+let todoItems       = JSON.parse(localStorage.getItem('todoList') || '[]');
 
 // ── Elementos ──
 const viewCategorias   = document.getElementById('viewCategorias');
@@ -183,7 +183,7 @@ function renderGrid() {
 
 function tarjeta({ sku, alias }) {
   const prod    = productosCache[sku];
-  const enLista = todoList.includes(sku);
+  const enLista = todoItems.includes(sku);
 
   if (prod === undefined || prod === null) {
     return `
@@ -264,7 +264,7 @@ async function eliminarSku(sku) {
   delete productosCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
   // Quitar del todo también
-  todoList = todoList.filter(s => s !== sku);
+  todoItems = todoItems.filter(s => s !== sku);
   guardarTodo();
   renderGrid();
   renderTodo();
@@ -287,14 +287,14 @@ function mostrarMsg(msg, tipo) {
 // ══════════════════════════════════════════
 
 function guardarTodo() {
-  localStorage.setItem('todoList', JSON.stringify(todoList));
+  localStorage.setItem('todoList', JSON.stringify(todoItems));
 }
 
 function toggleTodo(sku) {
-  if (todoList.includes(sku)) {
-    todoList = todoList.filter(s => s !== sku);
+  if (todoItems.includes(sku)) {
+    todoItems = todoItems.filter(s => s !== sku);
   } else {
-    todoList.push(sku);
+    todoItems.push(sku);
   }
   guardarTodo();
   renderTodo();
@@ -302,14 +302,14 @@ function toggleTodo(sku) {
 }
 
 function limpiarTodo() {
-  todoList = [];
+  todoItems = [];
   guardarTodo();
   renderTodo();
   renderGrid();
 }
 
 function renderTodo() {
-  const count = todoList.length;
+  const count = todoItems.length;
 
   // Badge y estado vacío
   todoBadge.textContent = count;
@@ -322,7 +322,7 @@ function renderTodo() {
   actualizarFab();
 
   // Construir items
-  const itemsHTML = todoList.map(sku => {
+  const itemsHTML = todoItems.map(sku => {
     const prod  = productosCache[sku];
     const datos = skusGuardados.find(s => s.sku === sku);
     const alias = datos?.alias || '';
@@ -349,7 +349,7 @@ function renderTodo() {
       </li>`;
   }).join('');
 
-  todoList.innerHTML    = itemsHTML;
+  todoList.innerHTML      = itemsHTML;
   todoListModal.innerHTML = itemsHTML;
 
   // Eventos de quitar
@@ -359,7 +359,7 @@ function renderTodo() {
 }
 
 function actualizarFab() {
-  const count = todoList.length;
+  const count = todoItems.length;
   todoFabCount.textContent = count;
   if (categoriaActiva) {
     todoFab.style.display = 'flex';

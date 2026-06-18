@@ -245,19 +245,25 @@ function tarjeta({ sku, alias }) {
 
   const fmt = n => n ? `$${Number(n).toLocaleString('es-CL')}` : null;
 
+  const cmrRow = prod.precioCMR
+    ? `<div class="precio-label">CMR</div><div class="precio-cmr">${fmt(prod.precioCMR)}</div>`
+    : '';
+
   let bloquePrecio = '';
   if (prod.precioOferta) {
     bloquePrecio = `
       <div class="precio-label">Normal</div>
       <div class="precio-tachado">${fmt(prod.precio) || '—'}</div>
       <div class="precio-label">Oferta</div>
-      <div class="precio-oferta">${fmt(prod.precioOferta)}</div>`;
+      <div class="precio-oferta">${fmt(prod.precioOferta)}</div>
+      ${cmrRow}`;
   } else if (prod.precio) {
     bloquePrecio = `
       <div class="precio-label">Precio</div>
-      <div class="precio-normal">${fmt(prod.precio)}</div>`;
+      <div class="precio-normal">${fmt(prod.precio)}</div>
+      ${cmrRow}`;
   } else {
-    bloquePrecio = `<div class="precio-normal" style="color:#999">Sin precio</div>`;
+    bloquePrecio = `<div class="precio-normal" style="color:#999">Sin precio</div>${cmrRow}`;
   }
 
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';

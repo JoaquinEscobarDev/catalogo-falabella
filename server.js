@@ -253,12 +253,16 @@ function extraerDeProductData(pd, skuBuscado) {
   const oferta   = precios.find(p => p.type === 'internetPrice' || p.type === 'offerPrice');
   const cmr      = precios.find(p => p.type === 'cmrPrice');
   const precioN  = parsePrecio(normal?.price?.[0]);
-  const precioO  = parsePrecio(oferta?.price?.[0]) || parsePrecio(cmr?.price?.[0]);
+  const precioO  = parsePrecio(oferta?.price?.[0]);
+  const precioCMR = parsePrecio(cmr?.price?.[0]);
   const imagenes = (variante.medias || []).filter(m => m.mediaType === 'image');
   const imagen   = imagenes[0]?.url ? `${imagenes[0].url}?width=500&height=500&fit=inside` : null;
   return {
     nombre: pd.name, sku: variante.id || skuBuscado, marca: pd.brandName,
-    precio: precioN, precioOferta: precioO !== precioN ? precioO : null, imagen,
+    precio: precioN,
+    precioOferta: precioO && precioO !== precioN ? precioO : null,
+    precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
+    imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
   };
 }
@@ -266,11 +270,16 @@ function extraerDeProductData(pd, skuBuscado) {
 function extraerDeSearchResult(item, skuBuscado) {
   const precios = item.prices || [];
   const normal  = precios.find(p => p.type === 'normalPrice');
-  const oferta  = precios.find(p => p.type === 'internetPrice' || p.type === 'offerPrice' || p.type === 'cmrPrice');
+  const oferta  = precios.find(p => p.type === 'internetPrice' || p.type === 'offerPrice');
+  const cmr     = precios.find(p => p.type === 'cmrPrice');
+  const precioN = parsePrecio(normal?.price?.[0]) || parsePrecio(item.prices?.[0]?.price?.[0]);
+  const precioO = parsePrecio(oferta?.price?.[0]);
+  const precioCMR = parsePrecio(cmr?.price?.[0]);
   return {
     nombre: item.displayName || item.name, sku: item.id || skuBuscado, marca: item.brand,
-    precio: parsePrecio(normal?.price?.[0]) || parsePrecio(item.prices?.[0]?.price?.[0]),
-    precioOferta: parsePrecio(oferta?.price?.[0]),
+    precio: precioN,
+    precioOferta: precioO && precioO !== precioN ? precioO : null,
+    precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen: item.mediaUrl || item.image || null,
     url: item.url ? `https://www.falabella.com${item.url}` : null,
   };

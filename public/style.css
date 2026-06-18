@@ -245,6 +245,7 @@ main {
 .precio-tachado { font-size:.87rem; font-weight:600; color:#999; text-decoration:line-through; }
 .precio-oferta  { font-size:1.1rem; font-weight:700; color:var(--rojo); }
 .precio-label   { font-size:.7rem; color:var(--texto-suave); }
+.precio-cmr     { font-size:1rem; font-weight:700; color:#7b2d8b; }
 
 .stock-badge {
   display: inline-block;

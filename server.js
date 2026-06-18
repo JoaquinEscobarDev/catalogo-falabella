@@ -62,6 +62,23 @@ function curlFetch(url) {
   });
 }
 
+// Debug: ver qué HTML recibe el servidor
+app.get('/api/debug/:sku', async (req, res) => {
+  const sku = req.params.sku;
+  try {
+    const html = await curlFetch(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
+    res.json({
+      length: html.length,
+      hasNextData: html.includes('__NEXT_DATA__'),
+      hasProductData: html.includes('productData'),
+      hasSku: html.includes(sku),
+      snippet: html.substring(0, 500),
+    });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 // Scraping de la página de búsqueda de Falabella
 app.get('/api/producto/:sku', async (req, res) => {
   const sku = req.params.sku;

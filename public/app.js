@@ -10,6 +10,11 @@ const CATEGORIAS = [
   { nombre: 'Línea Blanca',       icono: '🫧' },
   { nombre: 'Electrodomésticos',  icono: '⚡' },
   { nombre: 'Relojes',            icono: '⌚' },
+  { nombre: 'Audífonos',          icono: '🎧' },
+  { nombre: 'Audífonos Cascos',   icono: '🎵' },
+  { nombre: 'Parlantes',          icono: '🔊' },
+  { nombre: 'Cuidado Personal',   icono: '✨' },
+  { nombre: 'Clima',              icono: '❄️' },
 ];
 
 // ── Estado ──

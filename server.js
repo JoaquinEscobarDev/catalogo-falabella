@@ -67,12 +67,22 @@ app.get('/api/debug/:sku', async (req, res) => {
   const sku = req.params.sku;
   try {
     const html = await curlFetch(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
+    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    let parseError = null, pdKeys = null;
+    if (m) {
+      try {
+        const data = JSON.parse(m[1]);
+        const pd = data?.props?.pageProps?.productData;
+        pdKeys = pd ? Object.keys(pd).slice(0, 10) : 'no productData';
+      } catch(e) { parseError = e.message; }
+    }
     res.json({
       length: html.length,
       hasNextData: html.includes('__NEXT_DATA__'),
-      hasProductData: html.includes('productData'),
-      hasSku: html.includes(sku),
-      snippet: html.substring(0, 500),
+      regexMatch: !!m,
+      matchLength: m ? m[1].length : 0,
+      parseError,
+      pdKeys,
     });
   } catch (e) {
     res.json({ error: e.message });

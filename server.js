@@ -3,7 +3,9 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-extra');
+const stealth = require('puppeteer-extra-plugin-stealth');
+chromium.use(stealth());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -188,15 +190,18 @@ function curlFetch(url) {
 }
 
 async function playwrightFetch(url) {
-  const browser = await chromium.launch({
+  const proxyServer = process.env.PROXY_URL;
+  const launchOpts = {
     headless: true,
     args: [
       '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
-      '--disable-infobars',
       '--window-size=1920,1080',
     ],
-  });
+  };
+  if (proxyServer) launchOpts.proxy = { server: proxyServer };
+
+  const browser = await chromium.launch(launchOpts);
   try {
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -204,16 +209,13 @@ async function playwrightFetch(url) {
       locale: 'es-CL',
       extraHTTPHeaders: { 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8' },
     });
-    // Remover señales de webdriver que Cloudflare detecta
-    await context.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      window.chrome = { runtime: {} };
-      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
-    });
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // Esperar a que cargue __NEXT_DATA__
-    await page.waitForFunction(() => document.getElementById('__NEXT_DATA__') !== null, { timeout: 10000 }).catch(() => {});
+    // Esperar que la red quede idle para que el JS challenge de Cloudflare se resuelva
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+    await page.waitForFunction(
+      () => document.getElementById('__NEXT_DATA__') !== null,
+      { timeout: 20000 }
+    ).catch(() => {});
     return await page.content();
   } finally {
     await browser.close();

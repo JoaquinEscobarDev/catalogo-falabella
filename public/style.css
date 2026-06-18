@@ -235,18 +235,26 @@ main {
 .card-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:#f9f9f9; padding:10px; }
 .card-img-placeholder { width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:#f0f0f0; }
 
+/* wrapper que agrupa body + footer dentro de la tarjeta */
+.card-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
 .card-body { padding: 11px 13px 0; display:flex; flex-direction:column; gap:3px; flex:1; }
 .card-alias { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--verde-dark); }
 .card-nombre { font-size:.85rem; font-weight:600; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .card-sku { font-size:.74rem; color:var(--texto-suave); font-family:monospace; }
+.card-loading-msg { font-size:.83rem; color:var(--texto-suave); margin-top:6px; }
+.card-error-msg { font-size:.82rem; color:var(--rojo); margin-top:4px; }
 
-.card-precios { margin-top:7px; padding-top:7px; border-top:1px solid var(--gris-borde); display:flex; flex-direction:column; gap:1px; }
+/* Precios */
+.card-precios { margin-top:7px; padding-top:7px; border-top:1px solid var(--gris-borde); display:flex; flex-direction:column; gap:2px; }
+.precio-fila  { display:flex; flex-direction:column; gap:0; }
 .precio-normal { font-size:1.1rem; font-weight:700; }
 .precio-tachado { font-size:.87rem; font-weight:600; color:#999; text-decoration:line-through; }
 .precio-oferta  { font-size:1.1rem; font-weight:700; color:var(--rojo); }
 .precio-label   { font-size:.7rem; color:var(--texto-suave); }
 .precio-cmr     { font-size:1rem; font-weight:700; color:#7b2d8b; }
 
+/* Stock badge */
 .stock-badge {
   display: inline-block;
   margin-top: 6px;
@@ -266,7 +274,6 @@ main {
 .card-footer { padding:9px 13px 12px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .card-link { font-size:.76rem; color:var(--verde-dark); text-decoration:none; font-weight:600; }
 .card-link:hover { text-decoration:underline; }
-.card-error-msg { font-size:.82rem; color:var(--rojo); padding:14px 13px; }
 
 .btn-cambiar {
   background: var(--naranja); color:#fff; border:none;
@@ -357,88 +364,195 @@ main {
 .todo-clear-modal:active { background:#fdecea; }
 
 /* ══════════════════════════════════════
-   RESPONSIVE MÓVIL
+   RESPONSIVE MÓVIL  ≤ 480px
+   (teléfonos — vista principal)
 ══════════════════════════════════════ */
-@media (max-width: 680px) {
+@media (max-width: 480px) {
   :root { --header-h: 52px; }
 
-  main { padding: 14px 12px 90px; }
+  /* ── Layout general ── */
+  main { padding: 12px 10px 100px; }
+  header { padding: 0 12px; }
+  header h1 { font-size: .92rem; }
+  #viewProductos { gap: 9px; }
 
-  header { padding: 0 14px; }
-  header h1 { font-size: 1rem; }
+  /* ── Botones header ── */
+  .btn-back { padding: 6px 10px; font-size: .79rem; }
+  .btn-secondary { padding: 6px 10px; font-size: .79rem; }
 
-  /* Categorías: 2 columnas fijas en móvil */
-  .categorias-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-  .categoria-card { padding: 20px 10px 16px; gap: 8px; }
-  .categoria-icon { font-size: 2rem; }
-  .categoria-nombre { font-size: .85rem; }
+  /* ── Categorías: 2 columnas ── */
+  .subtitle { font-size: .87rem; margin-bottom: 14px; }
+  .categorias-grid { grid-template-columns: repeat(2, 1fr); gap: 9px; }
+  .categoria-card { padding: 20px 10px 15px; gap: 8px; border-width: 1.5px; }
+  .categoria-icon { font-size: 2.1rem; }
+  .categoria-nombre { font-size: .88rem; }
+  .categoria-count { font-size: .65rem; padding: 2px 6px; top: 7px; right: 7px; }
 
-  /* Ocultar sidebar, mostrar FAB */
+  /* ── ToDo: ocultar sidebar, mostrar FAB ── */
   .todo-sidebar { display: none; }
   .todo-fab { display: flex; }
 
-  /* Productos: 1 columna en móvil */
-  #grid { grid-template-columns: 1fr; gap: 10px; }
+  /* ── Grid: 1 columna ── */
+  #grid { grid-template-columns: 1fr; gap: 8px; }
 
-  /* Tarjeta horizontal en móvil */
+  /* ── Panel agregar ── */
+  .add-panel { padding: 13px 14px; border-radius: 10px; }
+  .add-panel h2 { font-size: .9rem; margin-bottom: 9px; }
+  #formAgregar { flex-direction: column; gap: 8px; }
+  #formAgregar input {
+    flex: none;
+    width: 100%;
+    padding: 13px 13px;
+    font-size: 1rem;
+    border-radius: 10px;
+  }
+  #formAgregar .btn-primary {
+    width: 100%;
+    padding: 13px;
+    font-size: 1rem;
+    border-radius: 10px;
+  }
+  .search-panel input {
+    font-size: .93rem;
+    padding: 13px 14px;
+    border-radius: 10px;
+  }
+
+  /* ── Tarjeta horizontal ── */
   .card {
     flex-direction: row;
     align-items: stretch;
-    min-height: 110px;
+    border-radius: 10px;
   }
+
+  /* Foto: columna izquierda fija */
   .card-img {
-    width: 100px;
-    min-width: 100px;
-    aspect-ratio: 1/1;
+    width: 106px;
+    min-width: 106px;
+    max-width: 106px;
+    height: auto;
+    aspect-ratio: unset;
+    align-self: stretch;
     flex-shrink: 0;
-    padding: 8px;
+    padding: 10px;
+    border-right: 1px solid var(--gris-borde);
+    background: #f8f8f8;
+    object-fit: contain;
   }
   .card-img-placeholder {
-    width: 100px;
-    min-width: 100px;
-    aspect-ratio: 1/1;
+    width: 106px;
+    min-width: 106px;
+    max-width: 106px;
+    height: auto;
+    aspect-ratio: unset;
+    align-self: stretch;
     flex-shrink: 0;
-    font-size: 2rem;
+    font-size: 2.2rem;
+    background: #f5f5f5;
+    border-right: 1px solid var(--gris-borde);
   }
-  .card-top-actions { top: 6px; right: 6px; }
 
-  /* Contenido de la tarjeta ocupa el resto */
-  .card > div:not(.card-top-actions):not(.card-img-placeholder) {
-    flex: 1;
-    min-width: 0;
+  /* Botón eliminar */
+  .card-top-actions { top: 8px; right: 8px; }
+  .btn-delete { font-size: 1rem; padding: 4px 7px; }
+
+  /* ── Body: info principal ── */
+  .card-body {
+    padding: 10px 38px 8px 12px;
+    gap: 3px;
   }
-  .card-body { padding: 10px 38px 6px 10px; gap: 3px; }
-  .card-nombre { -webkit-line-clamp: 2; font-size: .83rem; }
-  .card-precios { margin-top: 5px; padding-top: 5px; }
-  .precio-normal, .precio-oferta { font-size: 1rem; }
+  .card-alias { font-size: .71rem; }
+  .card-nombre {
+    font-size: .88rem;
+    font-weight: 600;
+    line-height: 1.32;
+    -webkit-line-clamp: 3;
+  }
+  .card-sku { font-size: .75rem; }
+  .card-loading-msg { font-size: .84rem; }
+  .card-error-msg { font-size: .83rem; }
 
-  .card-footer { padding: 6px 10px 10px; }
-  .card-link { font-size: .72rem; }
+  /* ── Precios: etiqueta y valor en la misma línea ── */
+  .card-precios {
+    margin-top: 6px;
+    padding-top: 6px;
+    gap: 3px;
+  }
+  .precio-fila {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 5px;
+    flex-wrap: nowrap;
+  }
+  .precio-label   { font-size: .68rem; white-space: nowrap; flex-shrink: 0; }
+  .precio-normal  { font-size: 1rem; }
+  .precio-tachado { font-size: .82rem; }
+  .precio-oferta  { font-size: 1rem; }
+  .precio-cmr     { font-size: .93rem; }
 
-  /* Formulario vertical */
-  #formAgregar { flex-direction: column; gap: 8px; }
-  #formAgregar input { flex: none; width: 100%; }
-  #formAgregar .btn-primary { width: 100%; padding: 11px; }
+  /* ── Stock ── */
+  .stock-badge { font-size: .7rem; padding: 2px 8px; margin-top: 5px; }
 
-  .add-panel { padding: 14px 16px; }
-  .add-panel h2 { font-size: .88rem; }
+  /* ── Footer: "Ver →" y botón Cambiar ── */
+  .card-footer {
+    padding: 7px 12px 10px;
+    border-top: 1px solid var(--gris-borde);
+    gap: 8px;
+  }
+  .card-link { font-size: .75rem; }
+  .btn-cambiar {
+    font-size: .78rem;
+    padding: 7px 14px;
+    border-radius: 8px;
+    min-height: 34px;
+  }
 
-  .search-panel input { font-size: .9rem; }
-
-  /* Botones header más pequeños */
-  .btn-back { padding: 5px 10px; font-size: .78rem; }
-  .btn-secondary { padding: 5px 12px; font-size: .8rem; }
+  /* ── FAB ── */
+  .todo-fab { bottom: 16px; right: 14px; padding: 11px 16px; font-size: .88rem; }
 }
 
-/* Tablets: 3 columnas para categorías */
+/* ══════════════════════════════════════
+   TABLET  481px – 680px
+   (tarjetas verticales, 2 columnas)
+══════════════════════════════════════ */
 @media (min-width: 481px) and (max-width: 680px) {
-  .categorias-grid { grid-template-columns: repeat(3, 1fr); }
-  #grid { grid-template-columns: repeat(2, 1fr); }
+  :root { --header-h: 54px; }
+
+  main { padding: 14px 12px 90px; }
+  header { padding: 0 14px; }
+  header h1 { font-size: 1rem; }
+  .btn-back { padding: 5px 10px; font-size: .8rem; }
+  .btn-secondary { padding: 5px 12px; font-size: .8rem; }
+
+  .todo-sidebar { display: none; }
+  .todo-fab { display: flex; }
+
+  .categorias-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .categoria-card { padding: 20px 10px 16px; }
+
+  #grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* Tarjetas verticales */
   .card { flex-direction: column; }
-  .card-img, .card-img-placeholder { width: 100%; min-width: unset; aspect-ratio: 1/1; }
+  .card-img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1/1;
+  }
+  .card-img-placeholder {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1/1;
+  }
+
+  /* Precios: vuelven a columna en tablet vertical */
+  .precio-fila { flex-direction: column; gap: 0; }
+
+  #formAgregar { flex-direction: column; gap: 8px; }
+  #formAgregar input { flex: none; width: 100%; }
+  #formAgregar .btn-primary { width: 100%; }
 }
 
 .spinning { animation: spin .8s linear infinite; display: inline-block; }

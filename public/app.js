@@ -212,14 +212,16 @@ function tarjeta({ sku, alias }) {
   if (prod === undefined || prod === null) {
     return `
       <div class="card loading">
-        <div class="card-img-placeholder">⏳</div>
-        <div class="card-body">
-          ${alias ? `<span class="card-alias">${alias}</span>` : ''}
-          <span class="card-sku">SKU: ${sku}</span>
-          <p style="color:#6b7280;font-size:.83rem;margin-top:6px">Cargando…</p>
-        </div>
         <div class="card-top-actions">
           <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        </div>
+        <div class="card-img-placeholder">⏳</div>
+        <div class="card-content">
+          <div class="card-body">
+            ${alias ? `<span class="card-alias">${alias}</span>` : ''}
+            <span class="card-sku">SKU: ${sku}</span>
+            <p class="card-loading-msg">Cargando…</p>
+          </div>
         </div>
       </div>`;
   }
@@ -227,14 +229,16 @@ function tarjeta({ sku, alias }) {
   if (prod.error) {
     return `
       <div class="card error">
-        <div class="card-img-placeholder">❌</div>
-        <div class="card-body">
-          ${alias ? `<span class="card-alias">${alias}</span>` : ''}
-          <span class="card-sku">SKU: ${sku}</span>
-          <p class="card-error-msg">${prod.error}</p>
-        </div>
         <div class="card-top-actions">
           <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
+        </div>
+        <div class="card-img-placeholder">❌</div>
+        <div class="card-content">
+          <div class="card-body">
+            ${alias ? `<span class="card-alias">${alias}</span>` : ''}
+            <span class="card-sku">SKU: ${sku}</span>
+            <p class="card-error-msg">${prod.error}</p>
+          </div>
         </div>
       </div>`;
   }
@@ -246,24 +250,21 @@ function tarjeta({ sku, alias }) {
   const fmt = n => n ? `$${Number(n).toLocaleString('es-CL')}` : null;
 
   const cmrRow = prod.precioCMR
-    ? `<div class="precio-label">CMR</div><div class="precio-cmr">${fmt(prod.precioCMR)}</div>`
+    ? `<div class="precio-fila"><span class="precio-label">CMR</span><span class="precio-cmr">${fmt(prod.precioCMR)}</span></div>`
     : '';
 
   let bloquePrecio = '';
   if (prod.precioOferta) {
     bloquePrecio = `
-      <div class="precio-label">Normal</div>
-      <div class="precio-tachado">${fmt(prod.precio) || '—'}</div>
-      <div class="precio-label">Oferta</div>
-      <div class="precio-oferta">${fmt(prod.precioOferta)}</div>
+      <div class="precio-fila"><span class="precio-label">Normal</span><span class="precio-tachado">${fmt(prod.precio) || '—'}</span></div>
+      <div class="precio-fila"><span class="precio-label">Oferta</span><span class="precio-oferta">${fmt(prod.precioOferta)}</span></div>
       ${cmrRow}`;
   } else if (prod.precio) {
     bloquePrecio = `
-      <div class="precio-label">Precio</div>
-      <div class="precio-normal">${fmt(prod.precio)}</div>
+      <div class="precio-fila"><span class="precio-label">Precio</span><span class="precio-normal">${fmt(prod.precio)}</span></div>
       ${cmrRow}`;
   } else {
-    bloquePrecio = `<div class="precio-normal" style="color:#999">Sin precio</div>${cmrRow}`;
+    bloquePrecio = `<div class="precio-fila"><span class="precio-normal" style="color:#999">Sin precio</span></div>${cmrRow}`;
   }
 
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
@@ -275,16 +276,18 @@ function tarjeta({ sku, alias }) {
         <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
       </div>
       ${img}
-      <div class="card-body">
-        ${alias ? `<span class="card-alias">${alias}</span>` : ''}
-        <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
-        <span class="card-sku">SKU: ${sku}</span>
-        <div class="card-precios">${bloquePrecio}</div>
-        ${badgeStock(sku)}
-      </div>
-      <div class="card-footer">
-        ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}
-        <button class="${btnClass}" data-sku="${sku}">${btnLabel}</button>
+      <div class="card-content">
+        <div class="card-body">
+          ${alias ? `<span class="card-alias">${alias}</span>` : ''}
+          <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
+          <span class="card-sku">SKU: ${sku}</span>
+          <div class="card-precios">${bloquePrecio}</div>
+          ${badgeStock(sku)}
+        </div>
+        <div class="card-footer">
+          ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}
+          <button class="${btnClass}" data-sku="${sku}">${btnLabel}</button>
+        </div>
       </div>
     </div>`;
 }

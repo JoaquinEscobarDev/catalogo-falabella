@@ -17,7 +17,8 @@
       "Bash(node -e ' *)",
       "Bash(curl -sv https://www.falabella.com/falabella-cl/search?Ntt=17461845 -H 'User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Accept: text/html,application/xhtml+xml' -H 'Accept-Language: es-CL,es;q=0.9' -o /dev/null)",
       "Bash(curl -sv https://www.falabella.com/falabella-cl/product/17461845/Notebook-Ideapad-Slim-3-Gen-10-T%C3%A1ctil-Intel-Core-i5-13420H-8GB-RAM-512GB-SSD-15,3-WUXGA-Lenovo/17461845 -H 'User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Accept: text/html,application/xhtml+xml' -H 'Accept-Language: es-CL,es;q=0.9' -o /dev/null)",
-      "PowerShell(Start-Sleep -Seconds 2; try { Invoke-WebRequest \"http://localhost:3000/api/producto/17461845\" -UseBasicParsing | Select-Object -ExpandProperty Content } catch { $_.Exception.Response; $_.ErrorDetails.Message })"
+      "PowerShell(Start-Sleep -Seconds 2; try { Invoke-WebRequest \"http://localhost:3000/api/producto/17461845\" -UseBasicParsing | Select-Object -ExpandProperty Content } catch { $_.Exception.Response; $_.ErrorDetails.Message })",
+      "PowerShell(Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Select-Object -First 1\\) -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; cd \"C:\\\\Users\\\\joaqu\\\\OneDrive\\\\Escritorio\\\\catalogoFalabella\"; node server.js)"
     ]
   }
 }

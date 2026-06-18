@@ -187,6 +187,20 @@ function playwrightRelease() {
   else playwrightBusy = false;
 }
 
+// Circuit breaker: si Playwright falla, pausa 10 min antes de reintentar
+let playwrightBlocked = false;
+let playwrightBlockedUntil = 0;
+function playwrightIsBlocked() {
+  if (!playwrightBlocked) return false;
+  if (Date.now() > playwrightBlockedUntil) { playwrightBlocked = false; return false; }
+  return true;
+}
+function playwrightMarkBlocked() {
+  playwrightBlocked = true;
+  playwrightBlockedUntil = Date.now() + 10 * 60 * 1000;
+  console.log('Playwright bloqueado 10 min, usando caché');
+}
+
 function curlFetch(url) {
   return new Promise((resolve, reject) => {
     execFile('curl', [
@@ -227,10 +241,10 @@ async function playwrightFetch(url) {
     });
     const page = await context.newPage();
     // Esperar que la red quede idle para que el JS challenge de Cloudflare se resuelva
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForFunction(
       () => document.getElementById('__NEXT_DATA__') !== null,
-      { timeout: 20000 }
+      { timeout: 10000 }
     ).catch(() => {});
     return await page.content();
   } finally {
@@ -245,8 +259,14 @@ async function fetchFalabella(sku) {
     return await curlFetch(url);
   } catch (e) {
     if (e.message === 'BLOCKED' || e.message.includes('403')) {
+      if (playwrightIsBlocked()) throw new Error('BLOCKED');
       console.log(`curl bloqueado para ${sku}, usando playwright...`);
-      return await playwrightFetch(url);
+      try {
+        return await playwrightFetch(url);
+      } catch (pe) {
+        playwrightMarkBlocked();
+        throw new Error('BLOCKED');
+      }
     }
     throw e;
   }

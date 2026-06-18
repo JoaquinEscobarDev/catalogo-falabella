@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catálogo Falabella</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1>🛒 Catálogo Falabella</h1>
+      <div class="header-actions">
+        <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Panel agregar SKU -->
+    <section class="add-panel">
+      <h2>Agregar producto</h2>
+      <form id="formAgregar">
+        <input type="text" id="inputSku" placeholder="SKU (ej: 88888888)" required />
+        <input type="text" id="inputAlias" placeholder="Alias opcional (ej: TV Samsung 55)" />
+        <button type="submit" class="btn-primary">Agregar</button>
+      </form>
+      <p id="msgAgregar" class="msg"></p>
+    </section>
+
+    <!-- Búsqueda rápida -->
+    <section class="search-panel">
+      <input type="text" id="filtro" placeholder="🔍 Filtrar por nombre, SKU o alias…" />
+    </section>
+
+    <!-- Grid de productos -->
+    <section id="grid" class="grid">
+      <div class="empty-state">Cargando productos…</div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

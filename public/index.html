@@ -14,9 +14,6 @@
         <button id="btnBack" class="btn-back" style="display:none">← Categorías</button>
         <h1 id="headerTitle">🛒 Catálogo Falabella</h1>
       </div>
-      <div class="header-actions" id="headerActions" style="display:none">
-        <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
-      </div>
     </div>
   </header>
 
@@ -89,6 +86,34 @@
       </div>
       <ul class="todo-list" id="todoListModal"></ul>
       <button class="todo-clear-modal" id="todoClearModal">Limpiar lista</button>
+    </div>
+  </div>
+
+  <!-- Modal tamaño / cantidad -->
+  <div class="size-overlay" id="sizeOverlay">
+    <div class="size-sheet">
+      <div class="size-sheet-header">
+        <span id="sizeTitulo">Agregar al pedido</span>
+        <button class="size-sheet-close" id="sizeClose">✕</button>
+      </div>
+      <div id="sizeStep1">
+        <p class="size-pregunta">¿Qué tamaño?</p>
+        <div class="size-options">
+          <button class="size-btn" data-size="Grande">Grande</button>
+          <button class="size-btn" data-size="Mediano">Mediano</button>
+          <button class="size-btn" data-size="Pequeño">Pequeño</button>
+        </div>
+      </div>
+      <div id="sizeStep2" style="display:none" data-size="">
+        <p class="size-pregunta">Tamaño: <strong id="sizeSelectedLabel"></strong></p>
+        <p class="size-pregunta size-pregunta-qty">¿Cuántas unidades?</p>
+        <div class="size-qty-row">
+          <button id="qtyMinus" class="qty-btn">−</button>
+          <input id="qtyInput" type="number" value="1" min="1" max="99" />
+          <button id="qtyPlus" class="qty-btn">+</button>
+        </div>
+        <button id="sizeConfirm" class="size-confirm-btn">Agregar al pedido ✓</button>
+      </div>
     </div>
   </div>
 

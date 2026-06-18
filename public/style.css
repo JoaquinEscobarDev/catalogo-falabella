@@ -568,5 +568,143 @@ main {
   #formAgregar .btn-primary { width: 100%; }
 }
 
-.spinning { animation: spin .8s linear infinite; display: inline-block; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* ── Modal tamaño / cantidad ── */
+.size-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 400;
+  align-items: flex-end;
+}
+.size-overlay.open { display: flex; }
+
+.size-sheet {
+  background: var(--blanco);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  padding: 22px 20px 32px;
+  animation: slideUp .22s ease;
+}
+
+.size-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.size-sheet-header span {
+  font-weight: 700;
+  font-size: .97rem;
+  line-height: 1.35;
+  flex: 1;
+}
+.size-sheet-close {
+  background: var(--gris-bg);
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: .9rem;
+  cursor: pointer;
+  color: var(--texto-suave);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.size-pregunta {
+  font-size: .9rem;
+  color: var(--texto-suave);
+  margin-bottom: 14px;
+  text-align: center;
+}
+.size-pregunta-qty { margin-top: 4px; margin-bottom: 0; }
+
+.size-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.size-btn {
+  padding: 20px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border: 2px solid var(--gris-borde);
+  border-radius: 14px;
+  background: var(--blanco);
+  cursor: pointer;
+  color: var(--texto);
+  transition: all .15s;
+  text-align: center;
+}
+.size-btn:active,
+.size-btn:hover {
+  background: var(--texto);
+  color: var(--blanco);
+  border-color: var(--texto);
+}
+
+.size-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 18px 0 22px;
+}
+.qty-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid var(--gris-borde);
+  background: var(--blanco);
+  font-size: 1.7rem;
+  font-weight: 300;
+  cursor: pointer;
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.qty-btn:hover { background: var(--gris-bg); }
+
+#qtyInput {
+  width: 90px;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  border: 2px solid var(--gris-borde);
+  border-radius: 10px;
+  padding: 8px 4px;
+  outline: none;
+  color: var(--texto);
+}
+#qtyInput:focus { border-color: var(--verde); }
+
+.size-confirm-btn {
+  width: 100%;
+  padding: 17px;
+  background: var(--verde);
+  color: var(--blanco);
+  border: none;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+}
+.size-confirm-btn:hover { background: var(--verde-dark); }
+
+/* Tamaño/cantidad en el ToDo */
+.todo-size {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--verde-dark);
+  background: #f0fdf4;
+  border-radius: 20px;
+  padding: 1px 7px;
+  width: fit-content;
+}

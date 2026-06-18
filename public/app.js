@@ -22,7 +22,13 @@ let categoriaActiva = null;
 let skusGuardados   = [];
 let productosCache  = {};
 let stockCache      = {};
-let todoItems       = JSON.parse(localStorage.getItem('todoList') || '[]');
+let sizeSkuPending  = null;
+
+// Migración: formato antiguo era array de strings, nuevo es array de objetos {sku, size, quantity}
+const rawTodo = JSON.parse(localStorage.getItem('todoList') || '[]');
+let todoItems = rawTodo.map(item =>
+  typeof item === 'string' ? { sku: item, size: 'Mediano', quantity: 1 } : item
+);
 
 // ── Elementos ──
 const viewCategorias   = document.getElementById('viewCategorias');
@@ -35,9 +41,7 @@ const inputSku         = document.getElementById('inputSku');
 const inputAlias       = document.getElementById('inputAlias');
 const msgAgregar       = document.getElementById('msgAgregar');
 const btnBack          = document.getElementById('btnBack');
-const btnRefreshAll    = document.getElementById('btnRefreshAll');
 const headerTitle      = document.getElementById('headerTitle');
-const headerActions    = document.getElementById('headerActions');
 // ToDo
 const todoBadge        = document.getElementById('todoBadge');
 const todoEmptyState   = document.getElementById('todoEmptyState');
@@ -83,10 +87,9 @@ function renderCategorias() {
 
 async function abrirCategoria(nombre) {
   categoriaActiva = nombre;
-  viewCategorias.style.display  = 'none';
-  viewProductos.style.display   = 'flex';
-  btnBack.style.display         = 'inline-block';
-  headerActions.style.display   = 'flex';
+  viewCategorias.style.display = 'none';
+  viewProductos.style.display  = 'flex';
+  btnBack.style.display        = 'inline-block';
   const cat = CATEGORIAS.find(c => c.nombre === nombre);
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
@@ -101,22 +104,9 @@ btnBack.addEventListener('click', () => {
   viewProductos.style.display  = 'none';
   viewCategorias.style.display = 'block';
   btnBack.style.display        = 'none';
-  headerActions.style.display  = 'none';
   headerTitle.textContent      = '🛒 Catálogo Falabella';
   todoFab.style.display        = 'none';
   renderCategorias();
-});
-
-btnRefreshAll.addEventListener('click', async () => {
-  if (!categoriaActiva) return;
-  const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
-  skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
-  btnRefreshAll.innerHTML = '<span class="spinning">↻</span> Actualizando…';
-  btnRefreshAll.disabled = true;
-  renderGrid();
-  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
-  btnRefreshAll.innerHTML = '↻ Actualizar precios';
-  btnRefreshAll.disabled = false;
 });
 
 filtroInput.addEventListener('input', renderGrid);
@@ -135,7 +125,7 @@ formAgregar.addEventListener('submit', async (e) => {
   const data = await r.json();
   if (!r.ok) { mostrarMsg(data.error || 'Error al agregar', 'err'); return; }
   mostrarMsg('SKU agregado ✓', 'ok');
-  inputSku.value = '';
+  inputSku.value   = '';
   inputAlias.value = '';
   skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva });
   renderGrid();
@@ -151,7 +141,7 @@ async function cargarProducto(sku) {
   productosCache[sku] = null;
   renderGrid();
   try {
-    const r = await fetch(`/api/producto/${sku}`);
+    const r    = await fetch(`/api/producto/${sku}`);
     const data = await r.json();
     productosCache[sku] = r.ok ? data : { error: data.error };
   } catch {
@@ -165,7 +155,7 @@ async function cargarStock(sku) {
   if (stockCache[sku] !== undefined) return;
   stockCache[sku] = null;
   try {
-    const r = await fetch(`/api/stock/${sku}`);
+    const r    = await fetch(`/api/stock/${sku}`);
     const data = await r.json();
     stockCache[sku] = r.ok ? data : { stock: null };
   } catch {
@@ -178,9 +168,9 @@ function renderGrid() {
   if (!categoriaActiva) return;
   const filtro  = filtroInput.value.toLowerCase();
   const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
-  const lista = skusCat.filter(s => {
+  const lista   = skusCat.filter(s => {
     if (!filtro) return true;
-    const prod = productosCache[s.sku];
+    const prod   = productosCache[s.sku];
     const nombre = prod?.nombre || '';
     return s.sku.includes(filtro)
       || (s.alias || '').toLowerCase().includes(filtro)
@@ -212,7 +202,7 @@ function badgeStock(sku) {
 
 function tarjeta({ sku, alias }) {
   const prod    = productosCache[sku];
-  const enLista = todoItems.includes(sku);
+  const enLista = todoItems.some(item => item.sku === sku);
 
   if (prod === undefined || prod === null) {
     return `
@@ -277,10 +267,10 @@ function tarjeta({ sku, alias }) {
 
   let cacheBadge = '';
   if (prod.cached && prod.updatedAt) {
-    const d = new Date(prod.updatedAt);
+    const d     = new Date(prod.updatedAt);
     const fecha = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
     const hora  = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    cacheBadge = `<span class="cache-badge" title="Precio guardado el ${fecha} a las ${hora}">⚠ ${fecha} ${hora}</span>`;
+    cacheBadge  = `<span class="cache-badge" title="Precio guardado el ${fecha} a las ${hora}">⚠ ${fecha} ${hora}</span>`;
   }
 
   return `
@@ -312,22 +302,16 @@ async function eliminarSku(sku) {
   delete productosCache[sku];
   delete stockCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
-  // Quitar del todo también
-  todoItems = todoItems.filter(s => s !== sku);
+  todoItems     = todoItems.filter(item => item.sku !== sku);
   guardarTodo();
   renderGrid();
   renderTodo();
   renderCategorias();
 }
 
-function reintentarSku(sku) {
-  delete productosCache[sku];
-  cargarProducto(sku);
-}
-
 function mostrarMsg(msg, tipo) {
   msgAgregar.textContent = msg;
-  msgAgregar.className = 'msg ' + tipo;
+  msgAgregar.className   = 'msg ' + tipo;
   if (tipo === 'ok') setTimeout(() => { msgAgregar.textContent = ''; }, 3000);
 }
 
@@ -340,14 +324,15 @@ function guardarTodo() {
 }
 
 function toggleTodo(sku) {
-  if (todoItems.includes(sku)) {
-    todoItems = todoItems.filter(s => s !== sku);
+  const idx = todoItems.findIndex(item => item.sku === sku);
+  if (idx !== -1) {
+    todoItems.splice(idx, 1);
+    guardarTodo();
+    renderTodo();
+    renderGrid();
   } else {
-    todoItems.push(sku);
+    abrirSizeModal(sku);
   }
-  guardarTodo();
-  renderTodo();
-  renderGrid();
 }
 
 function limpiarTodo() {
@@ -360,18 +345,15 @@ function limpiarTodo() {
 function renderTodo() {
   const count = todoItems.length;
 
-  // Badge y estado vacío
   todoBadge.textContent = count;
   todoBadge.classList.toggle('zero', count === 0);
-  todoEmptyState.style.display  = count === 0 ? 'block' : 'none';
-  todoModalEmpty.style.display  = count === 0 ? 'block' : 'none';
-  todoClearModal.style.display  = count === 0 ? 'none'  : 'block';
+  todoEmptyState.style.display = count === 0 ? 'block' : 'none';
+  todoModalEmpty.style.display = count === 0 ? 'block' : 'none';
+  todoClearModal.style.display = count === 0 ? 'none'  : 'block';
 
-  // FAB
   actualizarFab();
 
-  // Construir items
-  const itemsHTML = todoItems.map(sku => {
+  const itemsHTML = todoItems.map(({ sku, size, quantity }) => {
     const prod  = productosCache[sku];
     const datos = skusGuardados.find(s => s.sku === sku);
     const alias = datos?.alias || '';
@@ -393,6 +375,7 @@ function renderTodo() {
           <span class="todo-nombre" title="${nombre}">${nombre}</span>
           <span class="todo-sku">SKU: ${sku}</span>
           <span class="todo-precio">${precio}</span>
+          <span class="todo-size">${size} × ${quantity}</span>
         </div>
         <button class="todo-remove" data-sku="${sku}" title="Quitar">✕</button>
       </li>`;
@@ -401,34 +384,82 @@ function renderTodo() {
   todoList.innerHTML      = itemsHTML;
   todoListModal.innerHTML = itemsHTML;
 
-  // Eventos de quitar
   document.querySelectorAll('.todo-remove').forEach(btn => {
     btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
   });
 }
 
 function actualizarFab() {
-  const count = todoItems.length;
-  todoFabCount.textContent = count;
-  if (categoriaActiva) {
-    todoFab.style.display = 'flex';
-  }
+  todoFabCount.textContent = todoItems.length;
+  if (categoriaActiva) todoFab.style.display = 'flex';
 }
 
-// Abrir/cerrar modal móvil
-todoFab.addEventListener('click', () => {
-  todoOverlay.classList.add('open');
+// ══════════════════════════════════════════
+// MODAL TAMAÑO / CANTIDAD
+// ══════════════════════════════════════════
+
+function abrirSizeModal(sku) {
+  sizeSkuPending = sku;
+  const prod  = productosCache[sku];
+  const datos = skusGuardados.find(s => s.sku === sku);
+  const nombre = prod?.nombre || datos?.alias || `SKU ${sku}`;
+  document.getElementById('sizeTitulo').textContent =
+    nombre.length > 40 ? nombre.slice(0, 40) + '…' : nombre;
+  document.getElementById('sizeStep1').style.display = 'block';
+  document.getElementById('sizeStep2').style.display = 'none';
+  document.getElementById('sizeStep2').dataset.size  = '';
+  document.getElementById('qtyInput').value          = 1;
+  document.getElementById('sizeOverlay').classList.add('open');
+}
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('sizeStep2').dataset.size        = btn.dataset.size;
+    document.getElementById('sizeSelectedLabel').textContent = btn.dataset.size;
+    document.getElementById('sizeStep1').style.display       = 'none';
+    document.getElementById('sizeStep2').style.display       = 'block';
+  });
 });
-todoModalClose.addEventListener('click', () => {
-  todoOverlay.classList.remove('open');
+
+document.getElementById('qtyMinus').addEventListener('click', () => {
+  const input = document.getElementById('qtyInput');
+  if (parseInt(input.value) > 1) input.value = parseInt(input.value) - 1;
 });
-todoOverlay.addEventListener('click', (e) => {
+
+document.getElementById('qtyPlus').addEventListener('click', () => {
+  const input = document.getElementById('qtyInput');
+  input.value = parseInt(input.value) + 1;
+});
+
+document.getElementById('sizeConfirm').addEventListener('click', () => {
+  const size     = document.getElementById('sizeStep2').dataset.size;
+  const quantity = parseInt(document.getElementById('qtyInput').value) || 1;
+  if (!size) return;
+  todoItems.push({ sku: sizeSkuPending, size, quantity });
+  guardarTodo();
+  renderTodo();
+  renderGrid();
+  document.getElementById('sizeOverlay').classList.remove('open');
+});
+
+document.getElementById('sizeClose').addEventListener('click', () => {
+  document.getElementById('sizeOverlay').classList.remove('open');
+});
+
+document.getElementById('sizeOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('sizeOverlay'))
+    document.getElementById('sizeOverlay').classList.remove('open');
+});
+
+// ── Modal ToDo ──
+todoFab.addEventListener('click', () => todoOverlay.classList.add('open'));
+todoModalClose.addEventListener('click', () => todoOverlay.classList.remove('open'));
+todoOverlay.addEventListener('click', e => {
   if (e.target === todoOverlay) todoOverlay.classList.remove('open');
 });
 
-// Limpiar
 todoClear.addEventListener('click', () => {
-  if (todoList.length === 0) return;
+  if (todoItems.length === 0) return;
   if (confirm('¿Limpiar toda la lista?')) limpiarTodo();
 });
 todoClearModal.addEventListener('click', () => {

@@ -3,6 +3,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
+const cron = require('node-cron');
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
@@ -276,9 +277,24 @@ async function fetchFalabella(sku) {
   }
 }
 
+// Cuántas horas antes de considerar el caché "viejo" (default 6h, configurable)
+const CACHE_TTL_MS = (parseInt(process.env.CACHE_TTL_HOURS) || 6) * 60 * 60 * 1000;
+
 app.get('/api/producto/:sku', async (req, res) => {
-  const sku = req.params.sku;
+  const sku    = req.params.sku;
+  const force  = req.query.force === '1';
+
   try {
+    // Sin force: servir del caché si es reciente
+    if (!force) {
+      const cached = await dbGetProductoCache(sku);
+      if (cached?.updatedAt) {
+        const age = Date.now() - new Date(cached.updatedAt).getTime();
+        if (age < CACHE_TTL_MS) return res.json(cached);
+      }
+    }
+
+    // Intentar scraping (con proxy si está configurado)
     let product = null;
     try {
       const html = await fetchFalabella(sku);
@@ -288,18 +304,16 @@ app.get('/api/producto/:sku', async (req, res) => {
     }
 
     if (product) {
-      // Guardar/actualizar caché en background (no bloquea la respuesta)
       dbSetProductoCache(sku, product).catch(() => {});
       return res.json(product);
     }
 
-    // Fallback: datos del caché
+    // Scraping falló → caché aunque sea viejo
     const cached = await dbGetProductoCache(sku);
     if (cached) return res.json(cached);
 
     res.status(404).json({ error: 'Producto no encontrado para ese SKU' });
   } catch (e) {
-    // Último recurso: intentar caché ante cualquier error inesperado
     try {
       const cached = await dbGetProductoCache(sku);
       if (cached) return res.json(cached);
@@ -414,11 +428,52 @@ function parsePrecio(str) {
 }
 
 // ══════════════════════════════════════════
+// AUTO-REFRESH DIARIO 10:00 AM CHILE
+// ══════════════════════════════════════════
+
+async function refreshAllSkus() {
+  console.log('[Auto-refresh] Iniciando actualización 10:00 AM...');
+  let rows;
+  try { rows = await dbGetAll(); } catch (e) {
+    console.error('[Auto-refresh] Error leyendo SKUs:', e.message); return;
+  }
+  const skus = rows.map(r => r.sku);
+  console.log(`[Auto-refresh] ${skus.length} SKUs a actualizar`);
+  let ok = 0, fail = 0;
+
+  if (process.env.PROXY_URL) {
+    const BATCH = 10;
+    for (let i = 0; i < skus.length; i += BATCH) {
+      await Promise.allSettled(skus.slice(i, i + BATCH).map(async sku => {
+        try {
+          const html = await fetchFalabella(sku);
+          const product = extraerDeHTML(html, sku);
+          if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
+        } catch { fail++; }
+      }));
+    }
+  } else {
+    for (const sku of skus) {
+      try {
+        const html = await fetchFalabella(sku);
+        const product = extraerDeHTML(html, sku);
+        if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
+      } catch { fail++; }
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  console.log(`[Auto-refresh] Completado: ${ok} OK, ${fail} fallidos`);
+}
+
+// ══════════════════════════════════════════
 // INICIO
 // ══════════════════════════════════════════
 
 initDB().then(() => {
   app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+  // Todos los días a las 10:00 AM hora Chile
+  cron.schedule('0 10 * * *', refreshAllSkus, { timezone: 'America/Santiago' });
+  console.log('Auto-refresh programado: 10:00 AM hora Chile');
 }).catch(e => {
   console.error('Error iniciando DB:', e.message);
   process.exit(1);

@@ -283,6 +283,10 @@ main {
   color: #92400e;
   width: fit-content;
 }
+.cache-badge-vieja {
+  background: #fee2e2;
+  color: #b91c1c;
+}
 
 .card-footer { padding:9px 13px 12px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .card-link { font-size:.76rem; color:var(--verde-dark); text-decoration:none; font-weight:600; }

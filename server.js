@@ -3,7 +3,6 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const cron = require('node-cron');
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
@@ -459,41 +458,14 @@ function parsePrecio(str) {
 }
 
 // ══════════════════════════════════════════
-// AUTO-REFRESH DIARIO 10:00 AM CHILE
-// ══════════════════════════════════════════
-
-async function refreshAllSkus() {
-  console.log('[Auto-refresh] Iniciando actualización 10:00 AM...');
-  let rows;
-  try { rows = await dbGetAll(); } catch (e) {
-    console.error('[Auto-refresh] Error leyendo SKUs:', e.message); return;
-  }
-  const skus = rows.map(r => r.sku);
-  console.log(`[Auto-refresh] ${skus.length} SKUs a actualizar`);
-  let ok = 0, fail = 0;
-
-  // Secuencial: el proxy y el slot único de Playwright se saturan con concurrencia alta
-  // (probado: 8 en paralelo bajó el éxito a ~3%, secuencial llega a ~84%).
-  for (const sku of skus) {
-    try {
-      const html = await fetchFalabella(sku);
-      const product = extraerDeHTML(html, sku);
-      if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
-    } catch { fail++; }
-    await new Promise(r => setTimeout(r, 300));
-  }
-  console.log(`[Auto-refresh] Completado: ${ok} OK, ${fail} fallidos`);
-}
-
-// ══════════════════════════════════════════
 // INICIO
 // ══════════════════════════════════════════
+// El refresco masivo diario ya NO corre acá (Railway tiene IP de datacenter,
+// bloqueada por Cloudflare). Corre como script local (ver refresh-local.js)
+// desde una IP residencial sin proxy, vía el Programador de tareas de Windows.
 
 initDB().then(() => {
   app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
-  // Todos los días a las 10:00 AM hora Chile
-  cron.schedule('0 10 * * *', refreshAllSkus, { timezone: 'America/Santiago' });
-  console.log('Auto-refresh programado: 10:00 AM hora Chile');
 }).catch(e => {
   console.error('Error iniciando DB:', e.message);
   process.exit(1);

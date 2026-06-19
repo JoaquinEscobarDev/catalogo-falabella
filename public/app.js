@@ -1,3 +1,15 @@
+// ── Formato relativo de fecha ("hace 3h", "hace 2d") ──
+function formatRelativo(fecha) {
+  const ms = Date.now() - fecha.getTime();
+  const min = Math.round(ms / 60000);
+  if (min < 1)  return 'recién';
+  if (min < 60) return `hace ${min} min`;
+  const horas = Math.round(min / 60);
+  if (horas < 24) return `hace ${horas}h`;
+  const dias = Math.round(horas / 24);
+  return `hace ${dias}d`;
+}
+
 // ── Categorías ──
 const CATEGORIAS = [
   { nombre: 'Computadores',       icono: '💻' },
@@ -284,10 +296,12 @@ function tarjeta({ sku, alias }) {
 
   let cacheBadge = '';
   if (prod.cached && prod.updatedAt) {
-    const d     = new Date(prod.updatedAt);
-    const fecha = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
-    const hora  = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    cacheBadge  = `<span class="cache-badge" title="Precio guardado el ${fecha} a las ${hora}">⚠ ${fecha} ${hora}</span>`;
+    const d       = new Date(prod.updatedAt);
+    const fecha   = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+    const hora    = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    const relativo = formatRelativo(d);
+    const vieja   = (Date.now() - d.getTime()) > 36 * 3600 * 1000; // más de 36h sin actualizar
+    cacheBadge  = `<span class="cache-badge${vieja ? ' cache-badge-vieja' : ''}" title="Precio guardado el ${fecha} a las ${hora}">🕐 ${relativo}</span>`;
   }
 
   return `

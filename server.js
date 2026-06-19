@@ -264,6 +264,8 @@ async function playwrightFetch(url) {
       extraHTTPHeaders: { 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8' },
     });
     const page = await context.newPage();
+    // Probado bloquear imagenes/fuentes para ahorrar proxy: rompe el challenge de
+    // Cloudflare (vuelve a servir 403 "Un momento..."). No tocar resourceType.
     // Esperar que la red quede idle para que el JS challenge de Cloudflare se resuelva
     await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
     await page.waitForFunction(

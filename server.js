@@ -470,26 +470,15 @@ async function refreshAllSkus() {
   console.log(`[Auto-refresh] ${skus.length} SKUs a actualizar`);
   let ok = 0, fail = 0;
 
-  if (process.env.PROXY_URL) {
-    const BATCH = 10;
-    for (let i = 0; i < skus.length; i += BATCH) {
-      await Promise.allSettled(skus.slice(i, i + BATCH).map(async sku => {
-        try {
-          const html = await fetchFalabella(sku);
-          const product = extraerDeHTML(html, sku);
-          if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
-        } catch { fail++; }
-      }));
-    }
-  } else {
-    for (const sku of skus) {
-      try {
-        const html = await fetchFalabella(sku);
-        const product = extraerDeHTML(html, sku);
-        if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
-      } catch { fail++; }
-      await new Promise(r => setTimeout(r, 300));
-    }
+  // Secuencial: el proxy y el slot único de Playwright se saturan con concurrencia alta
+  // (probado: 8 en paralelo bajó el éxito a ~3%, secuencial llega a ~84%).
+  for (const sku of skus) {
+    try {
+      const html = await fetchFalabella(sku);
+      const product = extraerDeHTML(html, sku);
+      if (product) { await dbSetProductoCache(sku, product); ok++; } else fail++;
+    } catch { fail++; }
+    await new Promise(r => setTimeout(r, 300));
   }
   console.log(`[Auto-refresh] Completado: ${ok} OK, ${fail} fallidos`);
 }

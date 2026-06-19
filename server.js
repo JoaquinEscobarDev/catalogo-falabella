@@ -188,18 +188,38 @@ function playwrightRelease() {
   else playwrightBusy = false;
 }
 
-// Circuit breaker: si Playwright falla, pausa 10 min antes de reintentar
+// Circuit breaker: solo si fallan muchos SKUs seguidos (proxy/cuenta caída), pausa 10 min.
+// Una sola IP residencial bloqueada por Cloudflare es normal y no debe frenar el resto del batch.
+const PLAYWRIGHT_FAIL_THRESHOLD = 5;
+let playwrightConsecutiveFails = 0;
 let playwrightBlocked = false;
 let playwrightBlockedUntil = 0;
 function playwrightIsBlocked() {
   if (!playwrightBlocked) return false;
-  if (Date.now() > playwrightBlockedUntil) { playwrightBlocked = false; return false; }
+  if (Date.now() > playwrightBlockedUntil) { playwrightBlocked = false; playwrightConsecutiveFails = 0; return false; }
   return true;
 }
-function playwrightMarkBlocked() {
-  playwrightBlocked = true;
-  playwrightBlockedUntil = Date.now() + 10 * 60 * 1000;
-  console.log('Playwright bloqueado 10 min, usando caché');
+function playwrightMarkFailure() {
+  playwrightConsecutiveFails++;
+  if (playwrightConsecutiveFails >= PLAYWRIGHT_FAIL_THRESHOLD) {
+    playwrightBlocked = true;
+    playwrightBlockedUntil = Date.now() + 10 * 60 * 1000;
+    console.log(`Playwright falló ${playwrightConsecutiveFails} veces seguidas, bloqueado 10 min, usando caché`);
+  }
+}
+function playwrightMarkSuccess() {
+  playwrightConsecutiveFails = 0;
+}
+
+// Parsea user:pass embebidos en la URL del proxy al formato que espera Playwright
+function buildProxyConfig(proxyUrlStr) {
+  if (!proxyUrlStr) return undefined;
+  const u = new URL(proxyUrlStr);
+  return {
+    server: `${u.protocol}//${u.host}`,
+    username: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+  };
 }
 
 function curlFetch(url) {
@@ -224,7 +244,6 @@ function curlFetch(url) {
 
 async function playwrightFetch(url) {
   await playwrightSlot();
-  const proxyServer = process.env.PROXY_URL;
   const launchOpts = {
     headless: true,
     args: [
@@ -233,7 +252,8 @@ async function playwrightFetch(url) {
       '--window-size=1920,1080',
     ],
   };
-  if (proxyServer) launchOpts.proxy = { server: proxyServer };
+  const proxy = buildProxyConfig(process.env.PROXY_URL);
+  if (proxy) launchOpts.proxy = proxy;
 
   const browser = await chromium.launch(launchOpts);
   try {
@@ -257,22 +277,31 @@ async function playwrightFetch(url) {
   }
 }
 
+// Reintentos de Playwright: el proxy rota de IP en cada conexión nueva,
+// así que una IP marcada por Cloudflare en un intento no se repite en los siguientes.
+const PLAYWRIGHT_RETRIES = process.env.PROXY_URL ? 5 : 1;
+
 async function fetchFalabella(sku) {
   const url = `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
   try {
-    // Con proxy residencial, curl es suficiente y mucho más rápido
+    // Camino rápido: curl directo (funciona si Cloudflare no exige el JS challenge)
     return await curlFetch(url);
   } catch (e) {
     if (e.message !== 'BLOCKED' && !e.message.includes('403')) throw e;
-    // Sin proxy: intentar Playwright como fallback
-    if (process.env.PROXY_URL) throw new Error('BLOCKED'); // proxy falló, no reintentar
     if (playwrightIsBlocked()) throw new Error('BLOCKED');
-    console.log(`curl bloqueado para ${sku}, usando playwright...`);
-    try {
-      return await playwrightFetch(url);
-    } catch (pe) {
-      playwrightMarkBlocked();
-      throw new Error('BLOCKED');
+
+    for (let attempt = 1; attempt <= PLAYWRIGHT_RETRIES; attempt++) {
+      console.log(`curl bloqueado para ${sku}, usando playwright (intento ${attempt}/${PLAYWRIGHT_RETRIES})...`);
+      try {
+        const html = await playwrightFetch(url);
+        playwrightMarkSuccess();
+        return html;
+      } catch (pe) {
+        if (attempt === PLAYWRIGHT_RETRIES) {
+          playwrightMarkFailure();
+          throw new Error('BLOCKED');
+        }
+      }
     }
   }
 }

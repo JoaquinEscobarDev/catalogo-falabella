@@ -41,6 +41,8 @@ const inputSku         = document.getElementById('inputSku');
 const inputAlias       = document.getElementById('inputAlias');
 const msgAgregar       = document.getElementById('msgAgregar');
 const btnBack          = document.getElementById('btnBack');
+const btnRefreshAll    = document.getElementById('btnRefreshAll');
+const headerActions    = document.getElementById('headerActions');
 const headerTitle      = document.getElementById('headerTitle');
 // ToDo
 const todoBadge        = document.getElementById('todoBadge');
@@ -90,6 +92,7 @@ async function abrirCategoria(nombre) {
   viewCategorias.style.display = 'none';
   viewProductos.style.display  = 'flex';
   btnBack.style.display        = 'inline-block';
+  headerActions.style.display  = 'flex';
   const cat = CATEGORIAS.find(c => c.nombre === nombre);
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
@@ -104,6 +107,7 @@ btnBack.addEventListener('click', () => {
   viewProductos.style.display  = 'none';
   viewCategorias.style.display = 'block';
   btnBack.style.display        = 'none';
+  headerActions.style.display  = 'none';
   headerTitle.textContent      = '🛒 Catálogo Falabella';
   todoFab.style.display        = 'none';
   renderCategorias();
@@ -136,12 +140,13 @@ formAgregar.addEventListener('submit', async (e) => {
 // PRODUCTOS
 // ══════════════════════════════════════════
 
-async function cargarProducto(sku) {
-  if (productosCache[sku] !== undefined) return;
+async function cargarProducto(sku, force = false) {
+  if (!force && productosCache[sku] !== undefined) return;
   productosCache[sku] = null;
   renderGrid();
   try {
-    const r    = await fetch(`/api/producto/${sku}`);
+    const url  = force ? `/api/producto/${sku}?force=1` : `/api/producto/${sku}`;
+    const r    = await fetch(url);
     const data = await r.json();
     productosCache[sku] = r.ok ? data : { error: data.error };
   } catch {
@@ -150,6 +155,18 @@ async function cargarProducto(sku) {
   renderGrid();
   renderTodo();
 }
+
+btnRefreshAll.addEventListener('click', async () => {
+  if (!categoriaActiva) return;
+  const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
+  skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
+  btnRefreshAll.textContent = '↻ Actualizando…';
+  btnRefreshAll.disabled = true;
+  renderGrid();
+  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku, true), cargarStock(s.sku)])));
+  btnRefreshAll.textContent = '↻ Actualizar precios';
+  btnRefreshAll.disabled = false;
+});
 
 async function cargarStock(sku) {
   if (stockCache[sku] !== undefined) return;

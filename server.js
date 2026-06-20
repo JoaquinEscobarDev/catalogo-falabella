@@ -282,8 +282,7 @@ async function playwrightFetch(url) {
 // así que una IP marcada por Cloudflare en un intento no se repite en los siguientes.
 const PLAYWRIGHT_RETRIES = process.env.PROXY_URL ? 5 : 1;
 
-async function fetchFalabella(sku) {
-  const url = `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
+async function fetchFalabella(url) {
   try {
     // Camino rápido: curl directo (funciona si Cloudflare no exige el JS challenge)
     return await curlFetch(url);
@@ -292,7 +291,7 @@ async function fetchFalabella(sku) {
     if (playwrightIsBlocked()) throw new Error('BLOCKED');
 
     for (let attempt = 1; attempt <= PLAYWRIGHT_RETRIES; attempt++) {
-      console.log(`curl bloqueado para ${sku}, usando playwright (intento ${attempt}/${PLAYWRIGHT_RETRIES})...`);
+      console.log(`curl bloqueado para ${url}, usando playwright (intento ${attempt}/${PLAYWRIGHT_RETRIES})...`);
       try {
         const html = await playwrightFetch(url);
         playwrightMarkSuccess();
@@ -327,10 +326,21 @@ app.get('/api/producto/:sku', async (req, res) => {
     // Intentar scraping (con proxy si está configurado)
     let product = null;
     try {
-      const html = await fetchFalabella(sku);
+      const html = await fetchFalabella(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
       product = extraerDeHTML(html, sku);
     } catch (e) {
       console.log(`Scraping falló para ${sku}: ${e.message}`);
+    }
+
+    if (!product) {
+      // No salió en la búsqueda (probablemente sin stock) — probar la página directa
+      // del producto. El slug no importa, Falabella resuelve por el ID.
+      try {
+        const html = await fetchFalabella(`https://www.falabella.com/falabella-cl/product/${sku}/x/${sku}`);
+        product = extraerDeHTML(html, sku);
+      } catch (e) {
+        console.log(`Página directa falló para ${sku}: ${e.message}`);
+      }
     }
 
     if (product) {

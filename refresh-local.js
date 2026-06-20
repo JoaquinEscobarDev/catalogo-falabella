@@ -31,8 +31,7 @@ function curlFetch(url) {
   });
 }
 
-async function fetchFalabella(sku, intentos = 2) {
-  const url = `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
+async function fetchUrl(url, intentos = 2) {
   for (let i = 1; i <= intentos; i++) {
     try {
       return await curlFetch(url);
@@ -40,6 +39,17 @@ async function fetchFalabella(sku, intentos = 2) {
     if (i < intentos) await new Promise(res => setTimeout(res, 1500));
   }
   throw new Error('BLOCKED');
+}
+
+// Productos sin stock quedan fuera de la búsqueda (Ntt=) pero la página
+// directa del producto los sigue mostrando. El slug en la URL no importa,
+// Falabella resuelve por el ID — por eso "x" funciona como slug cualquiera.
+async function fetchFalabella(sku) {
+  return fetchUrl(`https://www.falabella.com/falabella-cl/search?Ntt=${sku}`);
+}
+
+async function fetchFalabellaDirecto(sku) {
+  return fetchUrl(`https://www.falabella.com/falabella-cl/product/${sku}/x/${sku}`);
 }
 
 function extraerDeHTML(html, skuBuscado) {
@@ -117,11 +127,20 @@ async function main() {
   const { rows } = await db.query('SELECT sku FROM skus ORDER BY sku');
   console.log(`[${new Date().toLocaleString('es-CL')}] Refrescando ${rows.length} SKUs...`);
 
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, viaDirecta = 0;
   for (const { sku } of rows) {
     try {
-      const html = await fetchFalabella(sku);
-      const producto = extraerDeHTML(html, sku);
+      let producto = null;
+      try {
+        const html = await fetchFalabella(sku);
+        producto = extraerDeHTML(html, sku);
+      } catch { /* sigue al fallback */ }
+      if (!producto) {
+        // No salió en la búsqueda (probablemente sin stock) — probar la página directa
+        const html = await fetchFalabellaDirecto(sku);
+        producto = extraerDeHTML(html, sku);
+        if (producto) viaDirecta++;
+      }
       if (!producto) throw new Error('sin datos');
       await db.query(`
         INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, updated_at)
@@ -141,7 +160,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 400)); // ritmo prudente, no hay apuro
   }
 
-  console.log(`\n[${new Date().toLocaleString('es-CL')}] Listo: ${ok} OK / ${fail} FAIL de ${rows.length}`);
+  console.log(`\n[${new Date().toLocaleString('es-CL')}] Listo: ${ok} OK (${viaDirecta} vía página directa, sin stock) / ${fail} FAIL de ${rows.length}`);
   await db.end();
 }
 

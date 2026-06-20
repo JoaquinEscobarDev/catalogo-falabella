@@ -393,6 +393,14 @@ function normalizarTexto(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+// El precio más bajo que realmente paga el cliente: CMR u oferta,
+// lo que sea menor; si no hay ninguno, el precio normal.
+function precioOrden(prod) {
+  if (!prod) return Infinity;
+  const candidatos = [prod.precioCMR, prod.precioOferta, prod.precio].filter(p => p != null);
+  return candidatos.length ? Math.min(...candidatos) : Infinity;
+}
+
 function renderGrid() {
   if (!categoriaActiva) return;
   const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
@@ -403,7 +411,7 @@ function renderGrid() {
     const nombre  = prod?.nombre || '';
     const haystack = normalizarTexto(`${s.sku} ${s.alias || ''} ${nombre}`);
     return palabras.every(p => haystack.includes(p));
-  });
+  }).sort((a, b) => precioOrden(productosCache[a.sku]) - precioOrden(productosCache[b.sku]));
 
   if (!lista.length) {
     grid.innerHTML = '<div class="empty-state">No hay productos en esta categoría.<br>Agregá un SKU arriba.</div>';

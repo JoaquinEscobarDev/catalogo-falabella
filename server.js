@@ -63,6 +63,14 @@ async function initDB() {
         procesado BOOLEAN DEFAULT FALSE
       )
     `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS stock_cache (
+        sku        TEXT PRIMARY KEY,
+        stock      INTEGER,
+        store_name TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     console.log('Conectado a PostgreSQL');
   } else {
     console.log('Sin DATABASE_URL — usando archivo JSON local');
@@ -173,6 +181,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/skus', async (req, res) => {
   try { res.json(await dbGetAll()); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Trae precio + stock cacheados de toda una categoría en una sola consulta,
+// en vez de 2 requests por SKU (lo que hacía la página antes de abrir una
+// categoría grande).
+app.get('/api/categoria/:nombre', async (req, res) => {
+  if (!db) return res.json([]);
+  try {
+    const { rows } = await db.query(`
+      SELECT s.sku, s.alias,
+             p.nombre, p.marca, p.precio, p.precio_oferta, p.precio_cmr, p.imagen, p.url, p.updated_at AS precio_actualizado,
+             st.stock, st.store_name
+      FROM skus s
+      LEFT JOIN producto_cache p ON s.sku = p.sku
+      LEFT JOIN stock_cache st ON s.sku = st.sku
+      WHERE s.categoria = $1
+    `, [req.params.nombre]);
+
+    res.json(rows.map(r => ({
+      sku: r.sku,
+      alias: r.alias,
+      producto: r.nombre ? {
+        nombre: r.nombre, sku: r.sku, marca: r.marca,
+        precio: r.precio, precioOferta: r.precio_oferta, precioCMR: r.precio_cmr,
+        imagen: r.imagen, url: r.url, cached: true, updatedAt: r.precio_actualizado,
+      } : null,
+      stock: r.store_name ? { stock: r.stock, storeName: r.store_name } : null,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/skus', async (req, res) => {
@@ -439,30 +476,58 @@ app.get('/api/producto/:sku', async (req, res) => {
 const STORE_ID   = '2617';
 const STORE_LAT  = '-33.394';
 const STORE_LON  = '-70.551';
+const STOCK_TTL_MS = (parseInt(process.env.STOCK_TTL_HOURS) || 2) * 60 * 60 * 1000;
+
+async function dbGetStockCache(sku) {
+  if (!db) return null;
+  const r = await db.query('SELECT * FROM stock_cache WHERE sku = $1', [sku]);
+  return r.rowCount ? r.rows[0] : null;
+}
+
+async function dbSetStockCache(sku, stock, storeName) {
+  if (!db) return;
+  await db.query(`
+    INSERT INTO stock_cache (sku, stock, store_name, updated_at)
+    VALUES ($1,$2,$3,NOW())
+    ON CONFLICT (sku) DO UPDATE SET stock=EXCLUDED.stock, store_name=EXCLUDED.store_name, updated_at=NOW()
+  `, [sku, stock, storeName]);
+}
+
+async function fetchStockEnVivo(sku) {
+  const url = `https://www.falabella.com/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`;
+  const html = await new Promise((resolve, reject) => {
+    execFile('curl', [
+      '-s', url,
+      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      '-H', 'Accept: application/json',
+      '-H', 'Referer: https://www.falabella.com/',
+      '--max-time', '10',
+    ], { maxBuffer: 2 * 1024 * 1024 }, (err, stdout) => {
+      if (err) return reject(err);
+      resolve(stdout);
+    });
+  });
+  const data   = JSON.parse(html);
+  const stores = data?.stores || [];
+  const tienda = stores.find(s => s.id === STORE_ID);
+  if (!tienda) return { stock: null, storeName: 'Los Dominicos' };
+  return { stock: tienda.stockQuantity?.number ?? null, storeName: tienda.storeName };
+}
 
 app.get('/api/stock/:sku', async (req, res) => {
   const sku = req.params.sku;
   try {
-    const url = `https://www.falabella.com/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`;
-    const { execFile } = require('child_process');
-    const html = await new Promise((resolve, reject) => {
-      execFile('curl', [
-        '-s', url,
-        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        '-H', 'Accept: application/json',
-        '-H', 'Referer: https://www.falabella.com/',
-        '--max-time', '10',
-      ], { maxBuffer: 2 * 1024 * 1024 }, (err, stdout) => {
-        if (err) return reject(err);
-        resolve(stdout);
-      });
-    });
-    const data   = JSON.parse(html);
-    const stores = data?.stores || [];
-    const tienda = stores.find(s => s.id === STORE_ID);
-    if (!tienda) return res.json({ stock: null, storeName: 'Los Dominicos' });
-    res.json({ stock: tienda.stockQuantity?.number ?? null, storeName: tienda.storeName });
+    const cached = await dbGetStockCache(sku);
+    if (cached && Date.now() - new Date(cached.updated_at).getTime() < STOCK_TTL_MS) {
+      return res.json({ stock: cached.stock, storeName: cached.store_name });
+    }
+    const resultado = await fetchStockEnVivo(sku);
+    dbSetStockCache(sku, resultado.stock, resultado.storeName).catch(() => {});
+    res.json(resultado);
   } catch (e) {
+    // Si falla el scraping pero hay caché vieja, mejor mostrar eso que nada
+    const cached = await dbGetStockCache(sku).catch(() => null);
+    if (cached) return res.json({ stock: cached.stock, storeName: cached.store_name });
     res.status(500).json({ error: e.message });
   }
 });

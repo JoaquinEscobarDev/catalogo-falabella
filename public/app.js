@@ -148,8 +148,29 @@ async function abrirCategoria(nombre) {
   filtroInput.value = '';
   actualizarFab();
   renderGrid();
+
   const skusCat = skusGuardados.filter(s => s.categoria === nombre);
-  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
+
+  // Un solo request trae precio + stock cacheados de toda la categoría,
+  // en vez de 2 por producto. Lo que no tenga caché todavía (poco común)
+  // se carga individual como antes.
+  let datos = [];
+  try {
+    const r = await fetch(`/api/categoria/${encodeURIComponent(nombre)}`);
+    datos = await r.json();
+  } catch { /* sigue con la carga individual de fallback */ }
+
+  const sinCache = [];
+  for (const d of datos) {
+    if (d.producto) productosCache[d.sku] = d.producto;
+    else sinCache.push(d.sku);
+    if (d.stock) stockCache[d.sku] = d.stock;
+  }
+  renderGrid();
+  renderTodo();
+
+  const faltantes = skusCat.filter(s => productosCache[s.sku] === undefined || stockCache[s.sku] === undefined);
+  await Promise.all(faltantes.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
 }
 
 btnBack.addEventListener('click', () => {

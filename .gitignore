@@ -3,3 +3,4 @@ skus.json
 productos-cache.json
 .env
 refresh-local.log
+*.traineddata

@@ -37,7 +37,9 @@
           <input type="text" id="inputSku" placeholder="SKU (ej: 17461845)" required />
           <input type="text" id="inputAlias" placeholder="Alias opcional" />
           <button type="submit" class="btn-primary">Agregar</button>
+          <button type="button" id="btnFoto" class="btn-secondary">📷 Por foto</button>
         </form>
+        <input type="file" id="inputFoto" accept="image/*" capture="environment" style="display:none" />
         <p id="msgAgregar" class="msg"></p>
       </div>
 
@@ -89,6 +91,19 @@
       </div>
       <ul class="todo-list" id="todoListModal"></ul>
       <button class="todo-clear-modal" id="todoClearModal">Limpiar lista</button>
+    </div>
+  </div>
+
+  <!-- Modal búsqueda por foto -->
+  <div class="foto-overlay" id="fotoOverlay">
+    <div class="foto-modal">
+      <div class="foto-modal-header">
+        <span>📷 Agregar por foto</span>
+        <button class="foto-modal-close" id="fotoModalClose">✕</button>
+      </div>
+      <div id="fotoModalBody">
+        <p class="foto-msg">Sacá una foto donde se lea el modelo o nombre del producto.</p>
+      </div>
     </div>
   </div>
 

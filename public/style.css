@@ -281,7 +281,6 @@ main {
 }
 .stock-ok      { background: #dcfce7; color: #15803d; }
 .stock-low     { background: #fee2e2; color: #b91c1c; }
-.stock-zero    { background: #f3f4f6; color: #6b7280; }
 .stock-unknown { background: #f3f4f6; color: #9ca3af; font-weight:400; }
 .stock-loading { background: #f3f4f6; color: #9ca3af; font-weight:400; animation: pulse 1.2s infinite; }
 

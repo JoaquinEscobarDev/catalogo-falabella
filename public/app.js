@@ -447,8 +447,7 @@ function badgeStock(sku) {
   if (info === undefined || info === null) return '<span class="stock-badge stock-loading">Stock…</span>';
   const n = info.stock;
   if (n === null || n === undefined) return '<span class="stock-badge stock-unknown">Sin info</span>';
-  if (n === 0) return `<span class="stock-badge stock-zero">Stock: 0</span>`;
-  if (n === 1) return `<span class="stock-badge stock-low">Stock: 1</span>`;
+  if (n <= 2) return `<span class="stock-badge stock-low">Revisar</span>`;
   return `<span class="stock-badge stock-ok">Stock: ${n}</span>`;
 }
 

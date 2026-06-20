@@ -48,6 +48,7 @@ const viewProductos    = document.getElementById('viewProductos');
 const categoriasGrid   = document.getElementById('categoriasGrid');
 const grid             = document.getElementById('grid');
 const filtroInput      = document.getElementById('filtro');
+const filtroMarca      = document.getElementById('filtroMarca');
 const formAgregar      = document.getElementById('formAgregar');
 const inputSku         = document.getElementById('inputSku');
 const inputAlias       = document.getElementById('inputAlias');
@@ -155,6 +156,7 @@ async function mostrarVistaProductos(nombre) {
   const cat = CATEGORIAS.find(c => c.nombre === nombre);
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
+  filtroMarca.value = '';
   actualizarFab();
   renderGrid();
 
@@ -201,6 +203,7 @@ window.addEventListener('popstate', (e) => {
 });
 
 filtroInput.addEventListener('input', renderGrid);
+filtroMarca.addEventListener('change', renderGrid);
 
 async function agregarSku(sku, alias) {
   if (!sku || !categoriaActiva) return false;
@@ -401,13 +404,26 @@ function precioOrden(prod) {
   return candidatos.length ? Math.min(...candidatos) : Infinity;
 }
 
+// Reconstruye las opciones del filtro de marca según lo que haya cargado
+// de la categoría activa, conservando la selección si sigue existiendo.
+function actualizarFiltroMarca(skusCat) {
+  const marcas = [...new Set(skusCat.map(s => productosCache[s.sku]?.marca).filter(Boolean))].sort();
+  const seleccionActual = filtroMarca.value;
+  filtroMarca.innerHTML = '<option value="">Todas las marcas</option>'
+    + marcas.map(m => `<option value="${m}">${m}</option>`).join('');
+  if (marcas.includes(seleccionActual)) filtroMarca.value = seleccionActual;
+}
+
 function renderGrid() {
   if (!categoriaActiva) return;
   const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
   const skusCat  = skusGuardados.filter(s => s.categoria === categoriaActiva);
+  actualizarFiltroMarca(skusCat);
+  const marcaSeleccionada = filtroMarca.value;
   const lista    = skusCat.filter(s => {
+    const prod = productosCache[s.sku];
+    if (marcaSeleccionada && prod?.marca !== marcaSeleccionada) return false;
     if (!palabras.length) return true;
-    const prod    = productosCache[s.sku];
     const nombre  = prod?.nombre || '';
     const haystack = normalizarTexto(`${s.sku} ${s.alias || ''} ${nombre}`);
     return palabras.every(p => haystack.includes(p));

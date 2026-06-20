@@ -176,8 +176,10 @@ main {
 .msg.ok  { color: var(--verde-dark); }
 .msg.err { color: var(--rojo); }
 
-.search-panel input {
-  width: 100%;
+.search-panel { display: flex; gap: 8px; }
+.search-panel input { flex: 1; }
+.search-panel input,
+.search-panel select {
   padding: 10px 14px;
   border: 1.5px solid var(--gris-borde);
   border-radius: 10px;
@@ -187,7 +189,9 @@ main {
   outline: none;
   transition: border-color .18s;
 }
-.search-panel input:focus { border-color: var(--verde); }
+.search-panel select { flex: 0 0 auto; max-width: 45%; }
+.search-panel input:focus,
+.search-panel select:focus { border-color: var(--verde); }
 
 /* ── Layout: grid + sidebar ── */
 .content-row {

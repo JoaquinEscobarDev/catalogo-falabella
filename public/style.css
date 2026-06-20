@@ -240,6 +240,16 @@ main {
 
 .card-body { padding: 11px 13px 0; display:flex; flex-direction:column; gap:3px; flex:1; }
 .card-alias { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--verde-dark); }
+.card-capacidad {
+  display: inline-block;
+  width: fit-content;
+  font-size: .74rem;
+  font-weight: 700;
+  color: #fff;
+  background: #1d4ed8;
+  padding: 1px 8px;
+  border-radius: 6px;
+}
 .card-nombre { font-size:.85rem; font-weight:600; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .card-sku { font-size:.74rem; color:var(--texto-suave); font-family:monospace; }
 .card-loading-msg { font-size:.83rem; color:var(--texto-suave); margin-top:6px; }

@@ -506,6 +506,7 @@ function tarjeta({ sku, alias }) {
       <div class="card-content">
         <div class="card-body">
           ${alias ? `<span class="card-alias">${alias}</span>` : ''}
+          ${prod.capacidad ? `<span class="card-capacidad">${prod.capacidad}${prod.color ? ` · ${prod.color}` : ''}</span>` : ''}
           <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
           <span class="card-sku">SKU: ${sku}</span>
           <div class="card-precios">${bloquePrecio}</div>

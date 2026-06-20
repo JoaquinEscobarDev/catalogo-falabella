@@ -87,8 +87,19 @@ function extraerDeProductData(pd, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
+    capacidad: extraerCapacidad(pd.name, variante.attributes),
+    color: variante.attributes?.colorName || null,
     ...extraerGarantias(pd),
   };
+}
+
+// El nombre del producto (pd.name) es genérico y no trae GB ni color —
+// esos datos están solo en attributes.size de la variante elegida. En
+// resultados de búsqueda no hay attributes, ahí se sacan del nombre.
+function extraerCapacidad(nombre, attributes) {
+  if (attributes?.size) return attributes.size;
+  const m = (nombre || '').match(/(\d+\s?(?:GB|TB))/i);
+  return m ? m[1].replace(/\s+/g, ' ').toUpperCase() : null;
 }
 
 // La garantía extendida (1/2/3 años) solo viene en la página de producto
@@ -119,13 +130,16 @@ function extraerDeSearchResult(item, skuBuscado) {
   const precioO = parsePrecio(oferta?.price?.[0]);
   const precioCMR = parsePrecio(cmr?.price?.[0]);
   const imagen = item.mediaUrl || item.image || item.mediaUrls?.[0] || null;
+  const nombre = item.displayName || item.name;
   return {
-    nombre: item.displayName || item.name, sku: item.id || item.skuId || item.productId || skuBuscado, marca: item.brand,
+    nombre, sku: item.id || item.skuId || item.productId || skuBuscado, marca: item.brand,
     precio: precioN,
     precioOferta: precioO && precioO !== precioN ? precioO : null,
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
+    capacidad: extraerCapacidad(nombre, null),
+    color: null,
     // Los listados de búsqueda no traen warrantyOptions, solo la página de producto.
     garantia1a: null, garantia2a: null, garantia3a: null,
   };
@@ -191,17 +205,18 @@ async function actualizarSku(db, sku) {
   if (cambio) await registrarCambios(db, sku, previo, producto);
 
   await db.query(`
-    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, capacidad, color, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
     ON CONFLICT (sku) DO UPDATE SET
       nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
       precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
       precio_cmr=EXCLUDED.precio_cmr, imagen=EXCLUDED.imagen,
       url=EXCLUDED.url,
       garantia_1a=EXCLUDED.garantia_1a, garantia_2a=EXCLUDED.garantia_2a, garantia_3a=EXCLUDED.garantia_3a,
+      capacidad=EXCLUDED.capacidad, color=EXCLUDED.color,
       updated_at=NOW()
   `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
-      producto.garantia1a, producto.garantia2a, producto.garantia3a]);
+      producto.garantia1a, producto.garantia2a, producto.garantia3a, producto.capacidad, producto.color]);
 
   return { ok: true, viaDirecta, cambio, producto };
 }
@@ -229,9 +244,11 @@ async function asegurarTablas(db) {
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_1a INTEGER`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_2a INTEGER`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_3a INTEGER`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS capacidad TEXT`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS color TEXT`);
 }
 
 module.exports = {
   obtenerProducto, actualizarSku, registrarCambios, asegurarTablas,
-  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias, parsePrecio,
+  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias, extraerCapacidad, parsePrecio,
 };

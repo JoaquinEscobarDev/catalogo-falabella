@@ -374,8 +374,13 @@ async function fetchFalabella(url) {
   }
 }
 
-// Cuántas horas antes de considerar el caché "viejo" (default 6h, configurable)
-const CACHE_TTL_MS = (parseInt(process.env.CACHE_TTL_HOURS) || 6) * 60 * 60 * 1000;
+// Cuántas horas antes de considerar el caché "viejo". El único refresco
+// confiable hoy es el script local una vez al día (ver refresh-local.js) —
+// si el TTL es menor a 24h, toda carga de página entre corridas dispara un
+// scraping en vivo desde Railway (lento y casi siempre bloqueado por
+// Cloudflare) antes de mostrar el precio ya guardado. Default 30h para
+// cubrir el ciclo diario con margen si la PC se prendió tarde.
+const CACHE_TTL_MS = (parseInt(process.env.CACHE_TTL_HOURS) || 30) * 60 * 60 * 1000;
 
 app.get('/api/producto/:sku', async (req, res) => {
   const sku    = req.params.sku;

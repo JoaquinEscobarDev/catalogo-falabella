@@ -77,6 +77,44 @@ async function init() {
   skusGuardados = await r.json();
   renderCategorias();
   renderTodo();
+  await revisarCambiosPrecio();
+}
+
+// ── Cambios de precio detectados por el refresh diario ──
+const NOMBRES_CAMPO = { normal: 'Normal', oferta: 'Oferta', cmr: 'CMR' };
+
+async function revisarCambiosPrecio() {
+  let cambios;
+  try {
+    const r = await fetch('/api/cambios-precio');
+    cambios = await r.json();
+  } catch { return; }
+  if (!cambios?.length) return;
+
+  const fmt = n => n != null ? `$${Number(n).toLocaleString('es-CL')}` : '—';
+  for (const c of cambios) {
+    let item = todoItems.find(i => i.sku === c.sku);
+    if (!item) {
+      item = { sku: c.sku, size: 'Mediano', quantity: 1, cambios: [] };
+      todoItems.push(item);
+    }
+    if (!item.cambios) item.cambios = [];
+    item.cambios.push({
+      campo: NOMBRES_CAMPO[c.campo] || c.campo,
+      texto: `${NOMBRES_CAMPO[c.campo] || c.campo}: ${fmt(c.precio_anterior)} → ${fmt(c.precio_nuevo)}`,
+      fecha: c.fecha,
+    });
+  }
+  guardarTodo();
+  renderTodo();
+
+  try {
+    await fetch('/api/cambios-precio/marcar-vistos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: cambios.map(c => c.id) }),
+    });
+  } catch { /* si falla, se vuelven a mostrar mañana, no pasa nada */ }
 }
 
 // ══════════════════════════════════════════
@@ -465,7 +503,7 @@ function renderTodo() {
 
   actualizarFab();
 
-  const itemsHTML = todoItems.map(({ sku, size, quantity }) => {
+  const itemsHTML = todoItems.map(({ sku, size, quantity, cambios }) => {
     const prod  = productosCache[sku];
     const datos = skusGuardados.find(s => s.sku === sku);
     const alias = datos?.alias || '';
@@ -480,6 +518,14 @@ function renderTodo() {
       ? fmt(prod.precioOferta)
       : (prod?.precio ? fmt(prod.precio) : '—');
 
+    const fechaCambio = cambios?.length ? new Date(cambios[cambios.length - 1].fecha) : null;
+    const cambiosHTML = cambios?.length
+      ? `<div class="todo-cambios">
+          ${cambios.map(c => `<span class="todo-cambio-linea">${c.texto}</span>`).join('')}
+          ${fechaCambio ? `<span class="todo-cambio-fecha">${fechaCambio.toLocaleDateString('es-CL')}</span>` : ''}
+        </div>`
+      : '';
+
     return `
       <li class="todo-item">
         ${thumb}
@@ -488,6 +534,7 @@ function renderTodo() {
           <span class="todo-sku">SKU: ${sku}</span>
           <span class="todo-precio">${precio}</span>
           <span class="todo-size">${size} × ${quantity}</span>
+          ${cambiosHTML}
         </div>
         <button class="todo-remove" data-sku="${sku}" title="Quitar">✕</button>
       </li>`;

@@ -44,6 +44,17 @@ async function initDB() {
         updated_at  TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS cambios_precio (
+        id SERIAL PRIMARY KEY,
+        sku TEXT NOT NULL,
+        campo TEXT NOT NULL,
+        precio_anterior INTEGER,
+        precio_nuevo INTEGER,
+        fecha TIMESTAMPTZ DEFAULT NOW(),
+        visto BOOLEAN DEFAULT FALSE
+      )
+    `);
     console.log('Conectado a PostgreSQL');
   } else {
     console.log('Sin DATABASE_URL — usando archivo JSON local');
@@ -169,6 +180,28 @@ app.post('/api/skus', async (req, res) => {
 app.delete('/api/skus/:sku', async (req, res) => {
   try { await dbDelete(req.params.sku); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Cambios de precio detectados por el refresh diario (ver refresh-local.js)
+app.get('/api/cambios-precio', async (req, res) => {
+  if (!db) return res.json([]);
+  try {
+    const { rows } = await db.query(
+      `SELECT id, sku, campo, precio_anterior, precio_nuevo, fecha
+       FROM cambios_precio WHERE visto = FALSE ORDER BY fecha ASC`
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/cambios-precio/marcar-vistos', async (req, res) => {
+  if (!db) return res.json({ ok: true });
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.json({ ok: true });
+  try {
+    await db.query('UPDATE cambios_precio SET visto = TRUE WHERE id = ANY($1)', [ids]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════════

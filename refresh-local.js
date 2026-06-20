@@ -120,14 +120,42 @@ function parsePrecio(str) {
   return isNaN(n) ? null : n;
 }
 
+async function registrarCambios(db, sku, anterior, nuevo) {
+  const campos = [
+    ['normal', anterior?.precio, nuevo.precio],
+    ['oferta', anterior?.precio_oferta, nuevo.precioOferta],
+    ['cmr', anterior?.precio_cmr, nuevo.precioCMR],
+  ];
+  for (const [campo, antes, despues] of campos) {
+    // Solo registrar si ya había un precio previo y cambió (evita ruido en el primer fetch)
+    if (antes != null && despues != null && antes !== despues) {
+      await db.query(
+        'INSERT INTO cambios_precio (sku, campo, precio_anterior, precio_nuevo) VALUES ($1,$2,$3,$4)',
+        [sku, campo, antes, despues]
+      );
+    }
+  }
+}
+
 async function main() {
   const db = new Client({ connectionString: process.env.DATABASE_URL });
   await db.connect();
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cambios_precio (
+      id SERIAL PRIMARY KEY,
+      sku TEXT NOT NULL,
+      campo TEXT NOT NULL,
+      precio_anterior INTEGER,
+      precio_nuevo INTEGER,
+      fecha TIMESTAMPTZ DEFAULT NOW(),
+      visto BOOLEAN DEFAULT FALSE
+    )
+  `);
 
   const { rows } = await db.query('SELECT sku FROM skus ORDER BY sku');
   console.log(`[${new Date().toLocaleString('es-CL')}] Refrescando ${rows.length} SKUs...`);
 
-  let ok = 0, fail = 0, viaDirecta = 0;
+  let ok = 0, fail = 0, viaDirecta = 0, cambios = 0;
   for (const { sku } of rows) {
     try {
       let producto = null;
@@ -142,6 +170,17 @@ async function main() {
         if (producto) viaDirecta++;
       }
       if (!producto) throw new Error('sin datos');
+
+      const { rows: previos } = await db.query('SELECT precio, precio_oferta, precio_cmr FROM producto_cache WHERE sku = $1', [sku]);
+      const previo = previos[0] || null;
+      const antesDeCambios = previo
+        ? (previo.precio !== producto.precio || previo.precio_oferta !== producto.precioOferta || previo.precio_cmr !== producto.precioCMR)
+        : false;
+      if (antesDeCambios) {
+        await registrarCambios(db, sku, previo, producto);
+        cambios++;
+      }
+
       await db.query(`
         INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, updated_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
@@ -152,7 +191,7 @@ async function main() {
           url=EXCLUDED.url, updated_at=NOW()
       `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url]);
       ok++;
-      console.log(`  OK   ${sku} - ${producto.nombre} - $${producto.precio || producto.precioOferta || '?'}`);
+      console.log(`  OK   ${sku} - ${producto.nombre} - $${producto.precio || producto.precioOferta || '?'}${antesDeCambios ? ' (precio cambió)' : ''}`);
     } catch (e) {
       fail++;
       console.log(`  FAIL ${sku} - ${e.message}`);
@@ -160,7 +199,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 400)); // ritmo prudente, no hay apuro
   }
 
-  console.log(`\n[${new Date().toLocaleString('es-CL')}] Listo: ${ok} OK (${viaDirecta} vía página directa, sin stock) / ${fail} FAIL de ${rows.length}`);
+  console.log(`\n[${new Date().toLocaleString('es-CL')}] Listo: ${ok} OK (${viaDirecta} vía página directa, ${cambios} con cambio de precio) / ${fail} FAIL de ${rows.length}`);
   await db.end();
 }
 

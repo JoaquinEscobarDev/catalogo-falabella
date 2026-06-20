@@ -749,3 +749,8 @@ main {
   padding: 1px 7px;
   width: fit-content;
 }
+
+/* Cambios de precio automáticos en el ToDo */
+.todo-cambios { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; }
+.todo-cambio-linea { font-size: .72rem; font-weight: 600; color: var(--rojo); }
+.todo-cambio-fecha { font-size: .66rem; color: var(--texto-suave); }

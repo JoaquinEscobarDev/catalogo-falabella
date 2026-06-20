@@ -137,7 +137,16 @@ function renderCategorias() {
   });
 }
 
-async function abrirCategoria(nombre) {
+// El botón "← Categorías" y el botón atrás del navegador hacen lo mismo:
+// retroceder en el historial. Quien efectivamente cambia la vista es el
+// listener de popstate, así ambos caminos quedan sincronizados y el botón
+// atrás del navegador ya no saca de la página, solo vuelve a categorías.
+function abrirCategoria(nombre) {
+  history.pushState({ categoria: nombre }, '');
+  mostrarVistaProductos(nombre);
+}
+
+async function mostrarVistaProductos(nombre) {
   categoriaActiva = nombre;
   viewCategorias.style.display = 'none';
   viewProductos.style.display  = 'flex';
@@ -173,7 +182,7 @@ async function abrirCategoria(nombre) {
   await Promise.all(faltantes.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
 }
 
-btnBack.addEventListener('click', () => {
+function mostrarVistaCategorias() {
   categoriaActiva = null;
   viewProductos.style.display  = 'none';
   viewCategorias.style.display = 'block';
@@ -182,6 +191,13 @@ btnBack.addEventListener('click', () => {
   headerTitle.textContent      = '🛒 Catálogo Falabella';
   todoFab.style.display        = 'none';
   renderCategorias();
+}
+
+btnBack.addEventListener('click', () => history.back());
+
+window.addEventListener('popstate', (e) => {
+  if (e.state && e.state.categoria) mostrarVistaProductos(e.state.categoria);
+  else mostrarVistaCategorias();
 });
 
 filtroInput.addEventListener('input', renderGrid);

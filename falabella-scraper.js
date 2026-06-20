@@ -87,7 +87,27 @@ function extraerDeProductData(pd, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
+    ...extraerGarantias(pd),
   };
+}
+
+// La garantía extendida (1/2/3 años) solo viene en la página de producto
+// (productData), no en los listados de búsqueda. Toma el precio de oferta
+// si lo hay, sino el primero disponible.
+function extraerGarantias(pd) {
+  const opciones = pd?.warrantyOptions?.fieldOptions || [];
+  const resultado = { garantia1a: null, garantia2a: null, garantia3a: null };
+  for (const op of opciones) {
+    const m = (op.name || '').match(/^(\d+)\s*año/i);
+    if (!m) continue;
+    const anios  = parseInt(m[1], 10);
+    const oferta = op.prices?.find(p => p.type === 'internetPrice');
+    const precio = parsePrecio(oferta?.price?.[0]) ?? parsePrecio(op.prices?.[0]?.price?.[0]) ?? parsePrecio(op.textPrice);
+    if (anios === 1) resultado.garantia1a = precio;
+    if (anios === 2) resultado.garantia2a = precio;
+    if (anios === 3) resultado.garantia3a = precio;
+  }
+  return resultado;
 }
 
 function extraerDeSearchResult(item, skuBuscado) {
@@ -106,6 +126,8 @@ function extraerDeSearchResult(item, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
+    // Los listados de búsqueda no traen warrantyOptions, solo la página de producto.
+    garantia1a: null, garantia2a: null, garantia3a: null,
   };
 }
 
@@ -169,14 +191,17 @@ async function actualizarSku(db, sku) {
   if (cambio) await registrarCambios(db, sku, previo, producto);
 
   await db.query(`
-    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
     ON CONFLICT (sku) DO UPDATE SET
       nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
       precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
       precio_cmr=EXCLUDED.precio_cmr, imagen=EXCLUDED.imagen,
-      url=EXCLUDED.url, updated_at=NOW()
-  `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url]);
+      url=EXCLUDED.url,
+      garantia_1a=EXCLUDED.garantia_1a, garantia_2a=EXCLUDED.garantia_2a, garantia_3a=EXCLUDED.garantia_3a,
+      updated_at=NOW()
+  `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
+      producto.garantia1a, producto.garantia2a, producto.garantia3a]);
 
   return { ok: true, viaDirecta, cambio, producto };
 }
@@ -201,9 +226,12 @@ async function asegurarTablas(db) {
       procesado BOOLEAN DEFAULT FALSE
     )
   `);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_1a INTEGER`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_2a INTEGER`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_3a INTEGER`);
 }
 
 module.exports = {
   obtenerProducto, actualizarSku, registrarCambios, asegurarTablas,
-  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, parsePrecio,
+  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias, parsePrecio,
 };

@@ -71,6 +71,9 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_1a INTEGER`);
+    await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_2a INTEGER`);
+    await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_3a INTEGER`);
     console.log('Conectado a PostgreSQL');
   } else {
     console.log('Sin DATABASE_URL — usando archivo JSON local');
@@ -107,6 +110,7 @@ async function dbGetProductoCache(sku) {
       nombre: row.nombre, sku: row.sku, marca: row.marca,
       precio: row.precio, precioOferta: row.precio_oferta, precioCMR: row.precio_cmr,
       imagen: row.imagen, url: row.url,
+      garantia1a: row.garantia_1a, garantia2a: row.garantia_2a, garantia3a: row.garantia_3a,
       cached: true, updatedAt: row.updated_at,
     };
   }
@@ -117,15 +121,18 @@ async function dbGetProductoCache(sku) {
 async function dbSetProductoCache(sku, product) {
   if (db) {
     await db.query(`
-      INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+      INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
       ON CONFLICT (sku) DO UPDATE SET
         nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
         precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
         precio_cmr=EXCLUDED.precio_cmr, imagen=EXCLUDED.imagen,
-        url=EXCLUDED.url, updated_at=NOW()
+        url=EXCLUDED.url,
+        garantia_1a=EXCLUDED.garantia_1a, garantia_2a=EXCLUDED.garantia_2a, garantia_3a=EXCLUDED.garantia_3a,
+        updated_at=NOW()
     `, [sku, product.nombre, product.marca, product.precio,
-        product.precioOferta, product.precioCMR, product.imagen, product.url]);
+        product.precioOferta, product.precioCMR, product.imagen, product.url,
+        product.garantia1a, product.garantia2a, product.garantia3a]);
   } else {
     const c = leerCache();
     c[sku] = { ...product, cached: false, updatedAt: new Date().toISOString() };
@@ -192,6 +199,7 @@ app.get('/api/categoria/:nombre', async (req, res) => {
     const { rows } = await db.query(`
       SELECT s.sku, s.alias,
              p.nombre, p.marca, p.precio, p.precio_oferta, p.precio_cmr, p.imagen, p.url, p.updated_at AS precio_actualizado,
+             p.garantia_1a, p.garantia_2a, p.garantia_3a,
              st.stock, st.store_name
       FROM skus s
       LEFT JOIN producto_cache p ON s.sku = p.sku
@@ -206,6 +214,7 @@ app.get('/api/categoria/:nombre', async (req, res) => {
         nombre: r.nombre, sku: r.sku, marca: r.marca,
         precio: r.precio, precioOferta: r.precio_oferta, precioCMR: r.precio_cmr,
         imagen: r.imagen, url: r.url, cached: true, updatedAt: r.precio_actualizado,
+        garantia1a: r.garantia_1a, garantia2a: r.garantia_2a, garantia3a: r.garantia_3a,
       } : null,
       stock: r.store_name ? { stock: r.stock, storeName: r.store_name } : null,
     })));
@@ -622,6 +631,8 @@ function extraerDeHTML(html, skuBuscado) {
   }
 }
 
+const { extraerGarantias } = require('./falabella-scraper');
+
 function extraerDeProductData(pd, skuBuscado) {
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};
   const precios  = variante.prices || [];
@@ -640,6 +651,7 @@ function extraerDeProductData(pd, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
+    ...extraerGarantias(pd),
   };
 }
 
@@ -661,6 +673,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
+    garantia1a: null, garantia2a: null, garantia3a: null,
   };
 }
 

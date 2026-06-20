@@ -470,6 +470,16 @@ function tarjeta({ sku, alias }) {
     bloquePrecio = `<div class="precio-fila"><span class="precio-normal" style="color:#999">Sin precio</span></div>${cmrRow}`;
   }
 
+  let bloqueGarantia = '';
+  if (prod.garantia1a || prod.garantia2a || prod.garantia3a) {
+    const filas = [
+      prod.garantia1a ? `<span class="garantia-item">1a: ${fmt(prod.garantia1a)}</span>` : '',
+      prod.garantia2a ? `<span class="garantia-item">2a: ${fmt(prod.garantia2a)}</span>` : '',
+      prod.garantia3a ? `<span class="garantia-item">3a: ${fmt(prod.garantia3a)}</span>` : '',
+    ].filter(Boolean).join('');
+    bloqueGarantia = `<div class="card-garantia"><span class="garantia-label">🛡️ Garantía ext.</span>${filas}</div>`;
+  }
+
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
   const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
 
@@ -495,6 +505,7 @@ function tarjeta({ sku, alias }) {
           <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
           <span class="card-sku">SKU: ${sku}</span>
           <div class="card-precios">${bloquePrecio}</div>
+          ${bloqueGarantia}
           ${badgeStock(sku)}
           ${cacheBadge}
         </div>

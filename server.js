@@ -637,7 +637,7 @@ function extraerDeHTML(html, skuBuscado) {
   }
 }
 
-const { extraerGarantias, extraerCapacidad } = require('./falabella-scraper');
+const { extraerGarantias, extraerCapacidad, extraerColorDeNombre } = require('./falabella-scraper');
 
 function extraerDeProductData(pd, skuBuscado) {
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};
@@ -657,8 +657,8 @@ function extraerDeProductData(pd, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
-    capacidad: extraerCapacidad(pd.name, variante.attributes),
-    color: variante.attributes?.colorName || null,
+    capacidad: extraerCapacidad(pd.name, variante.attributes) || extraerCapacidad(variante.name, null),
+    color: variante.attributes?.colorName || extraerColorDeNombre(variante.name),
     ...extraerGarantias(pd),
   };
 }
@@ -683,7 +683,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     imagen,
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
     capacidad: extraerCapacidad(nombre, null),
-    color: null,
+    color: extraerColorDeNombre(nombre),
     garantia1a: null, garantia2a: null, garantia3a: null,
   };
 }

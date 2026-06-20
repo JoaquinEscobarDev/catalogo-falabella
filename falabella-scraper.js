@@ -87,8 +87,11 @@ function extraerDeProductData(pd, skuBuscado) {
     precioCMR: precioCMR && precioCMR !== precioN && precioCMR !== precioO ? precioCMR : null,
     imagen,
     url: pd.slug ? `https://www.falabella.com/falabella-cl/product/${pd.id}/${pd.slug}` : null,
-    capacidad: extraerCapacidad(pd.name, variante.attributes),
-    color: variante.attributes?.colorName || null,
+    // Cuando el producto no tiene variantes de color/tamaño (un solo SKU),
+    // Falabella no llena attributes.size/colorName — ahí se sacan del
+    // nombre interno de la variante (ej. "SAMSUNG GALAXY A17 128GB NEGRO").
+    capacidad: extraerCapacidad(pd.name, variante.attributes) || extraerCapacidad(variante.name, null),
+    color: variante.attributes?.colorName || extraerColorDeNombre(variante.name),
     ...extraerGarantias(pd),
   };
 }
@@ -100,6 +103,24 @@ function extraerCapacidad(nombre, attributes) {
   if (attributes?.size) return attributes.size;
   const m = (nombre || '').match(/(\d+\s?(?:GB|TB))/i);
   return m ? m[1].replace(/\s+/g, ' ').toUpperCase() : null;
+}
+
+// Igual que la capacidad: en resultados de búsqueda no hay attributes,
+// pero el nombre suele terminar con el color (ej. "...256GB Negro").
+const COLORES_CONOCIDOS = [
+  'negro', 'blanco', 'azul', 'gris', 'celeste', 'morado', 'violeta', 'lila',
+  'rosado', 'rosa', 'rojo', 'verde', 'dorado', 'plateado', 'plata', 'titanio',
+  'naranjo', 'amarillo', 'fucsia', 'beige', 'cobre', 'turquesa', 'crema',
+];
+function extraerColorDeNombre(nombre) {
+  const palabras = (nombre || '').toLowerCase().split(/\s+/);
+  for (let i = palabras.length - 1; i >= 0; i--) {
+    const palabra = palabras[i].replace(/[^a-záéíóúñ]/g, '');
+    if (COLORES_CONOCIDOS.includes(palabra)) {
+      return palabra.charAt(0).toUpperCase() + palabra.slice(1);
+    }
+  }
+  return null;
 }
 
 // La garantía extendida (1/2/3 años) solo viene en la página de producto
@@ -139,7 +160,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     imagen,
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
     capacidad: extraerCapacidad(nombre, null),
-    color: null,
+    color: extraerColorDeNombre(nombre),
     // Los listados de búsqueda no traen warrantyOptions, solo la página de producto.
     garantia1a: null, garantia2a: null, garantia3a: null,
   };
@@ -250,5 +271,6 @@ async function asegurarTablas(db) {
 
 module.exports = {
   obtenerProducto, actualizarSku, registrarCambios, asegurarTablas,
-  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias, extraerCapacidad, parsePrecio,
+  fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias,
+  extraerCapacidad, extraerColorDeNombre, parsePrecio,
 };

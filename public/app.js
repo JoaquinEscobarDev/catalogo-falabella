@@ -287,16 +287,55 @@ async function cargarProducto(sku, force = false) {
   renderTodo();
 }
 
+// El refresco real lo hace tu PC (ver watch-refresh.js) cada ~5 min — Railway
+// no puede scrapear Falabella de forma confiable. El botón solo deja la
+// solicitud y espera a que se procese para volver a cargar los precios.
 btnRefreshAll.addEventListener('click', async () => {
-  if (!categoriaActiva) return;
-  const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
-  skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
-  btnRefreshAll.textContent = '↻ Actualizando…';
+  if (!categoriaActiva || btnRefreshAll.disabled) return;
   btnRefreshAll.disabled = true;
-  renderGrid();
-  await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku, true), cargarStock(s.sku)])));
-  btnRefreshAll.textContent = '↻ Actualizar precios';
-  btnRefreshAll.disabled = false;
+  btnRefreshAll.textContent = '↻ Solicitando…';
+
+  let solicitudId;
+  try {
+    const r = await fetch('/api/solicitar-refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoria: categoriaActiva }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error al solicitar');
+    solicitudId = data.id;
+  } catch (e) {
+    btnRefreshAll.textContent = '❌ ' + e.message;
+    setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 3000);
+    return;
+  }
+
+  btnRefreshAll.textContent = '↻ Esperando tu PC…';
+  const categoriaAlSolicitar = categoriaActiva;
+
+  // Tu PC revisa solicitudes pendientes cada ~5 min — esperamos hasta 12 min en total.
+  for (let intento = 0; intento < 24; intento++) {
+    await new Promise(res => setTimeout(res, 30000));
+    let procesado = false;
+    try {
+      const r = await fetch(`/api/solicitar-refresh/${solicitudId}`);
+      procesado = (await r.json()).procesado;
+    } catch { /* probar de nuevo en el próximo intento */ }
+    if (procesado) {
+      if (categoriaActiva === categoriaAlSolicitar) {
+        const skusCat = skusGuardados.filter(s => s.categoria === categoriaAlSolicitar);
+        skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
+        renderGrid();
+        await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
+      }
+      btnRefreshAll.textContent = '✓ Precios actualizados';
+      setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 3000);
+      return;
+    }
+  }
+  btnRefreshAll.textContent = '⏱ Tardó más de lo esperado';
+  setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 4000);
 });
 
 async function cargarStock(sku) {

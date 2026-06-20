@@ -55,6 +55,14 @@ async function initDB() {
         visto BOOLEAN DEFAULT FALSE
       )
     `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS solicitudes_refresh (
+        id SERIAL PRIMARY KEY,
+        categoria TEXT NOT NULL,
+        creado_en TIMESTAMPTZ DEFAULT NOW(),
+        procesado BOOLEAN DEFAULT FALSE
+      )
+    `);
     console.log('Conectado a PostgreSQL');
   } else {
     console.log('Sin DATABASE_URL — usando archivo JSON local');
@@ -201,6 +209,30 @@ app.post('/api/cambios-precio/marcar-vistos', async (req, res) => {
   try {
     await db.query('UPDATE cambios_precio SET visto = TRUE WHERE id = ANY($1)', [ids]);
     res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// "Actualizar precios" deja la solicitud para que tu PC la procese (ver
+// watch-refresh.js) — Railway no puede scrapear Falabella de forma confiable.
+app.post('/api/solicitar-refresh', async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'Sin base de datos' });
+  const { categoria } = req.body;
+  if (!categoria) return res.status(400).json({ error: 'Falta la categoría' });
+  try {
+    const { rows } = await db.query(
+      'INSERT INTO solicitudes_refresh (categoria) VALUES ($1) RETURNING id',
+      [categoria]
+    );
+    res.json({ ok: true, id: rows[0].id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/solicitar-refresh/:id', async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'Sin base de datos' });
+  try {
+    const { rows } = await db.query('SELECT procesado FROM solicitudes_refresh WHERE id = $1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'No existe' });
+    res.json({ procesado: rows[0].procesado });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

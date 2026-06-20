@@ -372,17 +372,21 @@ async function cargarStock(sku) {
   renderGrid();
 }
 
+// Normaliza (sin acentos, minúsculas) para que "camara" encuentre "Cámara".
+function normalizarTexto(str) {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 function renderGrid() {
   if (!categoriaActiva) return;
-  const filtro  = filtroInput.value.toLowerCase();
-  const skusCat = skusGuardados.filter(s => s.categoria === categoriaActiva);
-  const lista   = skusCat.filter(s => {
-    if (!filtro) return true;
-    const prod   = productosCache[s.sku];
-    const nombre = prod?.nombre || '';
-    return s.sku.includes(filtro)
-      || (s.alias || '').toLowerCase().includes(filtro)
-      || nombre.toLowerCase().includes(filtro);
+  const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
+  const skusCat  = skusGuardados.filter(s => s.categoria === categoriaActiva);
+  const lista    = skusCat.filter(s => {
+    if (!palabras.length) return true;
+    const prod    = productosCache[s.sku];
+    const nombre  = prod?.nombre || '';
+    const haystack = normalizarTexto(`${s.sku} ${s.alias || ''} ${nombre}`);
+    return palabras.every(p => haystack.includes(p));
   });
 
   if (!lista.length) {

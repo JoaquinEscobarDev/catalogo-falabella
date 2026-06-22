@@ -27,6 +27,7 @@ const CATEGORIAS = [
   { nombre: 'Parlantes',          icono: '🔊' },
   { nombre: 'Cuidado Personal',   icono: '✨' },
   { nombre: 'Clima',              icono: '❄️' },
+  { nombre: 'Accesorios',         icono: '🔌' },
 ];
 
 // ── Estado ──

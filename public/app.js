@@ -524,6 +524,10 @@ function tarjeta({ sku, alias }) {
     bloqueGarantia = `<div class="card-garantia"><span class="garantia-label">🛡️ Garantía ext.</span>${filas}</div>`;
   }
 
+  const bloqueCuotas = prod.cuotasSinInteres
+    ? `<div class="card-cuotas">💳 Hasta ${prod.cuotasSinInteres} cuotas sin interés (CMR)</div>`
+    : '';
+
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
   const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
 
@@ -550,6 +554,7 @@ function tarjeta({ sku, alias }) {
           <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
           <span class="card-sku">SKU: ${sku}</span>
           <div class="card-precios">${bloquePrecio}</div>
+          ${bloqueCuotas}
           ${bloqueGarantia}
           ${badgeStock(sku)}
           ${cacheBadge}

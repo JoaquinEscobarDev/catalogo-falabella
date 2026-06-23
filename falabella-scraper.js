@@ -92,8 +92,22 @@ function extraerDeProductData(pd, skuBuscado) {
     // nombre interno de la variante (ej. "SAMSUNG GALAXY A17 128GB NEGRO").
     capacidad: extraerCapacidad(pd.name, variante.attributes) || extraerCapacidad(variante.name, null),
     color: variante.attributes?.colorName || extraerColorDeNombre(variante.name),
+    cuotasSinInteres: extraerCuotasSinInteres(pd),
     ...extraerGarantias(pd),
   };
+}
+
+// Falabella ofrece varias promos de cuotas sin interés a la vez, algunas
+// solo para clientes de cierto segmento bancario (userSegment). Para no
+// prometer algo que no aplica a cualquier cliente, se toma el máximo de
+// cuotas entre las que usan CMR y no tienen restricción de segmento.
+function extraerCuotasSinInteres(pd) {
+  const opciones = pd?.installmentsWithoutInterest || [];
+  const validas = opciones.filter(o =>
+    o.paymentMethods?.includes('CMR_CREDIT_CARD') && (!o.userSegment || o.userSegment.length === 0)
+  );
+  if (!validas.length) return null;
+  return Math.max(...validas.map(o => o.installments));
 }
 
 // El nombre del producto (pd.name) es genérico y no trae GB ni color —
@@ -161,7 +175,9 @@ function extraerDeSearchResult(item, skuBuscado) {
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
     capacidad: extraerCapacidad(nombre, null),
     color: extraerColorDeNombre(nombre),
-    // Los listados de búsqueda no traen warrantyOptions, solo la página de producto.
+    // Los listados de búsqueda no traen warrantyOptions ni installmentsWithoutInterest,
+    // solo la página de producto.
+    cuotasSinInteres: null,
     garantia1a: null, garantia2a: null, garantia3a: null,
   };
 }
@@ -226,8 +242,8 @@ async function actualizarSku(db, sku) {
   if (cambio) await registrarCambios(db, sku, previo, producto);
 
   await db.query(`
-    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, capacidad, color, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, capacidad, color, cuotas_sin_interes, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
     ON CONFLICT (sku) DO UPDATE SET
       nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
       precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
@@ -235,9 +251,10 @@ async function actualizarSku(db, sku) {
       url=EXCLUDED.url,
       garantia_1a=EXCLUDED.garantia_1a, garantia_2a=EXCLUDED.garantia_2a, garantia_3a=EXCLUDED.garantia_3a,
       capacidad=EXCLUDED.capacidad, color=EXCLUDED.color,
+      cuotas_sin_interes=EXCLUDED.cuotas_sin_interes,
       updated_at=NOW()
   `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
-      producto.garantia1a, producto.garantia2a, producto.garantia3a, producto.capacidad, producto.color]);
+      producto.garantia1a, producto.garantia2a, producto.garantia3a, producto.capacidad, producto.color, producto.cuotasSinInteres]);
 
   return { ok: true, viaDirecta, cambio, producto };
 }
@@ -267,10 +284,11 @@ async function asegurarTablas(db) {
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_3a INTEGER`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS capacidad TEXT`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS color TEXT`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS cuotas_sin_interes INTEGER`);
 }
 
 module.exports = {
   obtenerProducto, actualizarSku, registrarCambios, asegurarTablas,
   fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias,
-  extraerCapacidad, extraerColorDeNombre, parsePrecio,
+  extraerCapacidad, extraerColorDeNombre, extraerCuotasSinInteres, parsePrecio,
 };

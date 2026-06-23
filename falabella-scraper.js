@@ -93,6 +93,7 @@ function extraerDeProductData(pd, skuBuscado) {
     capacidad: extraerCapacidad(pd.name, variante.attributes) || extraerCapacidad(variante.name, null),
     color: variante.attributes?.colorName || extraerColorDeNombre(variante.name),
     cuotasSinInteres: extraerCuotasSinInteres(pd),
+    despacho24h: extraerDespacho24h(variante.meatStickers),
     ...extraerGarantias(pd),
   };
 }
@@ -108,6 +109,13 @@ function extraerCuotasSinInteres(pd) {
   );
   if (!validas.length) return null;
   return Math.max(...validas.map(o => o.installments));
+}
+
+// "Despacho 24 horas" = envío a domicilio que llega al día siguiente
+// (meatSticker tipo "next_day"). "cc_next_day" es retiro en tienda, no
+// despacho, por eso no cuenta acá.
+function extraerDespacho24h(meatStickers) {
+  return (meatStickers || []).some(s => s.type === 'next_day');
 }
 
 // El nombre del producto (pd.name) es genérico y no trae GB ni color —
@@ -175,6 +183,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     url: item.url ? (item.url.startsWith('http') ? item.url : `https://www.falabella.com${item.url}`) : null,
     capacidad: extraerCapacidad(nombre, null),
     color: extraerColorDeNombre(nombre),
+    despacho24h: extraerDespacho24h(item.meatStickers),
     // Los listados de búsqueda no traen warrantyOptions ni installmentsWithoutInterest,
     // solo la página de producto.
     cuotasSinInteres: null,
@@ -242,8 +251,8 @@ async function actualizarSku(db, sku) {
   if (cambio) await registrarCambios(db, sku, previo, producto);
 
   await db.query(`
-    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, capacidad, color, cuotas_sin_interes, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+    INSERT INTO producto_cache (sku, nombre, marca, precio, precio_oferta, precio_cmr, imagen, url, garantia_1a, garantia_2a, garantia_3a, capacidad, color, cuotas_sin_interes, despacho_24h, updated_at)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
     ON CONFLICT (sku) DO UPDATE SET
       nombre=EXCLUDED.nombre, marca=EXCLUDED.marca,
       precio=EXCLUDED.precio, precio_oferta=EXCLUDED.precio_oferta,
@@ -252,9 +261,10 @@ async function actualizarSku(db, sku) {
       garantia_1a=EXCLUDED.garantia_1a, garantia_2a=EXCLUDED.garantia_2a, garantia_3a=EXCLUDED.garantia_3a,
       capacidad=EXCLUDED.capacidad, color=EXCLUDED.color,
       cuotas_sin_interes=EXCLUDED.cuotas_sin_interes,
+      despacho_24h=EXCLUDED.despacho_24h,
       updated_at=NOW()
   `, [sku, producto.nombre, producto.marca, producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
-      producto.garantia1a, producto.garantia2a, producto.garantia3a, producto.capacidad, producto.color, producto.cuotasSinInteres]);
+      producto.garantia1a, producto.garantia2a, producto.garantia3a, producto.capacidad, producto.color, producto.cuotasSinInteres, producto.despacho24h]);
 
   return { ok: true, viaDirecta, cambio, producto };
 }
@@ -285,10 +295,11 @@ async function asegurarTablas(db) {
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS capacidad TEXT`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS color TEXT`);
   await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS cuotas_sin_interes INTEGER`);
+  await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS despacho_24h BOOLEAN`);
 }
 
 module.exports = {
   obtenerProducto, actualizarSku, registrarCambios, asegurarTablas,
   fetchFalabella, fetchFalabellaDirecto, extraerDeHTML, extraerGarantias,
-  extraerCapacidad, extraerColorDeNombre, extraerCuotasSinInteres, parsePrecio,
+  extraerCapacidad, extraerColorDeNombre, extraerCuotasSinInteres, extraerDespacho24h, parsePrecio,
 };

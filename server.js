@@ -71,6 +71,14 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS todo_items (
+        sku        TEXT PRIMARY KEY,
+        size       TEXT NOT NULL DEFAULT 'Mediano',
+        quantity   INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_1a INTEGER`);
     await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_2a INTEGER`);
     await db.query(`ALTER TABLE producto_cache ADD COLUMN IF NOT EXISTS garantia_3a INTEGER`);
@@ -249,24 +257,58 @@ app.delete('/api/skus/:sku', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Cambios de precio detectados por el refresh diario (ver refresh-local.js)
-app.get('/api/cambios-precio', async (req, res) => {
+// ToDo compartido: vive en la base, no en localStorage, así todos los
+// dispositivos ven la misma lista. Cualquier SKU con cambio de precio sin
+// ver (detectado por el refresh diario) se agrega solo al ToDo de todos.
+app.get('/api/todo', async (req, res) => {
   if (!db) return res.json([]);
   try {
-    const { rows } = await db.query(
+    const { rows: pendientes } = await db.query(
+      'SELECT DISTINCT sku FROM cambios_precio WHERE visto = FALSE'
+    );
+    for (const { sku } of pendientes) {
+      await db.query('INSERT INTO todo_items (sku) VALUES ($1) ON CONFLICT (sku) DO NOTHING', [sku]);
+    }
+
+    const { rows: items }   = await db.query('SELECT sku, size, quantity FROM todo_items ORDER BY created_at ASC');
+    const { rows: cambios } = await db.query(
       `SELECT id, sku, campo, precio_anterior, precio_nuevo, fecha
        FROM cambios_precio WHERE visto = FALSE ORDER BY fecha ASC`
     );
-    res.json(rows);
+    const cambiosPorSku = {};
+    for (const c of cambios) (cambiosPorSku[c.sku] ||= []).push(c);
+
+    res.json(items.map(i => ({ ...i, cambios: cambiosPorSku[i.sku] || [] })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/cambios-precio/marcar-vistos', async (req, res) => {
+app.post('/api/todo', async (req, res) => {
   if (!db) return res.json({ ok: true });
-  const { ids } = req.body;
-  if (!Array.isArray(ids) || !ids.length) return res.json({ ok: true });
+  const { sku, size, quantity } = req.body;
+  if (!sku) return res.status(400).json({ error: 'SKU requerido' });
   try {
-    await db.query('UPDATE cambios_precio SET visto = TRUE WHERE id = ANY($1)', [ids]);
+    await db.query(`
+      INSERT INTO todo_items (sku, size, quantity) VALUES ($1, $2, $3)
+      ON CONFLICT (sku) DO UPDATE SET size = EXCLUDED.size, quantity = EXCLUDED.quantity
+    `, [sku, size || 'Mediano', quantity || 1]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/todo/:sku', async (req, res) => {
+  if (!db) return res.json({ ok: true });
+  try {
+    await db.query('UPDATE cambios_precio SET visto = TRUE WHERE sku = $1', [req.params.sku]);
+    await db.query('DELETE FROM todo_items WHERE sku = $1', [req.params.sku]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/todo/clear', async (req, res) => {
+  if (!db) return res.json({ ok: true });
+  try {
+    await db.query('UPDATE cambios_precio SET visto = TRUE WHERE visto = FALSE');
+    await db.query('DELETE FROM todo_items');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

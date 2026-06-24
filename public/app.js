@@ -37,11 +37,9 @@ let productosCache  = {};
 let stockCache      = {};
 let sizeSkuPending  = null;
 
-// Migración: formato antiguo era array de strings, nuevo es array de objetos {sku, size, quantity}
-const rawTodo = JSON.parse(localStorage.getItem('todoList') || '[]');
-let todoItems = rawTodo.map(item =>
-  typeof item === 'string' ? { sku: item, size: 'Mediano', quantity: 1 } : item
-);
+// El ToDo vive en el servidor (tabla todo_items), no en localStorage, para
+// que todos los dispositivos vean siempre la misma lista.
+let todoItems = [];
 
 // ── Elementos ──
 const viewCategorias   = document.getElementById('viewCategorias');
@@ -78,55 +76,34 @@ async function init() {
   const r = await fetch('/api/skus');
   skusGuardados = await r.json();
   renderCategorias();
-  renderTodo();
-  await revisarCambiosPrecio();
+  await cargarTodo();
+  // Refresca el ToDo cada 20s para que los cambios de otros dispositivos
+  // (agregar, quitar, limpiar) se vean sin tener que recargar la página.
+  setInterval(cargarTodo, 20000);
 }
 
 // ── Cambios de precio detectados por el refresh diario ──
 const NOMBRES_CAMPO = { normal: 'Normal', oferta: 'Oferta', cmr: 'CMR' };
 
-// No se marca "visto" acá: el ToDo vive en el localStorage de cada
-// dispositivo, así que si se marcara como visto al solo cargar la
-// página, un cambio detectado se perdería para cualquier otro
-// dispositivo que revise el ToDo más tarde. Se marca como visto recién
-// cuando el producto se quita del ToDo (ver marcarCambiosVistos).
-async function revisarCambiosPrecio() {
-  let cambios;
+async function cargarTodo() {
+  let items;
   try {
-    const r = await fetch('/api/cambios-precio');
-    cambios = await r.json();
+    const r = await fetch('/api/todo');
+    items = await r.json();
   } catch { return; }
-  if (!cambios?.length) return;
 
   const fmt = n => n != null ? `$${Number(n).toLocaleString('es-CL')}` : '—';
-  for (const c of cambios) {
-    let item = todoItems.find(i => i.sku === c.sku);
-    if (!item) {
-      item = { sku: c.sku, size: 'Mediano', quantity: 1, cambios: [] };
-      todoItems.push(item);
-    }
-    if (!item.cambios) item.cambios = [];
-    if (item.cambios.some(existente => existente.id === c.id)) continue;
-    item.cambios.push({
+  todoItems = items.map(item => ({
+    ...item,
+    cambios: (item.cambios || []).map(c => ({
       id: c.id,
       campo: NOMBRES_CAMPO[c.campo] || c.campo,
       texto: `${NOMBRES_CAMPO[c.campo] || c.campo}: ${fmt(c.precio_anterior)} → ${fmt(c.precio_nuevo)}`,
       fecha: c.fecha,
-    });
-  }
-  guardarTodo();
+    })),
+  }));
   renderTodo();
-}
-
-async function marcarCambiosVistos(ids) {
-  if (!ids?.length) return;
-  try {
-    await fetch('/api/cambios-precio/marcar-vistos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
-    });
-  } catch { /* si falla, se vuelven a mostrar más tarde, no pasa nada */ }
+  renderGrid();
 }
 
 // ══════════════════════════════════════════
@@ -585,13 +562,11 @@ function tarjeta({ sku, alias }) {
 async function eliminarSku(sku) {
   if (!confirm(`¿Eliminar el SKU ${sku}?`)) return;
   await fetch(`/api/skus/${sku}`, { method: 'DELETE' });
+  await fetch(`/api/todo/${sku}`, { method: 'DELETE' });
   delete productosCache[sku];
   delete stockCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
-  const quitado  = todoItems.find(item => item.sku === sku);
-  marcarCambiosVistos(quitado?.cambios?.map(c => c.id).filter(Boolean));
   todoItems = todoItems.filter(item => item.sku !== sku);
-  guardarTodo();
   renderGrid();
   renderTodo();
   renderCategorias();
@@ -607,30 +582,23 @@ function mostrarMsg(msg, tipo) {
 // TODO
 // ══════════════════════════════════════════
 
-function guardarTodo() {
-  localStorage.setItem('todoList', JSON.stringify(todoItems));
-}
-
-function toggleTodo(sku) {
+async function toggleTodo(sku) {
   const idx = todoItems.findIndex(item => item.sku === sku);
   if (idx !== -1) {
-    const [quitado] = todoItems.splice(idx, 1);
-    marcarCambiosVistos(quitado.cambios?.map(c => c.id).filter(Boolean));
-    guardarTodo();
+    todoItems.splice(idx, 1);
     renderTodo();
     renderGrid();
+    await fetch(`/api/todo/${sku}`, { method: 'DELETE' });
   } else {
     abrirSizeModal(sku);
   }
 }
 
-function limpiarTodo() {
-  const idsVistos = todoItems.flatMap(item => item.cambios?.map(c => c.id).filter(Boolean) || []);
-  marcarCambiosVistos(idsVistos);
+async function limpiarTodo() {
   todoItems = [];
-  guardarTodo();
   renderTodo();
   renderGrid();
+  await fetch('/api/todo/clear', { method: 'POST' });
 }
 
 function renderTodo() {
@@ -731,15 +699,20 @@ document.getElementById('qtyPlus').addEventListener('click', () => {
   input.value = parseInt(input.value) + 1;
 });
 
-document.getElementById('sizeConfirm').addEventListener('click', () => {
+document.getElementById('sizeConfirm').addEventListener('click', async () => {
   const size     = document.getElementById('sizeStep2').dataset.size;
   const quantity = parseInt(document.getElementById('qtyInput').value) || 1;
   if (!size) return;
-  todoItems.push({ sku: sizeSkuPending, size, quantity });
-  guardarTodo();
+  const sku = sizeSkuPending;
+  todoItems.push({ sku, size, quantity, cambios: [] });
   renderTodo();
   renderGrid();
   document.getElementById('sizeOverlay').classList.remove('open');
+  await fetch('/api/todo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sku, size, quantity }),
+  });
 });
 
 document.getElementById('sizeClose').addEventListener('click', () => {

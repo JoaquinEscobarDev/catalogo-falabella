@@ -85,6 +85,11 @@ async function init() {
 // ── Cambios de precio detectados por el refresh diario ──
 const NOMBRES_CAMPO = { normal: 'Normal', oferta: 'Oferta', cmr: 'CMR' };
 
+// No se marca "visto" acá: el ToDo vive en el localStorage de cada
+// dispositivo, así que si se marcara como visto al solo cargar la
+// página, un cambio detectado se perdería para cualquier otro
+// dispositivo que revise el ToDo más tarde. Se marca como visto recién
+// cuando el producto se quita del ToDo (ver marcarCambiosVistos).
 async function revisarCambiosPrecio() {
   let cambios;
   try {
@@ -101,7 +106,9 @@ async function revisarCambiosPrecio() {
       todoItems.push(item);
     }
     if (!item.cambios) item.cambios = [];
+    if (item.cambios.some(existente => existente.id === c.id)) continue;
     item.cambios.push({
+      id: c.id,
       campo: NOMBRES_CAMPO[c.campo] || c.campo,
       texto: `${NOMBRES_CAMPO[c.campo] || c.campo}: ${fmt(c.precio_anterior)} → ${fmt(c.precio_nuevo)}`,
       fecha: c.fecha,
@@ -109,14 +116,17 @@ async function revisarCambiosPrecio() {
   }
   guardarTodo();
   renderTodo();
+}
 
+async function marcarCambiosVistos(ids) {
+  if (!ids?.length) return;
   try {
     await fetch('/api/cambios-precio/marcar-vistos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: cambios.map(c => c.id) }),
+      body: JSON.stringify({ ids }),
     });
-  } catch { /* si falla, se vuelven a mostrar mañana, no pasa nada */ }
+  } catch { /* si falla, se vuelven a mostrar más tarde, no pasa nada */ }
 }
 
 // ══════════════════════════════════════════
@@ -578,7 +588,9 @@ async function eliminarSku(sku) {
   delete productosCache[sku];
   delete stockCache[sku];
   skusGuardados = skusGuardados.filter(s => s.sku !== sku);
-  todoItems     = todoItems.filter(item => item.sku !== sku);
+  const quitado  = todoItems.find(item => item.sku === sku);
+  marcarCambiosVistos(quitado?.cambios?.map(c => c.id).filter(Boolean));
+  todoItems = todoItems.filter(item => item.sku !== sku);
   guardarTodo();
   renderGrid();
   renderTodo();
@@ -602,7 +614,8 @@ function guardarTodo() {
 function toggleTodo(sku) {
   const idx = todoItems.findIndex(item => item.sku === sku);
   if (idx !== -1) {
-    todoItems.splice(idx, 1);
+    const [quitado] = todoItems.splice(idx, 1);
+    marcarCambiosVistos(quitado.cambios?.map(c => c.id).filter(Boolean));
     guardarTodo();
     renderTodo();
     renderGrid();
@@ -612,6 +625,8 @@ function toggleTodo(sku) {
 }
 
 function limpiarTodo() {
+  const idsVistos = todoItems.flatMap(item => item.cambios?.map(c => c.id).filter(Boolean) || []);
+  marcarCambiosVistos(idsVistos);
   todoItems = [];
   guardarTodo();
   renderTodo();

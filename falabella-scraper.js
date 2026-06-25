@@ -46,6 +46,35 @@ async function fetchFalabellaDirecto(sku) {
   return fetchUrl(`https://www.falabella.com/falabella-cl/product/${sku}/x/${sku}`);
 }
 
+// Algunos productos marketplace (ej. DDESIGN) no quedan indexados en el
+// buscador y, además, su product ID real no es el SKU/variant ID que
+// usamos para identificarlos sino ese número menos 1 — así arma Falabella
+// las URL de variantes de ese vendedor. Último recurso antes de declarar FAIL.
+// Acotado a SKUs largos (9+ dígitos) para no probarlo con los SKUs propios
+// de Falabella, donde productId === skuId y este truco daría un falso positivo.
+function pareceMarketplaceLargo(sku) {
+  return /^\d{9,}$/.test(sku);
+}
+
+async function fetchFalabellaDirectoOffset(sku) {
+  const productId = String(Number(sku) - 1);
+  return fetchUrl(`https://www.falabella.com/falabella-cl/product/${productId}/x/${sku}`);
+}
+
+// Sin validar que pd.id coincida con el SKU buscado: ya se construyó la URL
+// a propósito con el product ID adivinado, así que si hay productData se
+// confía en que es el producto correcto.
+function extraerDirectoSinValidarId(html, skuBuscado) {
+  try {
+    const m  = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    const pd = JSON.parse(m[1])?.props?.pageProps?.productData;
+    return pd ? extraerDeProductData(pd, skuBuscado) : null;
+  } catch {
+    return null;
+  }
+}
+
 function extraerDeHTML(html, skuBuscado) {
   try {
     const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -206,8 +235,16 @@ async function obtenerProducto(sku) {
     producto = extraerDeHTML(html, sku);
   } catch { /* sigue al fallback */ }
   if (!producto) {
-    const html = await fetchFalabellaDirecto(sku);
-    producto = extraerDeHTML(html, sku);
+    try {
+      const html = await fetchFalabellaDirecto(sku);
+      producto = extraerDeHTML(html, sku);
+    } catch { /* sigue al siguiente fallback */ }
+  }
+  if (!producto && pareceMarketplaceLargo(sku)) {
+    try {
+      const html = await fetchFalabellaDirectoOffset(sku);
+      producto = extraerDirectoSinValidarId(html, sku);
+    } catch { /* no hay más intentos */ }
   }
   return producto;
 }
@@ -237,9 +274,18 @@ async function actualizarSku(db, sku) {
   let producto = html ? extraerDeHTML(html, sku) : null;
   let viaDirecta = false;
   if (!producto) {
-    const htmlDirecto = await fetchFalabellaDirecto(sku);
-    producto = extraerDeHTML(htmlDirecto, sku);
-    viaDirecta = !!producto;
+    try {
+      const htmlDirecto = await fetchFalabellaDirecto(sku);
+      producto = extraerDeHTML(htmlDirecto, sku);
+      viaDirecta = !!producto;
+    } catch { /* sigue al siguiente fallback */ }
+  }
+  if (!producto && pareceMarketplaceLargo(sku)) {
+    try {
+      const htmlOffset = await fetchFalabellaDirectoOffset(sku);
+      producto = extraerDirectoSinValidarId(htmlOffset, sku);
+      viaDirecta = !!producto;
+    } catch { /* no hay más intentos */ }
   }
   if (!producto) return { ok: false };
 

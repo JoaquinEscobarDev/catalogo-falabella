@@ -517,6 +517,18 @@ app.get('/api/producto/:sku', async (req, res) => {
       }
     }
 
+    if (!product && /^\d{9,}$/.test(sku)) {
+      // Último recurso: productos marketplace (ej. DDESIGN) donde el product ID
+      // real de la URL es el SKU menos 1, no el SKU mismo.
+      try {
+        const productId = String(Number(sku) - 1);
+        const html = await fetchFalabella(`https://www.falabella.com/falabella-cl/product/${productId}/x/${sku}`);
+        product = extraerDirectoSinValidarId(html, sku);
+      } catch (e) {
+        console.log(`Página directa (offset) falló para ${sku}: ${e.message}`);
+      }
+    }
+
     if (product) {
       dbSetProductoCache(sku, product).catch(() => {});
       return res.json(product);
@@ -687,6 +699,20 @@ function extraerDeHTML(html, skuBuscado) {
 }
 
 const { extraerGarantias, extraerCapacidad, extraerColorDeNombre, extraerCuotasSinInteres, extraerDespacho24h } = require('./falabella-scraper');
+
+// Sin validar que pd.id coincida con el SKU buscado: ya se construyó la URL
+// a propósito con el product ID adivinado (SKU - 1), así que si hay
+// productData se confía en que es el producto correcto.
+function extraerDirectoSinValidarId(html, skuBuscado) {
+  try {
+    const m  = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    const pd = JSON.parse(m[1])?.props?.pageProps?.productData;
+    return pd ? extraerDeProductData(pd, skuBuscado) : null;
+  } catch {
+    return null;
+  }
+}
 
 function extraerDeProductData(pd, skuBuscado) {
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};

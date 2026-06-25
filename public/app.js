@@ -612,7 +612,13 @@ function renderTodo() {
 
   actualizarFab();
 
-  const itemsHTML = todoItems.map(({ sku, size, quantity, cambios }) => {
+  const grupos = {};
+  for (const item of todoItems) {
+    const categoria = skusGuardados.find(s => s.sku === item.sku)?.categoria || 'Sin categoría';
+    (grupos[categoria] ||= []).push(item);
+  }
+
+  const itemHTML = ({ sku, size, quantity, cambios }) => {
     const prod  = productosCache[sku];
     const datos = skusGuardados.find(s => s.sku === sku);
     const alias = datos?.alias || '';
@@ -647,7 +653,11 @@ function renderTodo() {
         </div>
         <button class="todo-remove" data-sku="${sku}" title="Quitar">✕</button>
       </li>`;
-  }).join('');
+  };
+
+  const itemsHTML = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es')).map(categoria =>
+    `<li class="todo-categoria">${categoria}</li>${grupos[categoria].map(itemHTML).join('')}`
+  ).join('');
 
   todoList.innerHTML      = itemsHTML;
   todoListModal.innerHTML = itemsHTML;

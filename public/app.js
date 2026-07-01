@@ -36,6 +36,7 @@ let skusGuardados   = [];
 let productosCache  = {};
 let stockCache      = {};
 let sizeSkuPending  = null;
+let gridPrimeraVez  = false; // true solo al entrar a una categoría → activa animación stagger
 
 // El ToDo vive en el servidor (tabla todo_items), no en localStorage, para
 // que todos los dispositivos vean siempre la misma lista.
@@ -111,10 +112,10 @@ async function cargarTodo() {
 // ══════════════════════════════════════════
 
 function renderCategorias() {
-  categoriasGrid.innerHTML = CATEGORIAS.map(c => {
+  categoriasGrid.innerHTML = CATEGORIAS.map((c, i) => {
     const count = skusGuardados.filter(s => s.categoria === c.nombre).length;
     return `
-      <div class="categoria-card" data-cat="${c.nombre}">
+      <div class="categoria-card" data-cat="${c.nombre}" style="--i:${i}">
         <span class="categoria-count ${count === 0 ? 'empty' : ''}">${count}</span>
         <span class="categoria-icon">${c.icono}</span>
         <span class="categoria-nombre">${c.nombre}</span>
@@ -139,12 +140,16 @@ async function mostrarVistaProductos(nombre) {
   categoriaActiva = nombre;
   viewCategorias.style.display = 'none';
   viewProductos.style.display  = 'flex';
+  viewProductos.classList.remove('view-enter');
+  void viewProductos.offsetWidth;
+  viewProductos.classList.add('view-enter');
   btnBack.style.display        = 'inline-block';
   headerActions.style.display  = 'flex';
   const cat = CATEGORIAS.find(c => c.nombre === nombre);
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
   filtroMarca.value = '';
+  gridPrimeraVez = true;
   actualizarFab();
   renderGrid();
 
@@ -176,6 +181,9 @@ function mostrarVistaCategorias() {
   categoriaActiva = null;
   viewProductos.style.display  = 'none';
   viewCategorias.style.display = 'block';
+  viewCategorias.classList.remove('view-enter');
+  void viewCategorias.offsetWidth;
+  viewCategorias.classList.add('view-enter');
   btnBack.style.display        = 'none';
   headerActions.style.display  = 'none';
   headerTitle.textContent      = '🛒 Catálogo Falabella';
@@ -346,7 +354,9 @@ function renderGrid() {
     grid.innerHTML = '<div class="empty-state">No hay productos en esta categoría.<br>Agregá un SKU arriba.</div>';
     return;
   }
-  grid.innerHTML = lista.map(s => tarjeta(s)).join('');
+  const animar = gridPrimeraVez;
+  if (gridPrimeraVez) gridPrimeraVez = false;
+  grid.innerHTML = lista.map((s, i) => tarjeta(s, animar ? i : -1)).join('');
   grid.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', () => eliminarSku(btn.dataset.sku));
   });
@@ -364,13 +374,14 @@ function badgeStock(sku) {
   return `<span class="stock-badge stock-ok">Stock: ${n}</span>`;
 }
 
-function tarjeta({ sku, alias }) {
+function tarjeta({ sku, alias }, idx = -1) {
   const prod    = productosCache[sku];
   const enLista = todoItems.some(item => item.sku === sku);
+  const animAttr = idx >= 0 ? ` animate-in" style="--i:${idx}` : '';
 
   if (prod === undefined || prod === null) {
     return `
-      <div class="card loading">
+      <div class="card loading${animAttr}">
         <div class="card-top-actions">
           <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
         </div>
@@ -387,7 +398,7 @@ function tarjeta({ sku, alias }) {
 
   if (prod.error) {
     return `
-      <div class="card error">
+      <div class="card error${animAttr}">
         <div class="card-top-actions">
           <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
         </div>
@@ -458,7 +469,7 @@ function tarjeta({ sku, alias }) {
   }
 
   return `
-    <div class="card${prod.cached ? ' cached' : ''}">
+    <div class="card${prod.cached ? ' cached' : ''}${animAttr}">
       <div class="card-top-actions">
         <button class="btn-delete" data-sku="${sku}" title="Eliminar">✕</button>
       </div>
@@ -595,6 +606,7 @@ function renderTodo() {
 function actualizarFab() {
   todoFabCount.textContent = todoItems.length;
   if (categoriaActiva) todoFab.style.display = 'flex';
+  todoFab.classList.toggle('has-items', todoItems.length > 0);
 }
 
 // ══════════════════════════════════════════

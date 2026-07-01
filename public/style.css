@@ -157,17 +157,19 @@ main {
   text-align: center;
   position: relative;
   animation: fadeInUp .35s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 35ms);
+  animation-delay: calc(var(--i, 0) * 25ms);
 }
-.categoria-card:hover  { transform: translateY(-5px); box-shadow: var(--sombra-hover); border-color: var(--verde); }
-.categoria-card:active { transform: translateY(-2px); }
+@media (hover: hover) {
+  .categoria-card:hover { transform: translateY(-5px); box-shadow: var(--sombra-hover); border-color: var(--verde); }
+  .categoria-card:hover .categoria-icon { transform: scale(1.18); }
+}
+.categoria-card:active { transform: scale(0.96); transition-duration: .08s; }
 .categoria-icon {
   font-size: 2.4rem;
   line-height: 1;
   transition: transform .22s var(--ease);
   display: block;
 }
-.categoria-card:hover .categoria-icon { transform: scale(1.18); }
 .categoria-nombre { font-size: .93rem; font-weight: 700; }
 .categoria-count {
   position: absolute; top: 9px; right: 9px;
@@ -262,7 +264,9 @@ main {
   transition: transform .22s var(--ease), box-shadow .22s var(--ease);
   position: relative;
 }
-.card:hover { transform: translateY(-3px); box-shadow: var(--sombra-hover); }
+@media (hover: hover) {
+  .card:hover { transform: translateY(-3px); box-shadow: var(--sombra-hover); }
+}
 .card.animate-in {
   animation: fadeInUp .3s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 40ms);
@@ -276,8 +280,11 @@ main {
 
 .card-top-actions { position: absolute; top: 7px; right: 7px; z-index: 2; }
 
-.card-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:#f9f9f9; padding:10px; transition: transform .3s var(--ease); }
-.card:hover .card-img { transform: scale(1.04); }
+.card-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:#f9f9f9; padding:10px; }
+@media (hover: hover) {
+  .card-img { transition: transform .3s var(--ease); }
+  .card:hover .card-img { transform: scale(1.04); }
+}
 .card-img-placeholder { width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:#f0f0f0; }
 
 /* wrapper que agrupa body + footer dentro de la tarjeta */
@@ -642,11 +649,14 @@ main {
   }
   .card-link { font-size: .75rem; }
   .btn-cambiar {
-    font-size: .78rem;
-    padding: 7px 14px;
+    font-size: .82rem;
+    padding: 10px 16px;
     border-radius: 8px;
-    min-height: 34px;
+    min-height: 44px;
   }
+
+  /* Feedback táctil en cards (reemplaza hover que no existe en touch) */
+  .card:active { transform: scale(0.985); transition-duration: .08s; }
 
   /* ── FAB ── */
   .todo-fab { bottom: 16px; right: 14px; padding: 11px 16px; font-size: .88rem; }

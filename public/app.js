@@ -354,8 +354,10 @@ function renderGrid() {
     grid.innerHTML = '<div class="empty-state">No hay productos en esta categoría.<br>Agregá un SKU arriba.</div>';
     return;
   }
-  const animar = gridPrimeraVez;
-  if (gridPrimeraVez) gridPrimeraVez = false;
+  // Solo animar cuando ya hay datos reales (no skeletons de carga)
+  const hayDatos = lista.some(s => productosCache[s.sku] !== undefined && productosCache[s.sku] !== null);
+  const animar = gridPrimeraVez && hayDatos;
+  if (animar) gridPrimeraVez = false;
   grid.innerHTML = lista.map((s, i) => tarjeta(s, animar ? i : -1)).join('');
   grid.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', () => eliminarSku(btn.dataset.sku));

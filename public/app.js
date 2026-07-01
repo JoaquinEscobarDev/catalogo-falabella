@@ -103,6 +103,22 @@ async function cargarTodo() {
       fecha: c.fecha,
     })),
   }));
+
+  // Precargar en silencio los productos del ToDo que no están en caché
+  // para que las imágenes se vean sin tener que entrar a cada categoría.
+  const faltantes = todoItems.map(i => i.sku).filter(sku => productosCache[sku] === undefined);
+  if (faltantes.length) {
+    await Promise.all(faltantes.map(async sku => {
+      try {
+        const r = await fetch(`/api/producto/${sku}`);
+        const data = await r.json();
+        productosCache[sku] = r.ok ? data : { error: data.error };
+      } catch {
+        productosCache[sku] = { error: 'Error de red' };
+      }
+    }));
+  }
+
   renderTodo();
   renderGrid();
 }

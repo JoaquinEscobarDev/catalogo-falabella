@@ -4,8 +4,8 @@
   "description": "Catálogo de precios Falabella - Los Dominicos",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#7ab648",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
   "lang": "es",
   "orientation": "portrait-primary",
   "icons": [

@@ -5,13 +5,10 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
-const multer = require('multer');
-const { createWorker } = require('tesseract.js');
 chromium.use(stealth());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // ══════════════════════════════════════════
 // BASE DE DATOS — PostgreSQL o JSON fallback
@@ -606,66 +603,6 @@ app.get('/api/stock/:sku', async (req, res) => {
     if (cached) return res.json({ stock: cached.stock, storeName: cached.store_name });
     res.status(500).json({ error: e.message });
   }
-});
-
-// ══════════════════════════════════════════
-// BUSCAR POR FOTO (OCR + búsqueda de texto libre)
-// ══════════════════════════════════════════
-
-// Saca de la imagen palabras candidatas para buscar: prioriza tokens
-// alfanuméricos (modelos como "PT730DW") sobre palabras sueltas o precios.
-function candidatosDeOCR(texto) {
-  const tokens = texto.split(/\s+/).map(t => t.trim()).filter(Boolean);
-  const esPrecio = t => /^\$?[\d.,]+$/.test(t);
-  const alfanumericos = tokens.filter(t => !esPrecio(t) && /[a-zA-Z]/.test(t) && /\d/.test(t) && t.length >= 4);
-  const palabras = tokens.filter(t => !esPrecio(t) && /^[a-zA-Z]{4,}$/.test(t));
-  // más largos primero: suelen ser más específicos (menos falsos positivos)
-  alfanumericos.sort((a, b) => b.length - a.length);
-  palabras.sort((a, b) => b.length - a.length);
-  return [...new Set([...alfanumericos, ...palabras])].slice(0, 5);
-}
-
-function extraerCandidatos(html, max = 6) {
-  try {
-    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    if (!m) return [];
-    const data      = JSON.parse(m[1]);
-    const pageProps = data?.props?.pageProps;
-    const results   = pageProps?.initialData?.state?.results || pageProps?.searchResult?.state?.results || pageProps?.results;
-    if (!results?.length) return [];
-    return results.slice(0, max).map(item => extraerDeSearchResult(item, null)).filter(p => p.sku);
-  } catch {
-    return [];
-  }
-}
-
-app.post('/api/buscar-foto', upload.single('foto'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Falta la foto' });
-
-  let texto = '';
-  try {
-    const worker = await createWorker('eng');
-    const { data } = await worker.recognize(req.file.buffer);
-    texto = data.text || '';
-    await worker.terminate();
-  } catch (e) {
-    return res.status(500).json({ error: `OCR falló: ${e.message}` });
-  }
-
-  const candidatosTexto = candidatosDeOCR(texto);
-  if (!candidatosTexto.length) {
-    return res.json({ texto, candidatos: [] });
-  }
-
-  for (const termino of candidatosTexto) {
-    try {
-      const html = await fetchFalabella(`https://www.falabella.com/falabella-cl/search?Ntt=${encodeURIComponent(termino)}`);
-      const candidatos = extraerCandidatos(html);
-      if (candidatos.length) return res.json({ texto, terminoUsado: termino, candidatos });
-    } catch { /* probar el siguiente término */ }
-  }
-
-  res.json({ texto, candidatos: [] });
 });
 
 // ══════════════════════════════════════════

@@ -1,27 +1,23 @@
 // Refresca los precios de todos los SKUs guardados.
-// Pensado para correr en tu PC (IP residencial, sin proxy) vía el
-// Programador de tareas de Windows — Railway tiene IP de datacenter
-// y Cloudflare la bloquea, por eso esto no puede correr ahí.
+// Pensado para correr en tu PC (IP residencial) vía el Programador de tareas
+// de Windows, contra el Postgres del VPS a través del túnel SSH (ver
+// DEPLOY.md) — el VPS tiene IP de datacenter y Cloudflare la bloquea, por eso
+// esto no corre ahí.
 //
-// Uso manual: node refresh-local.js
+// Uso manual: node scripts/refresh-local.js
 // Uso programado: ver refresh-diario.bat (Programador de tareas de Windows)
 
-require('dotenv').config({ quiet: true });
-const { Client } = require('pg');
-const { actualizarSku, asegurarTablas } = require('./falabella-scraper');
+const db = require('../src/config/database');
+const productService = require('../src/services/productService');
 
 async function main() {
-  const db = new Client({ connectionString: process.env.DATABASE_URL });
-  await db.connect();
-  await asegurarTablas(db);
-
-  const { rows } = await db.query('SELECT sku FROM skus ORDER BY sku');
+  const { rows } = await db.query('SELECT sku FROM products ORDER BY sku');
   console.log(`[${new Date().toLocaleString('es-CL')}] Refrescando ${rows.length} SKUs...`);
 
   let ok = 0, fail = 0, viaDirecta = 0, cambios = 0;
   for (const { sku } of rows) {
     try {
-      const r = await actualizarSku(db, sku);
+      const r = await productService.refreshSku(sku);
       if (!r.ok) throw new Error('sin datos');
       if (r.viaDirecta) viaDirecta++;
       if (r.cambio) cambios++;

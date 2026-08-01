@@ -1,3 +1,4 @@
 @echo off
 cd /d "%~dp0"
-node refresh-local.js >> refresh-local.log 2>&1
+call open-tunnel.bat
+node scripts\refresh-local.js >> refresh-local.log 2>&1

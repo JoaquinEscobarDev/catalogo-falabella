@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: catalogo_falabella
+      POSTGRES_USER: catalogo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Solo loopback del VPS — nunca expuesto a internet. La PC llega acá
+      # vía túnel SSH (ver DEPLOY.md), no conectándose directo al puerto.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalogo -d catalogo_falabella"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://catalogo:${POSTGRES_PASSWORD}@postgres:5432/catalogo_falabella
+      PORT: 3000
+      PROXY_URL: ${PROXY_URL:-}
+    ports:
+      # nginx en el host del VPS hace de reverse proxy hacia acá (ver DEPLOY.md)
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  postgres_data:

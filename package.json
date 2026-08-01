@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "refresh": "node refresh-local.js"
+    "migrate": "node migrations/run.js",
+    "migrate:from-neon": "node scripts/migrate-from-neon.js",
+    "refresh": "node scripts/refresh-local.js",
+    "watch-refresh": "node scripts/watch-refresh.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

@@ -1,23 +1,18 @@
 // Atiende las solicitudes del botón "Actualizar precios" de la web.
-// El botón solo deja una fila en solicitudes_refresh (no puede tocar tu PC
+// El botón solo deja una fila en refresh_requests (no puede tocar tu PC
 // directamente) — este script, corrido cada 5 min por el Programador de
-// tareas de Windows, las revisa y refresca esos SKUs desde tu IP residencial.
+// tareas de Windows, las revisa y refresca esos SKUs contra el Postgres del
+// VPS a través del túnel SSH (ver DEPLOY.md).
 //
-// Uso manual: node watch-refresh.js
+// Uso manual: node scripts/watch-refresh.js
 // Uso programado: ver watch-refresh.bat (Programador de tareas de Windows)
 
-require('dotenv').config({ quiet: true });
-const { Client } = require('pg');
-const { actualizarSku, asegurarTablas } = require('./falabella-scraper');
+const db = require('../src/config/database');
+const productService = require('../src/services/productService');
+const refreshRequestsRepository = require('../src/repositories/refreshRequestsRepository');
 
 async function main() {
-  const db = new Client({ connectionString: process.env.DATABASE_URL });
-  await db.connect();
-  await asegurarTablas(db);
-
-  const { rows: solicitudes } = await db.query(
-    `SELECT id, categoria FROM solicitudes_refresh WHERE procesado = FALSE ORDER BY creado_en ASC`
-  );
+  const solicitudes = await refreshRequestsRepository.findPending();
 
   if (!solicitudes.length) {
     await db.end();
@@ -28,13 +23,16 @@ async function main() {
     console.log(`[${new Date().toLocaleString('es-CL')}] Procesando solicitud #${id} (${categoria})...`);
     // Marcar como procesada antes de empezar, para no reintentarla si este
     // script se corre de nuevo mientras todavía está trabajando en esta.
-    await db.query('UPDATE solicitudes_refresh SET procesado = TRUE WHERE id = $1', [id]);
+    await refreshRequestsRepository.markProcessed(id);
 
-    const { rows: skus } = await db.query('SELECT sku FROM skus WHERE categoria = $1', [categoria]);
+    const { rows: skus } = await db.query(`
+      SELECT p.sku FROM products p JOIN categories c ON c.id = p.category_id WHERE c.nombre = $1
+    `, [categoria]);
+
     let ok = 0, fail = 0;
     for (const { sku } of skus) {
       try {
-        const r = await actualizarSku(db, sku);
+        const r = await productService.refreshSku(sku);
         if (r.ok) ok++; else fail++;
       } catch { fail++; }
       await new Promise(res => setTimeout(res, 400));

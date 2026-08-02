@@ -689,6 +689,88 @@ document.getElementById('sizeOverlay').addEventListener('click', e => {
     document.getElementById('sizeOverlay').classList.remove('open');
 });
 
+// ══════════════════════════════════════════
+// BÚSQUEDA GLOBAL
+// ══════════════════════════════════════════
+
+const btnSearchGlobal = document.getElementById('btnSearchGlobal');
+const searchOverlay   = document.getElementById('searchOverlay');
+const searchInput     = document.getElementById('searchInput');
+const searchClose     = document.getElementById('searchClose');
+const searchBody      = document.getElementById('searchBody');
+
+let searchDebounce = null;
+
+btnSearchGlobal.addEventListener('click', () => {
+  searchOverlay.classList.add('open');
+  searchInput.value = '';
+  searchBody.innerHTML = '<p class="search-hint">Escribí al menos 2 caracteres</p>';
+  setTimeout(() => searchInput.focus(), 80);
+});
+
+searchClose.addEventListener('click', cerrarBusqueda);
+searchOverlay.addEventListener('click', e => { if (e.target === searchOverlay) cerrarBusqueda(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarBusqueda(); });
+
+function cerrarBusqueda() {
+  searchOverlay.classList.remove('open');
+}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  if (q.length < 2) {
+    searchBody.innerHTML = '<p class="search-hint">Escribí al menos 2 caracteres</p>';
+    return;
+  }
+  searchBody.innerHTML = '<p class="search-loading">Buscando…</p>';
+  searchDebounce = setTimeout(() => buscarProductos(q), 280);
+});
+
+async function buscarProductos(q) {
+  let resultados;
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    resultados = await r.json();
+  } catch {
+    searchBody.innerHTML = '<p class="search-empty">Error al buscar</p>';
+    return;
+  }
+
+  if (!resultados.length) {
+    searchBody.innerHTML = '<p class="search-empty">Sin resultados para "<strong>' + q + '</strong>"</p>';
+    return;
+  }
+
+  const fmt = n => n ? `$${Number(n).toLocaleString('es-CL')}` : null;
+
+  searchBody.innerHTML = resultados.map(p => {
+    const img = p.imagen
+      ? `<img class="search-result-img" src="${p.imagen}" alt="" loading="lazy" />`
+      : `<div class="search-result-placeholder">📦</div>`;
+    const precio = p.precioOferta
+      ? `<div class="search-result-precio"><small>${fmt(p.precio) || ''}</small>${fmt(p.precioOferta)}</div>`
+      : `<div class="search-result-precio">${fmt(p.precio) || '—'}</div>`;
+    return `
+      <div class="search-result-item" data-cat="${p.categoria}">
+        ${img}
+        <div class="search-result-info">
+          <div class="search-result-nombre" title="${p.nombre || p.alias || p.sku}">${p.nombre || p.alias || p.sku}</div>
+          <div class="search-result-meta">SKU: ${p.sku}${p.alias ? ' · ' + p.alias : ''}</div>
+          <span class="search-result-cat">${p.categoria}</span>
+        </div>
+        ${precio}
+      </div>`;
+  }).join('');
+
+  searchBody.querySelectorAll('.search-result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      cerrarBusqueda();
+      abrirCategoria(el.dataset.cat);
+    });
+  });
+}
+
 // ── Modal ToDo ──
 todoFab.addEventListener('click', () => todoOverlay.classList.add('open'));
 todoModalClose.addEventListener('click', () => todoOverlay.classList.remove('open'));

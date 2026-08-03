@@ -791,12 +791,33 @@ main {
   gap: 12px;
 }
 
-/* Cards dentro del modal de búsqueda: width fijo, sin animación */
+/* Cards dentro del modal de búsqueda */
 .search-modal-body .card {
   width: 100%;
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.search-modal-body .card-img,
+.search-modal-body .card-img-placeholder {
+  width: 90px !important;
+  min-width: 90px;
+  max-width: 90px;
+  height: 90px !important;
+  aspect-ratio: 1/1;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.search-modal-body .card-content {
+  flex: 1;
+  min-width: 0;
+}
+.search-modal-body .card-top-actions {
+  display: none;
 }
 .search-hint {
   text-align: center;

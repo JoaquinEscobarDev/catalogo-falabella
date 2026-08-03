@@ -7,6 +7,7 @@ router.get('/skus', productsController.list);
 router.post('/skus', productsController.create);
 router.delete('/skus/:sku', productsController.remove);
 
+router.get('/search', productsController.search);
 router.get('/categoria/:nombre', productsController.findByCategory);
 router.get('/producto/:sku', productsController.getProducto);
 

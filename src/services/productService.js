@@ -79,4 +79,9 @@ async function refreshSku(sku) {
   return { ok: true, viaDirecta, cambio, producto };
 }
 
-module.exports = { listAll, create, remove, findByCategory, getProducto, refreshSku };
+async function search(q) {
+  if (!q || q.trim().length < 2) return [];
+  return productsRepository.search(q.trim());
+}
+
+module.exports = { listAll, create, remove, findByCategory, getProducto, refreshSku, search };

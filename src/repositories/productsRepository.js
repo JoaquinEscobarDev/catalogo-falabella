@@ -87,7 +87,29 @@ async function findByCategoryName(nombreCategoria) {
   }));
 }
 
+async function search(q) {
+  const term = `%${q}%`;
+  const { rows } = await db.query(`
+    SELECT p.sku, p.alias, c.nombre AS categoria,
+           p.nombre, p.marca, p.imagen,
+           p.precio_normal, p.precio_oferta, p.precio_cmr,
+           p.url, p.price_updated_at
+    FROM products p
+    JOIN categories c ON c.id = p.category_id
+    WHERE p.sku ILIKE $1 OR p.alias ILIKE $1
+       OR p.nombre ILIKE $1 OR p.marca ILIKE $1
+    ORDER BY p.nombre
+    LIMIT 60
+  `, [term]);
+  return rows.map(r => ({
+    sku: r.sku, alias: r.alias, categoria: r.categoria,
+    nombre: r.nombre, marca: r.marca, imagen: r.imagen,
+    precio: r.precio_normal, precioOferta: r.precio_oferta, precioCMR: r.precio_cmr,
+    url: r.url, updatedAt: r.price_updated_at,
+  }));
+}
+
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getPreviousPrices, setPriceData, findByCategoryName,
+  getPriceData, getPreviousPrices, setPriceData, findByCategoryName, search,
 };

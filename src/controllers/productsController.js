@@ -26,4 +26,8 @@ const getProducto = asyncHandler(async (req, res) => {
   res.json(producto);
 });
 
-module.exports = { list, create, remove, findByCategory, getProducto };
+const search = asyncHandler(async (req, res) => {
+  res.json(await productService.search(req.query.q || ''));
+});
+
+module.exports = { list, create, remove, findByCategory, getProducto, search };

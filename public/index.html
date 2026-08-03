@@ -20,6 +20,7 @@
         <button id="btnBack" class="btn-back" style="display:none">← Categorías</button>
         <h1 id="headerTitle">🛒 Catálogo Falabella</h1>
       </div>
+      <button class="btn-search-global" id="btnSearchGlobal" title="Buscar producto">🔍</button>
       <div class="header-actions" id="headerActions" style="display:none">
         <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
       </div>
@@ -125,6 +126,19 @@
           <button id="qtyPlus" class="qty-btn">+</button>
         </div>
         <button id="sizeConfirm" class="size-confirm-btn">Agregar al pedido ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal búsqueda global -->
+  <div class="search-overlay" id="searchOverlay">
+    <div class="search-modal">
+      <div class="search-modal-header">
+        <input class="search-modal-input" id="searchInput" type="text" placeholder="Nombre, SKU, marca…" autocomplete="off" />
+        <button class="search-modal-close" id="searchClose">✕</button>
+      </div>
+      <div class="search-modal-body" id="searchBody">
+        <p class="search-hint">Escribí al menos 2 caracteres</p>
       </div>
     </div>
   </div>

@@ -751,33 +751,38 @@ async function buscarProductos(q) {
     return;
   }
 
-  const fmt = n => n ? `$${Number(n).toLocaleString('es-CL')}` : null;
+  // Inyectar en caché para que tarjeta() lea los datos correctamente
+  for (const p of resultados) {
+    productosCache[p.sku] = p;
+    if (p.stock !== undefined) stockCache[p.sku] = { stock: p.stock };
+  }
 
   searchBody.innerHTML = resultados.map(p => {
-    const nombre = (p.nombre || p.alias || p.sku || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    const cat    = (p.categoria || '').replace(/"/g, '&quot;');
-    const img = p.imagen
-      ? `<img class="search-result-img" src="${p.imagen}" alt="" loading="lazy" />`
-      : `<div class="search-result-placeholder">📦</div>`;
-    const precio = p.precioOferta
-      ? `<div class="search-result-precio"><small>${fmt(p.precio) || ''}</small>${fmt(p.precioOferta)}</div>`
-      : `<div class="search-result-precio">${fmt(p.precio) || '—'}</div>`;
-    return `
-      <div class="search-result-item" data-cat="${cat}">
-        ${img}
-        <div class="search-result-info">
-          <div class="search-result-nombre" title="${nombre}">${nombre}</div>
-          <div class="search-result-meta">SKU: ${p.sku}${p.alias ? ' · ' + p.alias : ''}</div>
-          <span class="search-result-cat">${p.categoria || ''}</span>
-        </div>
-        ${precio}
-      </div>`;
+    // Reusar tarjeta() para mostrar exactamente la misma info que en el grid
+    const cardHtml = tarjeta({ sku: p.sku, alias: p.alias });
+    // Insertar badge de categoría antes del nombre
+    return cardHtml.replace(
+      '<span class="card-nombre"',
+      `<span class="search-result-cat" style="margin-bottom:4px">${p.categoria || ''}</span><span class="card-nombre"`
+    );
   }).join('');
 
-  searchBody.querySelectorAll('.search-result-item').forEach(el => {
-    el.addEventListener('click', () => {
+  // Ocultar botón eliminar (no corresponde en el contexto de búsqueda)
+  searchBody.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'none');
+
+  // Botón cambiar funciona igual que en el grid
+  searchBody.querySelectorAll('.btn-cambiar').forEach(btn => {
+    btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
+  });
+
+  // Click en cualquier parte de la card (excepto botones/links) → ir a categoría
+  searchBody.querySelectorAll('.card').forEach((el, i) => {
+    const cat = resultados[i]?.categoria;
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', e => {
+      if (e.target.closest('.btn-cambiar') || e.target.closest('.card-link')) return;
       cerrarBusqueda();
-      abrirCategoria(el.dataset.cat);
+      abrirCategoria(cat);
     });
   });
 }

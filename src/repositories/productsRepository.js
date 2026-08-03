@@ -93,9 +93,13 @@ async function search(q) {
     SELECT p.sku, p.alias, c.nombre AS categoria,
            p.nombre, p.marca, p.imagen,
            p.precio_normal, p.precio_oferta, p.precio_cmr,
-           p.url, p.price_updated_at
+           p.url, p.price_updated_at,
+           p.garantia_1a, p.garantia_2a, p.garantia_3a,
+           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h,
+           s.stock
     FROM products p
     JOIN categories c ON c.id = p.category_id
+    LEFT JOIN stock_cache s ON s.sku = p.sku
     WHERE p.sku ILIKE $1 OR p.alias ILIKE $1
        OR p.nombre ILIKE $1 OR p.marca ILIKE $1
     ORDER BY p.nombre
@@ -105,7 +109,11 @@ async function search(q) {
     sku: r.sku, alias: r.alias, categoria: r.categoria,
     nombre: r.nombre, marca: r.marca, imagen: r.imagen,
     precio: r.precio_normal, precioOferta: r.precio_oferta, precioCMR: r.precio_cmr,
-    url: r.url, updatedAt: r.price_updated_at,
+    url: r.url, updatedAt: r.price_updated_at, cached: true,
+    garantia1a: r.garantia_1a, garantia2a: r.garantia_2a, garantia3a: r.garantia_3a,
+    capacidad: r.capacidad, color: r.color,
+    cuotasSinInteres: r.cuotas_sin_interes, despacho24h: r.despacho_24h,
+    stock: r.stock,
   }));
 }
 

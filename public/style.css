@@ -788,7 +788,15 @@ main {
   padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+}
+
+/* Cards dentro del modal de búsqueda: width fijo, sin animación */
+.search-modal-body .card {
+  width: 100%;
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 .search-hint {
   text-align: center;

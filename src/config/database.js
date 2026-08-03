@@ -17,4 +17,5 @@ module.exports = {
     }
     return pool.query(...args);
   },
+  end: () => pool.end(),
 };

@@ -1,4 +1,4 @@
-const CACHE = 'catalogo-v4';
+const CACHE = 'catalogo-v5';
 const STATIC = ['/', '/style.css', '/app.js', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {

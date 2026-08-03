@@ -381,6 +381,9 @@ function renderGrid() {
   grid.querySelectorAll('.btn-cambiar').forEach(btn => {
     btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
   });
+  grid.querySelectorAll('.btn-upc').forEach(btn => {
+    btn.addEventListener('click', () => editarUpc(btn.dataset.sku));
+  });
 }
 
 function badgeStock(sku) {
@@ -498,6 +501,14 @@ function tarjeta({ sku, alias }, idx = -1) {
           ${prod.capacidad ? `<span class="card-capacidad">${prod.capacidad}${prod.color ? ` · ${prod.color}` : ''}</span>` : ''}
           <span class="card-nombre" title="${prod.nombre}">${prod.nombre}</span>
           <span class="card-sku">SKU: ${sku}</span>
+          <div class="card-upc-row">
+            ${prod.upc
+              ? `<span class="card-upc-val">UPC: ${prod.upc}</span>`
+              : ''}
+            <button class="btn-upc" data-sku="${sku}" title="${prod.upc ? 'Editar UPC' : 'Agregar UPC'}">
+              ${prod.upc ? '✏' : '＋ UPC'}
+            </button>
+          </div>
           <div class="card-precios">${bloquePrecio}</div>
           ${bloqueDespacho}
           ${bloqueCuotas}
@@ -511,6 +522,46 @@ function tarjeta({ sku, alias }, idx = -1) {
         </div>
       </div>
     </div>`;
+}
+
+async function editarUpc(sku) {
+  const prod = productosCache[sku];
+  const actual = prod?.upc || '';
+
+  // Reemplazar la fila UPC por un input inline
+  const row = document.querySelector(`.btn-upc[data-sku="${sku}"]`)?.closest('.card-upc-row');
+  if (!row) return;
+
+  row.innerHTML = `
+    <input class="upc-input" type="text" value="${actual}" placeholder="Ej: 012345678901" maxlength="14" />
+    <button class="upc-save" data-sku="${sku}">✓</button>
+    <button class="upc-cancel">✕</button>`;
+
+  const input  = row.querySelector('.upc-input');
+  const btnSave   = row.querySelector('.upc-save');
+  const btnCancel = row.querySelector('.upc-cancel');
+
+  input.focus();
+  input.select();
+
+  const guardar = async () => {
+    const val = input.value.trim();
+    btnSave.disabled = true;
+    await fetch(`/api/producto/${sku}/upc`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ upc: val }),
+    });
+    if (productosCache[sku]) productosCache[sku].upc = val || null;
+    renderGrid();
+  };
+
+  btnSave.addEventListener('click', guardar);
+  btnCancel.addEventListener('click', () => renderGrid());
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') guardar();
+    if (e.key === 'Escape') renderGrid();
+  });
 }
 
 async function eliminarSku(sku) {

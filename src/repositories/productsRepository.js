@@ -8,7 +8,7 @@ function mapRowToProducto(row) {
     imagen: row.imagen, url: row.url, cached: true, updatedAt: row.price_updated_at,
     garantia1a: row.garantia_1a, garantia2a: row.garantia_2a, garantia3a: row.garantia_3a,
     capacidad: row.capacidad, color: row.color, cuotasSinInteres: row.cuotas_sin_interes,
-    despacho24h: row.despacho_24h,
+    despacho24h: row.despacho_24h, upc: row.upc,
   };
 }
 
@@ -70,6 +70,10 @@ async function setPriceData(sku, producto) {
 }
 
 // Trae precio + stock cacheados de toda una categoría en una sola consulta.
+async function setUpc(sku, upc) {
+  await db.query('UPDATE products SET upc = $2 WHERE sku = $1', [sku, upc || null]);
+}
+
 async function findByCategoryName(nombreCategoria) {
   const { rows } = await db.query(`
     SELECT p.*, st.stock, st.store_name
@@ -119,5 +123,5 @@ async function search(q) {
 
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getPreviousPrices, setPriceData, findByCategoryName, search,
+  getPriceData, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
 };

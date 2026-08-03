@@ -84,4 +84,8 @@ async function search(q) {
   return productsRepository.search(q.trim());
 }
 
-module.exports = { listAll, create, remove, findByCategory, getProducto, refreshSku, search };
+async function setUpc(sku, upc) {
+  await productsRepository.setUpc(sku, upc);
+}
+
+module.exports = { listAll, create, remove, findByCategory, getProducto, refreshSku, search, setUpc };

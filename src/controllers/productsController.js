@@ -30,4 +30,10 @@ const search = asyncHandler(async (req, res) => {
   res.json(await productService.search(req.query.q || ''));
 });
 
-module.exports = { list, create, remove, findByCategory, getProducto, search };
+const setUpc = asyncHandler(async (req, res) => {
+  const { upc } = req.body;
+  await productService.setUpc(req.params.sku, upc);
+  res.json({ ok: true });
+});
+
+module.exports = { list, create, remove, findByCategory, getProducto, search, setUpc };

@@ -304,6 +304,27 @@ main {
 }
 .card-nombre { font-size:.85rem; font-weight:600; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color: var(--texto); }
 .card-sku { font-size:.74rem; color: var(--texto-suave); font-family:monospace; }
+
+.card-upc-row { display:flex; align-items:center; gap:6px; margin-top:3px; flex-wrap:wrap; }
+.card-upc-val { font-size:.72rem; color: var(--texto-suave); font-family:monospace; }
+.btn-upc {
+  font-size:.68rem; padding:1px 6px; border-radius:5px;
+  background: var(--surface-2); border:1px solid var(--borde);
+  color: var(--texto-suave); cursor:pointer; line-height:1.6;
+  transition: color .15s, border-color .15s;
+}
+.btn-upc:hover { color: var(--texto); border-color: var(--azul); }
+.upc-input {
+  font-size:.78rem; font-family:monospace; padding:2px 7px;
+  background: var(--surface-2); border:1.5px solid var(--azul);
+  border-radius:6px; color: var(--texto); outline:none; width:130px;
+}
+.upc-save, .upc-cancel {
+  font-size:.72rem; padding:2px 7px; border-radius:5px; cursor:pointer;
+  border:1px solid var(--borde); background: var(--surface-2); color: var(--texto-suave);
+}
+.upc-save { color: var(--verde); border-color: var(--verde); }
+.upc-cancel:hover { color: var(--texto); }
 .card-loading-msg { font-size:.83rem; color: var(--texto-suave); margin-top:6px; }
 .card-error-msg { font-size:.82rem; color: var(--rojo); margin-top:4px; }
 

@@ -876,17 +876,28 @@ todoClearModal.addEventListener('click', () => {
 // CMR se toma del dato scrapeado del producto (el más preciso).
 // Las de otros bancos corresponden a la oferta base habitual y pueden
 // variar según promociones vigentes — verificar en www.falabella.com.
+// cuotas = cuotas sin interés estándar en Falabella (CMR viene del producto)
+// cae    = CAE referencial del banco (% anual) — puede variar; editable en el modal
 const BANCOS_CUOTAS = [
-  { banco: 'Banco de Chile',  variante: 'Visa / Mastercard',        cuotas: 3  },
-  { banco: 'BCI',             variante: 'Crédito',                  cuotas: 6  },
-  { banco: 'Santander',       variante: 'Mastercard / Visa',        cuotas: 3  },
-  { banco: 'Banco Estado',    variante: 'Mastercard / CuentaRUT',   cuotas: 3  },
-  { banco: 'Scotiabank',      variante: 'Visa / Mastercard',        cuotas: 3  },
-  { banco: 'Itaú',            variante: 'Crédito',                  cuotas: 3  },
-  { banco: 'BICE',            variante: 'Visa',                     cuotas: 3  },
-  { banco: 'Security',        variante: 'Mastercard',               cuotas: 3  },
-  { banco: 'Coopeuch',        variante: 'Visa Crédito',             cuotas: 3  },
+  { banco: 'Banco de Chile',  variante: 'Visa / Mastercard',        cuotas: 3,  cae: 29 },
+  { banco: 'BCI',             variante: 'Crédito',                  cuotas: 6,  cae: 27 },
+  { banco: 'Santander',       variante: 'Mastercard / Visa',        cuotas: 3,  cae: 32 },
+  { banco: 'Banco Estado',    variante: 'Mastercard / CuentaRUT',   cuotas: 3,  cae: 24 },
+  { banco: 'Scotiabank',      variante: 'Visa / Mastercard',        cuotas: 3,  cae: 31 },
+  { banco: 'Itaú',            variante: 'Crédito',                  cuotas: 3,  cae: 30 },
+  { banco: 'BICE',            variante: 'Visa',                     cuotas: 3,  cae: 26 },
+  { banco: 'Security',        variante: 'Mastercard',               cuotas: 3,  cae: 28 },
+  { banco: 'Coopeuch',        variante: 'Visa Crédito',             cuotas: 3,  cae: 22 },
 ];
+
+// Fórmula de cuota con interés (amortización francesa)
+function calcCuotaConInteres(precio, n, caeAnual) {
+  if (caeAnual === 0) return { cuota: Math.ceil(precio / n), total: precio, interes: 0 };
+  const r = Math.pow(1 + caeAnual / 100, 1 / 12) - 1;
+  const cuota = Math.ceil(precio * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
+  const total = cuota * n;
+  return { cuota, total, interes: total - precio };
+}
 
 const cuotasOverlay = document.getElementById('cuotasOverlay');
 const cuotasBody    = document.getElementById('cuotasBody');
@@ -912,9 +923,10 @@ function abrirCuotasModal(sku) {
   cuotasOverlay.classList.add('open');
 }
 
-function renderCuotasBody(prod, precios, precioBase, bancoSeleccionado = null) {
-  const fmt = n => `$${Number(n).toLocaleString('es-CL')}`;
-  const cuotaFmt = (total, n) => fmt(Math.ceil(total / n));
+// modo: 'sin' | 'con'
+function renderCuotasBody(prod, precios, precioBase, bancoSeleccionado = null, modo = 'sin') {
+  const fmt   = n => `$${Number(Math.round(n)).toLocaleString('es-CL')}`;
+  const fmtSI = (total, n) => fmt(Math.ceil(total / n));
 
   // Tabs de precio
   const tabsHTML = precios.map(p =>
@@ -923,110 +935,179 @@ function renderCuotasBody(prod, precios, precioBase, bancoSeleccionado = null) {
     </button>`
   ).join('');
 
-  // Construir lista completa de bancos (CMR primero)
+  // Lista completa de bancos (CMR primero)
   const cmrCuotas = prod.cuotasSinInteres;
   const todosBancos = [
-    ...(cmrCuotas ? [{ banco: 'CMR Falabella', variante: 'Tarjeta CMR', cuotas: cmrCuotas, esCmr: true }] : []),
+    ...(cmrCuotas ? [{ banco: 'CMR Falabella', variante: 'Tarjeta CMR', cuotas: cmrCuotas, cae: 32, esCmr: true }] : []),
     ...BANCOS_CUOTAS.map(b => ({ ...b, esCmr: false })),
   ];
-
-  // Selección por defecto: CMR si tiene cuotas, sino el primero
   if (!bancoSeleccionado) bancoSeleccionado = todosBancos[0];
 
-  // Resultado destacado
-  const resultadoHTML = `
-    <div class="cuotas-resultado" id="cuotasResultado">
-      <div class="cuotas-resultado-banco">${bancoSeleccionado.banco} <span class="cuotas-resultado-variante">${bancoSeleccionado.variante}</span></div>
-      <div class="cuotas-resultado-cifra">${cuotaFmt(precioBase, bancoSeleccionado.cuotas)}<span class="cuotas-resultado-mes">/mes</span></div>
-      <div class="cuotas-resultado-detalle">${bancoSeleccionado.cuotas} cuotas sin interés · total ${fmt(precioBase)}</div>
+  // Toggle sin/con interés
+  const toggleHTML = `
+    <div class="cuotas-modo-toggle">
+      <button class="cuotas-modo-btn${modo === 'sin' ? ' active' : ''}" data-modo="sin">Sin interés</button>
+      <button class="cuotas-modo-btn${modo === 'con' ? ' active' : ''}" data-modo="con">Con interés</button>
     </div>`;
 
-  // Filas de la tabla
-  const filasHTML = todosBancos.map(b => {
-    const sel = b.banco === bancoSeleccionado.banco;
-    return `
-      <tr class="cuotas-fila${sel ? ' selected' : ''}" data-banco="${b.banco}" data-cuotas="${b.cuotas}" data-es-cmr="${b.esCmr}" style="cursor:pointer">
-        <td>
-          <span class="cuotas-banco-nombre">${b.banco}</span>
-          <span class="cuotas-banco-variante">${b.variante}</span>
-        </td>
-        <td><span class="cuotas-badge${b.esCmr ? ' cmr' : ''}">${b.cuotas} cuotas</span></td>
-        <td>
-          <span class="cuotas-monto">${cuotaFmt(precioBase, b.cuotas)}</span>
-          <span class="cuotas-monto-sub">/mes</span>
-        </td>
-      </tr>`;
-  }).join('');
+  // ── MODO SIN INTERÉS ──
+  let contenidoHTML = '';
+  if (modo === 'sin') {
+    const result = { cuota: Math.ceil(precioBase / bancoSeleccionado.cuotas), total: precioBase, interes: 0 };
+    const resultadoHTML = `
+      <div class="cuotas-resultado">
+        <div class="cuotas-resultado-banco">${bancoSeleccionado.banco} <span class="cuotas-resultado-variante">${bancoSeleccionado.variante}</span></div>
+        <div class="cuotas-resultado-cifra">${fmt(result.cuota)}<span class="cuotas-resultado-mes">/mes</span></div>
+        <div class="cuotas-resultado-detalle">${bancoSeleccionado.cuotas} cuotas sin interés · total ${fmt(result.total)}</div>
+      </div>`;
 
-  // Opciones de la calculadora libre
-  const opciones = [2,3,6,9,12,18,24,36,48].map(n =>
-    `<option value="${n}">${n} cuotas — ${cuotaFmt(precioBase, n)}/mes</option>`
-  ).join('');
+    const filasHTML = todosBancos.map(b => {
+      const sel = b.banco === bancoSeleccionado.banco;
+      return `
+        <tr class="cuotas-fila${sel ? ' selected' : ''}" data-banco="${b.banco}" style="cursor:pointer">
+          <td>
+            <span class="cuotas-banco-nombre">${b.banco}</span>
+            <span class="cuotas-banco-variante">${b.variante}</span>
+          </td>
+          <td><span class="cuotas-badge${b.esCmr ? ' cmr' : ''}">${b.cuotas} cuotas</span></td>
+          <td>
+            <span class="cuotas-monto">${fmtSI(precioBase, b.cuotas)}</span>
+            <span class="cuotas-monto-sub">/mes</span>
+          </td>
+        </tr>`;
+    }).join('');
+
+    contenidoHTML = `
+      ${resultadoHTML}
+      <div class="cuotas-tabla-wrap">
+        <p class="cuotas-tabla-titulo">Seleccioná banco / tarjeta</p>
+        <table class="cuotas-tabla">
+          <thead><tr><th>Banco / Tarjeta</th><th>Cuotas CSI</th><th>Monto/mes</th></tr></thead>
+          <tbody>${filasHTML}</tbody>
+        </table>
+      </div>
+      <p class="cuotas-aviso">
+        ✅ Cuotas sin interés: el total que paga el cliente es exactamente el precio indicado.<br>
+        CMR Falabella: dato verificado de falabella.com. Otros bancos: oferta base habitual, verificar en caja.
+      </p>`;
+
+  // ── MODO CON INTERÉS ──
+  } else {
+    const calcResult = calcCuotaConInteres(precioBase, bancoSeleccionado.cuotas, bancoSeleccionado.cae);
+
+    const opcionesBanco = todosBancos.map(b =>
+      `<option value="${b.banco}"${b.banco === bancoSeleccionado.banco ? ' selected' : ''}>${b.banco}</option>`
+    ).join('');
+    const opcionesCuotas = [2,3,6,9,12,18,24,36,48].map(n =>
+      `<option value="${n}"${n === bancoSeleccionado.cuotas ? ' selected' : ''}>${n} cuotas</option>`
+    ).join('');
+
+    contenidoHTML = `
+      <div class="cuotas-resultado">
+        <div class="cuotas-resultado-banco">${bancoSeleccionado.banco} <span class="cuotas-resultado-variante">${bancoSeleccionado.variante}</span></div>
+        <div class="cuotas-resultado-cifra">${fmt(calcResult.cuota)}<span class="cuotas-resultado-mes">/mes</span></div>
+        <div class="cuotas-resultado-detalle">
+          ${bancoSeleccionado.cuotas} cuotas · total ${fmt(calcResult.total)}
+          <span class="cuotas-interes-badge">+${fmt(calcResult.interes)} en intereses</span>
+        </div>
+      </div>
+
+      <div class="cuotas-tabla-wrap">
+        <p class="cuotas-tabla-titulo">Configurar cálculo</p>
+        <div class="cuotas-con-form">
+          <div class="cuotas-con-row">
+            <label class="cuotas-con-label">Banco / Tarjeta</label>
+            <select class="cuotas-calc-select" id="cuotasConBanco">${opcionesBanco}</select>
+          </div>
+          <div class="cuotas-con-row">
+            <label class="cuotas-con-label">Cuotas</label>
+            <select class="cuotas-calc-select" id="cuotasConN">${opcionesCuotas}</select>
+          </div>
+          <div class="cuotas-con-row">
+            <label class="cuotas-con-label">CAE anual %</label>
+            <input class="cuotas-calc-select" id="cuotasConCae" type="number" min="0" max="200" step="0.5" value="${bancoSeleccionado.cae}" style="width:90px" />
+          </div>
+        </div>
+
+        <table class="cuotas-tabla" style="margin-top:10px">
+          <thead><tr><th>Detalle</th><th style="text-align:right">Valor</th></tr></thead>
+          <tbody>
+            <tr id="cuotasConTrCuota"><td>Cuota mensual</td><td style="text-align:right"><span class="cuotas-monto">${fmt(calcResult.cuota)}</span></td></tr>
+            <tr id="cuotasConTrTotal"><td>Total a pagar</td><td style="text-align:right"><span class="cuotas-monto">${fmt(calcResult.total)}</span></td></tr>
+            <tr id="cuotasConTrInteres"><td>Total intereses</td><td style="text-align:right"><span class="cuotas-monto" style="color:var(--rojo)">${fmt(calcResult.interes)}</span></td></tr>
+            <tr id="cuotasConTrCae"><td>CAE aplicado</td><td style="text-align:right"><span class="cuotas-banco-variante">${bancoSeleccionado.cae}% anual</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="cuotas-aviso">
+        ⚠️ CAE referencial — puede variar según historial crediticio y producto contratado.
+        Verificar tasa exacta con el banco antes de informar al cliente.
+        Cálculo usa amortización francesa (cuota constante).
+      </p>`;
+  }
 
   cuotasBody.innerHTML = `
     <div class="cuotas-producto">
       <p class="cuotas-producto-nombre">${prod.nombre}</p>
       <div class="cuotas-precio-tabs">${tabsHTML}</div>
     </div>
-
-    ${resultadoHTML}
-
-    <div class="cuotas-tabla-wrap">
-      <p class="cuotas-tabla-titulo">Seleccioná banco / tarjeta</p>
-      <table class="cuotas-tabla">
-        <thead>
-          <tr>
-            <th>Banco / Tarjeta</th>
-            <th>Cuotas</th>
-            <th>Monto/mes</th>
-          </tr>
-        </thead>
-        <tbody>${filasHTML}</tbody>
-      </table>
-    </div>
-
-    <div class="cuotas-calc">
-      <p class="cuotas-calc-titulo">Calcular para cualquier número de cuotas</p>
-      <div class="cuotas-calc-row">
-        <span class="cuotas-calc-label">Cuotas:</span>
-        <select class="cuotas-calc-select" id="cuotasCalcSelect">
-          ${opciones}
-        </select>
-        <span class="cuotas-calc-result" id="cuotasCalcResult">${cuotaFmt(precioBase, bancoSeleccionado.cuotas)}/mes</span>
-      </div>
-    </div>
-
-    <p class="cuotas-aviso">
-      ⚠️ Las cuotas sin interés de bancos distintos a CMR pueden variar según promociones vigentes.
-      Información CMR obtenida directamente de falabella.com.
-      Verificar en caja antes de realizar la venta.
-    </p>`;
+    ${toggleHTML}
+    ${contenidoHTML}`;
 
   // Tabs de precio
   cuotasBody.querySelectorAll('.cuotas-precio-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       cuotasPrecioActual = parseInt(tab.dataset.valor);
-      const bancoActual = todosBancos.find(b => b.banco === document.querySelector('.cuotas-fila.selected')?.dataset?.banco) || null;
-      renderCuotasBody(prod, precios, cuotasPrecioActual, bancoActual);
+      const bancoActual = todosBancos.find(b => b.banco === document.querySelector('.cuotas-fila.selected')?.dataset?.banco) || bancoSeleccionado;
+      renderCuotasBody(prod, precios, cuotasPrecioActual, bancoActual, modo);
     });
   });
 
-  // Selección de fila
-  cuotasBody.querySelectorAll('.cuotas-fila').forEach(fila => {
-    fila.addEventListener('click', () => {
-      const banco = todosBancos.find(b => b.banco === fila.dataset.banco);
-      if (!banco) return;
-      renderCuotasBody(prod, precios, precioBase, banco);
+  // Toggle sin/con
+  cuotasBody.querySelectorAll('.cuotas-modo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      renderCuotasBody(prod, precios, precioBase, bancoSeleccionado, btn.dataset.modo);
     });
   });
 
-  // Calculadora libre
-  const calcSelect = document.getElementById('cuotasCalcSelect');
-  const calcResult = document.getElementById('cuotasCalcResult');
-  calcSelect.value = String(bancoSeleccionado.cuotas);
-  calcSelect.addEventListener('change', () => {
-    calcResult.textContent = cuotaFmt(precioBase, parseInt(calcSelect.value)) + '/mes';
-  });
+  if (modo === 'sin') {
+    // Selección de fila
+    cuotasBody.querySelectorAll('.cuotas-fila').forEach(fila => {
+      fila.addEventListener('click', () => {
+        const banco = todosBancos.find(b => b.banco === fila.dataset.banco);
+        if (banco) renderCuotasBody(prod, precios, precioBase, banco, 'sin');
+      });
+    });
+  } else {
+    // Calculadora con interés — actualizar en tiempo real
+    const actualizarConInteres = () => {
+      const bancoBuscado = document.getElementById('cuotasConBanco').value;
+      const nCuotas  = parseInt(document.getElementById('cuotasConN').value);
+      const caeInput = parseFloat(document.getElementById('cuotasConCae').value) || 0;
+      const bancoObj = todosBancos.find(b => b.banco === bancoBuscado) || bancoSeleccionado;
+      const r = calcCuotaConInteres(precioBase, nCuotas, caeInput);
+      document.getElementById('cuotasConTrCuota').querySelector('.cuotas-monto').textContent  = fmt(r.cuota);
+      document.getElementById('cuotasConTrTotal').querySelector('.cuotas-monto').textContent   = fmt(r.total);
+      document.getElementById('cuotasConTrInteres').querySelector('.cuotas-monto').textContent = fmt(r.interes);
+      document.getElementById('cuotasConTrCae').querySelector('.cuotas-banco-variante').textContent = caeInput + '% anual';
+      // Actualizar resultado destacado
+      cuotasBody.querySelector('.cuotas-resultado-banco').innerHTML =
+        `${bancoObj.banco} <span class="cuotas-resultado-variante">${bancoObj.variante}</span>`;
+      cuotasBody.querySelector('.cuotas-resultado-cifra').innerHTML =
+        `${fmt(r.cuota)}<span class="cuotas-resultado-mes">/mes</span>`;
+      cuotasBody.querySelector('.cuotas-resultado-detalle').innerHTML =
+        `${nCuotas} cuotas · total ${fmt(r.total)} <span class="cuotas-interes-badge">+${fmt(r.interes)} en intereses</span>`;
+    };
+    // Al cambiar banco → pre-rellenar CAE
+    document.getElementById('cuotasConBanco').addEventListener('change', () => {
+      const bancoBuscado = document.getElementById('cuotasConBanco').value;
+      const bancoObj = todosBancos.find(b => b.banco === bancoBuscado);
+      if (bancoObj) document.getElementById('cuotasConCae').value = bancoObj.cae;
+      actualizarConInteres();
+    });
+    document.getElementById('cuotasConN').addEventListener('change', actualizarConInteres);
+    document.getElementById('cuotasConCae').addEventListener('input', actualizarConInteres);
+  }
 }
 
 cuotasClose.addEventListener('click', () => cuotasOverlay.classList.remove('open'));

@@ -1134,6 +1134,63 @@ main {
   line-height: 1.4;
 }
 
+/* Toggle sin / con interés */
+.cuotas-modo-toggle {
+  display: flex;
+  gap: 0;
+  margin: 10px 16px 0;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cuotas-modo-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--texto-suave);
+  padding: 8px 12px;
+  font-size: .85rem;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.cuotas-modo-btn.active {
+  background: var(--surface-2);
+  color: var(--texto);
+  font-weight: 600;
+}
+.cuotas-modo-btn:not(.active):hover { background: rgba(255,255,255,.03); }
+
+/* Badge de intereses */
+.cuotas-interes-badge {
+  display: inline-block;
+  margin-left: 6px;
+  background: rgba(248,81,73,.12);
+  color: var(--rojo);
+  border: 1px solid rgba(248,81,73,.25);
+  border-radius: 8px;
+  padding: 1px 7px;
+  font-size: .72rem;
+  font-weight: 600;
+}
+
+/* Formulario con interés */
+.cuotas-con-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.cuotas-con-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cuotas-con-label {
+  font-size: .82rem;
+  color: var(--texto-suave);
+  min-width: 110px;
+}
+
 /* Resultado destacado */
 .cuotas-resultado {
   margin: 10px 16px 4px;

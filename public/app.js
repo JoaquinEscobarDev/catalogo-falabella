@@ -912,7 +912,7 @@ function abrirCuotasModal(sku) {
   cuotasOverlay.classList.add('open');
 }
 
-function renderCuotasBody(prod, precios, precioBase) {
+function renderCuotasBody(prod, precios, precioBase, bancoSeleccionado = null) {
   const fmt = n => `$${Number(n).toLocaleString('es-CL')}`;
   const cuotaFmt = (total, n) => fmt(Math.ceil(total / n));
 
@@ -923,41 +923,40 @@ function renderCuotasBody(prod, precios, precioBase) {
     </button>`
   ).join('');
 
-  // Fila CMR del producto
+  // Construir lista completa de bancos (CMR primero)
   const cmrCuotas = prod.cuotasSinInteres;
-  const cmrRow = cmrCuotas
-    ? `<tr>
+  const todosBancos = [
+    ...(cmrCuotas ? [{ banco: 'CMR Falabella', variante: 'Tarjeta CMR', cuotas: cmrCuotas, esCmr: true }] : []),
+    ...BANCOS_CUOTAS.map(b => ({ ...b, esCmr: false })),
+  ];
+
+  // Selección por defecto: CMR si tiene cuotas, sino el primero
+  if (!bancoSeleccionado) bancoSeleccionado = todosBancos[0];
+
+  // Resultado destacado
+  const resultadoHTML = `
+    <div class="cuotas-resultado" id="cuotasResultado">
+      <div class="cuotas-resultado-banco">${bancoSeleccionado.banco} <span class="cuotas-resultado-variante">${bancoSeleccionado.variante}</span></div>
+      <div class="cuotas-resultado-cifra">${cuotaFmt(precioBase, bancoSeleccionado.cuotas)}<span class="cuotas-resultado-mes">/mes</span></div>
+      <div class="cuotas-resultado-detalle">${bancoSeleccionado.cuotas} cuotas sin interés · total ${fmt(precioBase)}</div>
+    </div>`;
+
+  // Filas de la tabla
+  const filasHTML = todosBancos.map(b => {
+    const sel = b.banco === bancoSeleccionado.banco;
+    return `
+      <tr class="cuotas-fila${sel ? ' selected' : ''}" data-banco="${b.banco}" data-cuotas="${b.cuotas}" data-es-cmr="${b.esCmr}" style="cursor:pointer">
         <td>
-          <span class="cuotas-banco-nombre">CMR Falabella</span>
-          <span class="cuotas-banco-variante">Tarjeta CMR</span>
+          <span class="cuotas-banco-nombre">${b.banco}</span>
+          <span class="cuotas-banco-variante">${b.variante}</span>
         </td>
-        <td><span class="cuotas-badge cmr">${cmrCuotas} cuotas</span></td>
+        <td><span class="cuotas-badge${b.esCmr ? ' cmr' : ''}">${b.cuotas} cuotas</span></td>
         <td>
-          <span class="cuotas-monto">${cuotaFmt(precioBase, cmrCuotas)}</span>
+          <span class="cuotas-monto">${cuotaFmt(precioBase, b.cuotas)}</span>
           <span class="cuotas-monto-sub">/mes</span>
         </td>
-      </tr>`
-    : `<tr>
-        <td>
-          <span class="cuotas-banco-nombre">CMR Falabella</span>
-          <span class="cuotas-banco-variante">Tarjeta CMR</span>
-        </td>
-        <td><span class="cuotas-badge cmr">Ver producto</span></td>
-        <td><span class="cuotas-monto" style="color:var(--texto-suave)">—</span></td>
       </tr>`;
-
-  const bancosRows = BANCOS_CUOTAS.map(b => `
-    <tr>
-      <td>
-        <span class="cuotas-banco-nombre">${b.banco}</span>
-        <span class="cuotas-banco-variante">${b.variante}</span>
-      </td>
-      <td><span class="cuotas-badge">${b.cuotas} cuotas</span></td>
-      <td>
-        <span class="cuotas-monto">${cuotaFmt(precioBase, b.cuotas)}</span>
-        <span class="cuotas-monto-sub">/mes</span>
-      </td>
-    </tr>`).join('');
+  }).join('');
 
   // Opciones de la calculadora libre
   const opciones = [2,3,6,9,12,18,24,36,48].map(n =>
@@ -970,8 +969,10 @@ function renderCuotasBody(prod, precios, precioBase) {
       <div class="cuotas-precio-tabs">${tabsHTML}</div>
     </div>
 
+    ${resultadoHTML}
+
     <div class="cuotas-tabla-wrap">
-      <p class="cuotas-tabla-titulo">Cuotas sin interés en Falabella</p>
+      <p class="cuotas-tabla-titulo">Seleccioná banco / tarjeta</p>
       <table class="cuotas-tabla">
         <thead>
           <tr>
@@ -980,10 +981,7 @@ function renderCuotasBody(prod, precios, precioBase) {
             <th>Monto/mes</th>
           </tr>
         </thead>
-        <tbody>
-          ${cmrRow}
-          ${bancosRows}
-        </tbody>
+        <tbody>${filasHTML}</tbody>
       </table>
     </div>
 
@@ -994,7 +992,7 @@ function renderCuotasBody(prod, precios, precioBase) {
         <select class="cuotas-calc-select" id="cuotasCalcSelect">
           ${opciones}
         </select>
-        <span class="cuotas-calc-result" id="cuotasCalcResult">${cuotaFmt(precioBase, 3)}/mes</span>
+        <span class="cuotas-calc-result" id="cuotasCalcResult">${cuotaFmt(precioBase, bancoSeleccionado.cuotas)}/mes</span>
       </div>
     </div>
 
@@ -1008,15 +1006,24 @@ function renderCuotasBody(prod, precios, precioBase) {
   cuotasBody.querySelectorAll('.cuotas-precio-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       cuotasPrecioActual = parseInt(tab.dataset.valor);
-      renderCuotasBody(prod, precios, cuotasPrecioActual);
+      const bancoActual = todosBancos.find(b => b.banco === document.querySelector('.cuotas-fila.selected')?.dataset?.banco) || null;
+      renderCuotasBody(prod, precios, cuotasPrecioActual, bancoActual);
+    });
+  });
+
+  // Selección de fila
+  cuotasBody.querySelectorAll('.cuotas-fila').forEach(fila => {
+    fila.addEventListener('click', () => {
+      const banco = todosBancos.find(b => b.banco === fila.dataset.banco);
+      if (!banco) return;
+      renderCuotasBody(prod, precios, precioBase, banco);
     });
   });
 
   // Calculadora libre
   const calcSelect = document.getElementById('cuotasCalcSelect');
   const calcResult = document.getElementById('cuotasCalcResult');
-  calcSelect.value = '3';
-  calcResult.textContent = cuotaFmt(precioBase, 3) + '/mes';
+  calcSelect.value = String(bancoSeleccionado.cuotas);
   calcSelect.addEventListener('change', () => {
     calcResult.textContent = cuotaFmt(precioBase, parseInt(calcSelect.value)) + '/mes';
   });

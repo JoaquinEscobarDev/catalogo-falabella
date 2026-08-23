@@ -1134,6 +1134,52 @@ main {
   line-height: 1.4;
 }
 
+/* Resultado destacado */
+.cuotas-resultado {
+  margin: 10px 16px 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: rgba(121,192,255,.1);
+  border: 1px solid rgba(121,192,255,.3);
+  text-align: center;
+}
+.cuotas-resultado-banco {
+  font-size: .8rem;
+  color: var(--azul);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.cuotas-resultado-variante {
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+.cuotas-resultado-cifra {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--texto);
+  line-height: 1.1;
+}
+.cuotas-resultado-mes {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+.cuotas-resultado-detalle {
+  font-size: .78rem;
+  color: var(--texto-suave);
+  margin-top: 4px;
+}
+
+/* Filas seleccionables */
+.cuotas-tabla .cuotas-fila:hover { background: rgba(255,255,255,.03); }
+.cuotas-tabla .cuotas-fila.selected {
+  background: rgba(121,192,255,.07);
+}
+.cuotas-tabla .cuotas-fila.selected td:first-child {
+  border-left: 3px solid var(--azul);
+  padding-left: 3px;
+}
+
 /* Botón cuotas en la card */
 .btn-cuotas {
   background: none;

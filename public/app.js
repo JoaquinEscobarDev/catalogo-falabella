@@ -384,6 +384,9 @@ function renderGrid() {
   grid.querySelectorAll('.btn-upc').forEach(btn => {
     btn.addEventListener('click', () => editarUpc(btn.dataset.sku));
   });
+  grid.querySelectorAll('.btn-cuotas').forEach(btn => {
+    btn.addEventListener('click', () => abrirCuotasModal(btn.dataset.sku));
+  });
 }
 
 function badgeStock(sku) {
@@ -472,6 +475,8 @@ function tarjeta({ sku, alias }, idx = -1) {
     ? `<div class="card-cuotas">💳 Hasta ${prod.cuotasSinInteres} cuotas sin interés (CMR)</div>`
     : '';
 
+  const btnCuotas = `<button class="btn-cuotas" data-sku="${sku}">💳 Cuotas</button>`;
+
   const bloqueDespacho = prod.despacho24h
     ? `<div class="card-despacho">🚚 Despacho 24 horas</div>`
     : '';
@@ -518,7 +523,10 @@ function tarjeta({ sku, alias }, idx = -1) {
         </div>
         <div class="card-footer">
           ${prod.url ? `<a class="card-link" href="${prod.url}" target="_blank" rel="noopener">Ver →</a>` : '<span></span>'}
-          <button class="${btnClass}" data-sku="${sku}">${btnLabel}</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            ${btnCuotas}
+            <button class="${btnClass}" data-sku="${sku}">${btnLabel}</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -821,6 +829,10 @@ async function buscarProductos(q) {
   // Ocultar botón eliminar (no corresponde en el contexto de búsqueda)
   searchBody.querySelectorAll('.btn-delete').forEach(btn => btn.style.display = 'none');
 
+  searchBody.querySelectorAll('.btn-cuotas').forEach(btn => {
+    btn.addEventListener('click', () => abrirCuotasModal(btn.dataset.sku));
+  });
+
   // Botón cambiar funciona igual que en el grid
   searchBody.querySelectorAll('.btn-cambiar').forEach(btn => {
     btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
@@ -854,4 +866,166 @@ todoClearModal.addEventListener('click', () => {
     limpiarTodo();
     todoOverlay.classList.remove('open');
   }
+});
+
+// ══════════════════════════════════════════
+// CALCULADORA DE CUOTAS
+// ══════════════════════════════════════════
+
+// Cuotas sin interés estándar en Falabella Chile por banco/tarjeta.
+// CMR se toma del dato scrapeado del producto (el más preciso).
+// Las de otros bancos corresponden a la oferta base habitual y pueden
+// variar según promociones vigentes — verificar en www.falabella.com.
+const BANCOS_CUOTAS = [
+  { banco: 'Banco de Chile',  variante: 'Visa / Mastercard',        cuotas: 3  },
+  { banco: 'BCI',             variante: 'Crédito',                  cuotas: 6  },
+  { banco: 'Santander',       variante: 'Mastercard / Visa',        cuotas: 3  },
+  { banco: 'Banco Estado',    variante: 'Mastercard / CuentaRUT',   cuotas: 3  },
+  { banco: 'Scotiabank',      variante: 'Visa / Mastercard',        cuotas: 3  },
+  { banco: 'Itaú',            variante: 'Crédito',                  cuotas: 3  },
+  { banco: 'BICE',            variante: 'Visa',                     cuotas: 3  },
+  { banco: 'Security',        variante: 'Mastercard',               cuotas: 3  },
+  { banco: 'Coopeuch',        variante: 'Visa Crédito',             cuotas: 3  },
+];
+
+const cuotasOverlay = document.getElementById('cuotasOverlay');
+const cuotasBody    = document.getElementById('cuotasBody');
+const cuotasClose   = document.getElementById('cuotasClose');
+
+let cuotasSkuActual = null;
+let cuotasPrecioActual = 0;
+
+function abrirCuotasModal(sku) {
+  cuotasSkuActual = sku;
+  const prod = productosCache[sku];
+  if (!prod || prod.error) return;
+
+  // Determinar precios disponibles
+  const precios = [];
+  if (prod.precioCMR)    precios.push({ label: 'CMR', valor: prod.precioCMR });
+  if (prod.precioOferta) precios.push({ label: 'Oferta', valor: prod.precioOferta });
+  if (prod.precio)       precios.push({ label: 'Normal', valor: prod.precio });
+  if (!precios.length)   return;
+
+  cuotasPrecioActual = precios[0].valor;
+  renderCuotasBody(prod, precios, cuotasPrecioActual);
+  cuotasOverlay.classList.add('open');
+}
+
+function renderCuotasBody(prod, precios, precioBase) {
+  const fmt = n => `$${Number(n).toLocaleString('es-CL')}`;
+  const cuotaFmt = (total, n) => fmt(Math.ceil(total / n));
+
+  // Tabs de precio
+  const tabsHTML = precios.map(p =>
+    `<button class="cuotas-precio-tab${p.valor === precioBase ? ' active' : ''}" data-valor="${p.valor}">
+      ${p.label}: ${fmt(p.valor)}
+    </button>`
+  ).join('');
+
+  // Fila CMR del producto
+  const cmrCuotas = prod.cuotasSinInteres;
+  const cmrRow = cmrCuotas
+    ? `<tr>
+        <td>
+          <span class="cuotas-banco-nombre">CMR Falabella</span>
+          <span class="cuotas-banco-variante">Tarjeta CMR</span>
+        </td>
+        <td><span class="cuotas-badge cmr">${cmrCuotas} cuotas</span></td>
+        <td>
+          <span class="cuotas-monto">${cuotaFmt(precioBase, cmrCuotas)}</span>
+          <span class="cuotas-monto-sub">/mes</span>
+        </td>
+      </tr>`
+    : `<tr>
+        <td>
+          <span class="cuotas-banco-nombre">CMR Falabella</span>
+          <span class="cuotas-banco-variante">Tarjeta CMR</span>
+        </td>
+        <td><span class="cuotas-badge cmr">Ver producto</span></td>
+        <td><span class="cuotas-monto" style="color:var(--texto-suave)">—</span></td>
+      </tr>`;
+
+  const bancosRows = BANCOS_CUOTAS.map(b => `
+    <tr>
+      <td>
+        <span class="cuotas-banco-nombre">${b.banco}</span>
+        <span class="cuotas-banco-variante">${b.variante}</span>
+      </td>
+      <td><span class="cuotas-badge">${b.cuotas} cuotas</span></td>
+      <td>
+        <span class="cuotas-monto">${cuotaFmt(precioBase, b.cuotas)}</span>
+        <span class="cuotas-monto-sub">/mes</span>
+      </td>
+    </tr>`).join('');
+
+  // Opciones de la calculadora libre
+  const opciones = [2,3,6,9,12,18,24,36,48].map(n =>
+    `<option value="${n}">${n} cuotas — ${cuotaFmt(precioBase, n)}/mes</option>`
+  ).join('');
+
+  cuotasBody.innerHTML = `
+    <div class="cuotas-producto">
+      <p class="cuotas-producto-nombre">${prod.nombre}</p>
+      <div class="cuotas-precio-tabs">${tabsHTML}</div>
+    </div>
+
+    <div class="cuotas-tabla-wrap">
+      <p class="cuotas-tabla-titulo">Cuotas sin interés en Falabella</p>
+      <table class="cuotas-tabla">
+        <thead>
+          <tr>
+            <th>Banco / Tarjeta</th>
+            <th>Cuotas</th>
+            <th>Monto/mes</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cmrRow}
+          ${bancosRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cuotas-calc">
+      <p class="cuotas-calc-titulo">Calcular para cualquier número de cuotas</p>
+      <div class="cuotas-calc-row">
+        <span class="cuotas-calc-label">Cuotas:</span>
+        <select class="cuotas-calc-select" id="cuotasCalcSelect">
+          ${opciones}
+        </select>
+        <span class="cuotas-calc-result" id="cuotasCalcResult">${cuotaFmt(precioBase, 3)}/mes</span>
+      </div>
+    </div>
+
+    <p class="cuotas-aviso">
+      ⚠️ Las cuotas sin interés de bancos distintos a CMR pueden variar según promociones vigentes.
+      Información CMR obtenida directamente de falabella.com.
+      Verificar en caja antes de realizar la venta.
+    </p>`;
+
+  // Tabs de precio
+  cuotasBody.querySelectorAll('.cuotas-precio-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      cuotasPrecioActual = parseInt(tab.dataset.valor);
+      renderCuotasBody(prod, precios, cuotasPrecioActual);
+    });
+  });
+
+  // Calculadora libre
+  const calcSelect = document.getElementById('cuotasCalcSelect');
+  const calcResult = document.getElementById('cuotasCalcResult');
+  calcSelect.value = '3';
+  calcResult.textContent = cuotaFmt(precioBase, 3) + '/mes';
+  calcSelect.addEventListener('change', () => {
+    calcResult.textContent = cuotaFmt(precioBase, parseInt(calcSelect.value)) + '/mes';
+  });
+}
+
+cuotasClose.addEventListener('click', () => cuotasOverlay.classList.remove('open'));
+cuotasOverlay.addEventListener('click', e => {
+  if (e.target === cuotasOverlay) cuotasOverlay.classList.remove('open');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cuotasOverlay.classList.remove('open');
 });

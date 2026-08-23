@@ -1,142 +1,134 @@
-# 🛒 Catálogo de Precios Falabella
+# Catálogo Falabella
 
-Herramienta web para hacer seguimiento diario de precios de productos en Falabella Chile. Agregás los SKUs una sola vez y cada mañana revisás todos los precios de un vistazo.
+Herramienta interna para vendedores de tienda. Permite consultar precios en tiempo real de falabella.com, simular cuotas con distintos bancos, registrar cambios de precio pendientes y gestionar el catálogo por categorías.
 
----
-
-## ✨ Funcionalidades
-
-- 📦 **Búsqueda por SKU** — ingresás el SKU y aparecen nombre, imagen y precio automáticamente
-- 💰 **Precio normal y precio oferta** — muestra ambos cuando hay descuento
-- 🔍 **Filtro en tiempo real** — buscá por nombre, SKU o alias
-- 💾 **Base de datos persistente** — los SKUs se guardan y no hay que volver a ingresarlos
-- 🔁 **Actualización masiva** — un botón refresca todos los precios a la vez
-- 🏷️ **Alias personalizados** — poné un nombre propio a cada producto (ej: "TV Living")
-- 🔗 **Link directo a Falabella** — con un click vas al producto en el sitio
+Desplegada como PWA instalable en Railway con PostgreSQL.
 
 ---
 
-## 🖼️ Vista previa
+## Funcionalidades
 
-```
-┌─────────────────────────────────────────┐
-│  🛒 Catálogo Falabella   [↻ Actualizar] │
-├─────────────────────────────────────────┤
-│  SKU: [__________]  Alias: [_________]  │
-│                              [Agregar]  │
-├─────────────────────────────────────────┤
-│  🔍 Filtrar por nombre, SKU o alias...  │
-├──────────┬──────────┬───────────────────┤
-│ [Imagen] │ [Imagen] │ [Imagen]          │
-│ Nombre   │ Nombre   │ Nombre            │
-│ SKU      │ SKU      │ SKU               │
-│ $699.990 │ $49.990  │ $129.990          │
-│ $569.990 │          │ $99.990 oferta    │
-└──────────┴──────────┴───────────────────┘
-```
+### Catálogo por categorías
+- Organización de productos en categorías personalizadas (ej: Zona A, Zona B, Electro)
+- Vista de grilla con tarjeta por producto mostrando imagen, nombre, precios y variaciones
+- Filtro en tiempo real por nombre, SKU, alias o marca
+- Filtro adicional por marca dentro de una categoría
+
+### Precios en tiempo real
+- Scraping de falabella.com al abrir un producto (curl + Playwright stealth como respaldo ante bloqueos de Cloudflare)
+- Muestra precio CMR, precio oferta y precio normal en la misma tarjeta
+- Historial de precios guardado en base de datos para detectar variaciones
+- Indicador visual de cambio de precio (subida / bajada) respecto al registro anterior
+
+### Código UPC por producto
+- Campo UPC editable inline en cada tarjeta
+- Guardado inmediato en base de datos al confirmar
+- Útil para escaneo rápido en caja
+
+### Simulador de cuotas (`💳`)
+- Botón en cada tarjeta que abre un modal de simulación
+- **Precio CMR**: muestra únicamente las cuotas sin interés de la tarjeta CMR Falabella, obtenidas directamente del scraping de la página del producto
+- **Precio Oferta / Normal**: muestra todos los demás bancos
+  - **Sin interés**: tabla con 9 bancos (Banco de Chile, BCI, Santander, Banco Estado, Scotiabank, Itaú, BICE, Security, Coopeuch), cada uno con sus cuotas sin interés base. Selección de fila para ver el detalle en el encabezado
+  - **Con interés**: calculadora con banco, número de cuotas y CAE editable. Cálculo con amortización francesa (cuota constante). Muestra cuota mensual, total a pagar y total en intereses
+- CAE por banco preconfigurado y editable por el usuario
+
+### Lista de cambios de precio (ToDo)
+- Botón "Cambiar" en cada tarjeta para agregar un producto a la lista de pendientes
+- Panel lateral en escritorio y modal flotante en móvil
+- Contador de items pendientes visible en todo momento (FAB en móvil)
+- Persistencia en base de datos (sobrevive cierres de pestaña)
+
+### Búsqueda global
+- Ícono de búsqueda en el header que abre un modal con campo de texto
+- Búsqueda en tiempo real sobre todos los productos de todas las categorías
+- Muestra la tarjeta completa del producto con imagen, precios y botón de cuotas
+
+### Gestión de SKUs
+- Formulario para agregar SKU con alias y categoría
+- Eliminación de SKU con confirmación
+- Actualización de precios manual por producto o refresh masivo de toda la categoría
+
+### PWA instalable
+- Manifest y service worker incluidos (`catalogo-v7`)
+- Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
+- Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 
 ---
 
-## 🚀 Instalación local
+## Stack técnico
 
-### Requisitos
-- [Node.js](https://nodejs.org) v18 o superior
-- `curl` instalado en el sistema (viene por defecto en Windows 10+, macOS y Linux)
-- Docker + Docker Compose (para levantar Postgres local fácilmente)
+| Capa | Tecnología |
+|---|---|
+| Backend | Node.js + Express |
+| Base de datos | PostgreSQL (Railway) |
+| Scraping | curl (headers reales) + Playwright stealth (fallback) |
+| Frontend | HTML/CSS/JS vanilla (sin frameworks) |
+| Deploy | Railway (auto-deploy desde `main`) |
+| PWA | Service Worker + Web App Manifest |
 
-### Pasos
+---
+
+## API REST
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/skus` | Lista todos los SKUs |
+| `POST` | `/api/skus` | Agrega un SKU |
+| `DELETE` | `/api/skus/:sku` | Elimina un SKU |
+| `GET` | `/api/search?q=...` | Búsqueda global de productos |
+| `GET` | `/api/categoria/:nombre` | Productos de una categoría |
+| `GET` | `/api/producto/:sku` | Datos de un producto (caché + scraping) |
+| `PATCH` | `/api/producto/:sku/upc` | Actualiza el UPC de un producto |
+| `GET` | `/api/stock/:sku` | Stock disponible de un producto |
+| `GET` | `/api/todo` | Lista de cambios pendientes |
+| `POST` | `/api/todo` | Agrega/actualiza un item pendiente |
+| `DELETE` | `/api/todo/:sku` | Elimina un item pendiente |
+| `POST` | `/api/todo/clear` | Limpia toda la lista |
+| `POST` | `/api/solicitar-refresh` | Solicita refresh de precios en segundo plano |
+| `GET` | `/api/solicitar-refresh/:id` | Consulta el estado de un refresh |
+
+---
+
+## Scripts
 
 ```bash
-# 1. Clonar el repositorio
-git clone https://github.com/JoaquinEscobarDev/catalogo-falabella.git
-cd catalogo-falabella
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Levantar Postgres local
-echo "POSTGRES_PASSWORD=dev" > .env
-docker compose up -d postgres
-
-# 4. Configurar .env (ver .env.example) apuntando DATABASE_URL al Postgres local
-#    DATABASE_URL=postgresql://catalogo:dev@localhost:5432/catalogo_falabella
-
-# 5. Crear el esquema
-npm run migrate
-
-# 6. Iniciar el servidor
-npm start
+npm start                # Inicia el servidor en producción
+npm run dev              # Inicia con nodemon (desarrollo)
+npm run migrate          # Ejecuta las migraciones de base de datos
+npm run refresh          # Refresh masivo de precios desde IP local
+npm run watch-refresh    # Refresh continuo (modo watch)
 ```
 
-Luego abrí el navegador en **http://localhost:3000**
+---
+
+## Variables de entorno
+
+```env
+DATABASE_URL=postgresql://...   # URL de conexión a PostgreSQL
+PROXY_URL=                      # Proxy opcional para scraping en datacenter
+CACHE_TTL_MS=300000             # TTL de caché de precios (default: 5 min)
+PORT=3000
+```
 
 ---
 
-## 📖 Cómo usar
-
-1. **Encontrá el SKU** del producto en Falabella — está en la URL del producto o en la ficha técnica
-2. **Pegá el SKU** en el campo de la app y opcionalmente poné un alias
-3. Click en **Agregar** — la app consulta Falabella y muestra el producto
-4. **Cada mañana** abrí la app y click en **↻ Actualizar precios** para ver los precios del día
-
----
-
-## 🛠️ Stack técnico
-
-| Componente | Tecnología |
-|---|---|
-| Backend | Node.js + Express, arquitectura en capas (routes → controllers → services → repositories) |
-| Base de datos | PostgreSQL propio (Docker, sobre un VPS de Hostinger) |
-| Frontend | HTML + CSS + JavaScript vanilla |
-| Scraping | curl + Playwright (respaldo) + parsing de `__NEXT_DATA__` |
-| Refresh de precios | Corre desde una PC con IP residencial (Task Scheduler de Windows) contra el Postgres del VPS vía túnel SSH — ver [DEPLOY.md](DEPLOY.md) |
-
----
-
-## 📁 Estructura del proyecto
+## Estructura del proyecto
 
 ```
-catalogo-falabella/
-├── server.js               # Bootstrap: conecta Postgres y levanta src/app.js
+├── public/              # Frontend (HTML, CSS, JS, PWA)
+│   ├── index.html
+│   ├── app.js           # Lógica principal del cliente
+│   ├── style.css
+│   ├── sw.js            # Service Worker
+│   └── manifest.json
 ├── src/
-│   ├── config/             # env.js, database.js (pool de pg)
-│   ├── repositories/       # acceso a datos, una tabla por archivo
-│   ├── services/           # lógica de negocio + scraperService (scraping puro)
-│   ├── controllers/        # handlers HTTP, delegan a services
-│   ├── routes/             # define /api/*
-│   └── app.js              # ensambla express + rutas
-├── migrations/              # esquema SQL versionado + runner
-├── scripts/
-│   ├── migrate-from-neon.js # migración de datos, una sola vez
-│   ├── refresh-local.js     # refresh diario completo (PC)
-│   └── watch-refresh.js     # atiende el botón "Actualizar precios" (PC)
-├── docker-compose.yml       # app + postgres para el VPS (y desarrollo local)
-├── DEPLOY.md                # proceso completo de deploy en Hostinger
-└── public/                  # frontend (sin cambios de API)
+│   ├── config/          # Configuración de BD y entorno
+│   ├── controllers/     # Handlers HTTP
+│   ├── repositories/    # Acceso a base de datos
+│   ├── routes/          # Definición de rutas
+│   └── services/        # Lógica de negocio y scraping
+├── migrations/          # Migraciones de esquema
+├── scripts/             # Utilidades de mantenimiento
+└── server.js            # Entry point
 ```
-
----
-
-## ⚙️ Variables de entorno
-
-Ver [.env.example](.env.example) y [DEPLOY.md](DEPLOY.md) para el detalle completo
-(`DATABASE_URL`, `PROXY_URL`, y las de uso puntual `OLD_DATABASE_URL`/`NEW_DATABASE_URL`
-para la migración de datos).
-
----
-
-## 🌐 Deploy en Hostinger
-
-Ver [DEPLOY.md](DEPLOY.md) para el proceso completo: alta del VPS, Docker Compose
-(app + Postgres), migración de datos desde el Postgres anterior, nginx + HTTPS,
-y cómo conectar el refresh diario de la PC al Postgres del VPS por túnel SSH.
-
-Redeploy de cambios nuevos: `ssh` al VPS → `git pull && docker compose up -d --build`.
-
----
-
-## 📝 Notas
-
-- Los datos se obtienen directamente de Falabella Chile (`falabella.com`)
-- El scraping usa la página de búsqueda pública, no una API privada
-- Los precios mostrados son en **pesos chilenos (CLP)**

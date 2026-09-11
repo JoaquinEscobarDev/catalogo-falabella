@@ -129,6 +129,12 @@
 
     .empty-row td { text-align: center; color: var(--texto-suave); padding: 40px; }
 
+    .error-banner {
+      background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.35);
+      border-radius: 10px; padding: 14px 20px; color: #f85149;
+      font-size: .9rem; display: none; margin-bottom: 20px;
+    }
+
     @media (max-width: 600px) {
       .content { padding: 20px 14px; }
       .dash-header { padding: 0 14px; }
@@ -149,6 +155,7 @@
   </header>
 
   <div class="content">
+    <div class="error-banner" id="errorBanner"></div>
     <!-- Stats -->
     <div class="stats-grid" id="statsGrid">
       <div class="stat-card total"><div class="stat-label">Total reservas</div><div class="stat-value" id="statTotal">—</div></div>
@@ -333,14 +340,20 @@
     });
 
     async function cargar() {
+      const banner = document.getElementById('errorBanner');
+      banner.style.display = 'none';
       try {
         const res  = await fetch('/api/reservas-iphone');
         const data = await res.json();
-        todasLasReservas = data.reservas;
+        if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+        todasLasReservas = Array.isArray(data.reservas) ? data.reservas : [];
         actualizarStats(todasLasReservas);
         buildCharts(todasLasReservas);
         renderTabla(todasLasReservas);
       } catch (e) {
+        banner.textContent = `⚠ Error al cargar reservas: ${e.message}`;
+        banner.style.display = 'block';
+        renderTabla([]);
         console.error('Error cargando reservas:', e);
       }
     }

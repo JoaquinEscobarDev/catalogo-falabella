@@ -342,19 +342,32 @@
     async function cargar() {
       const banner = document.getElementById('errorBanner');
       banner.style.display = 'none';
+
+      // 1. Cargar datos
       try {
         const res  = await fetch('/api/reservas-iphone');
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
         todasLasReservas = Array.isArray(data.reservas) ? data.reservas : [];
-        actualizarStats(todasLasReservas);
-        buildCharts(todasLasReservas);
-        renderTabla(todasLasReservas);
       } catch (e) {
         banner.textContent = `⚠ Error al cargar reservas: ${e.message}`;
         banner.style.display = 'block';
-        renderTabla([]);
+        todasLasReservas = [];
         console.error('Error cargando reservas:', e);
+      }
+
+      // 2. Render stats y tabla (siempre, aunque los datos estén vacíos)
+      actualizarStats(todasLasReservas);
+      renderTabla(todasLasReservas);
+
+      // 3. Gráficos (Chart.js puede estar bloqueado por el browser — no es crítico)
+      try {
+        buildCharts(todasLasReservas);
+      } catch (e) {
+        console.warn('Gráficos no disponibles:', e.message);
+        document.querySelectorAll('.chart-wrap').forEach(el => {
+          el.innerHTML = '<p style="color:var(--texto-suave);font-size:.85rem;padding:20px 0">Gráficos bloqueados por el navegador</p>';
+        });
       }
     }
 

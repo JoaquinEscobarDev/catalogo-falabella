@@ -101,12 +101,52 @@
 
   <div class="actions">
     <a href="/reserva-iphone" class="btn-link primary" target="_blank">Abrir formulario</a>
+    <button class="btn-link" id="btnPng">⬇ Descargar PNG</button>
+    <button class="btn-link" onclick="window.print()">🖨 Imprimir</button>
     <a href="/dashboard-iphone" class="btn-link">Dashboard</a>
-    <button class="btn-link" onclick="window.print()">Imprimir</button>
   </div>
+
+  <canvas id="cvs" style="display:none"></canvas>
 
   <script>
     document.getElementById('urlChip').textContent = window.location.origin + '/reserva-iphone';
+
+    document.getElementById('btnPng').addEventListener('click', async () => {
+      const btn = document.getElementById('btnPng');
+      btn.textContent = 'Generando…';
+      btn.disabled = true;
+      try {
+        const res  = await fetch('/api/reservas-iphone/qr');
+        const svg  = await res.text();
+        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload = () => {
+          const size = 800;
+          const cvs  = document.getElementById('cvs');
+          cvs.width  = size;
+          cvs.height = size;
+          const ctx  = cvs.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, size, size);
+          ctx.drawImage(img, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+          cvs.toBlob(pngBlob => {
+            const a = Object.assign(document.createElement('a'), {
+              href: URL.createObjectURL(pngBlob),
+              download: 'qr-reserva-iphone18.png'
+            });
+            document.body.appendChild(a); a.click(); a.remove();
+            btn.textContent = '⬇ Descargar PNG';
+            btn.disabled = false;
+          }, 'image/png');
+        };
+        img.src = url;
+      } catch (e) {
+        btn.textContent = '⬇ Descargar PNG';
+        btn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>

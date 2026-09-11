@@ -116,23 +116,19 @@
       btn.textContent = 'Generando…';
       btn.disabled = true;
       try {
-        // Cargar poster y QR en paralelo
+        // Load poster and QR in parallel — QR served directly as image/svg+xml
         const [posterImg, qrImg] = await Promise.all([
           loadImage('/poster-iphone18.jpg'),
-          fetch('/api/reservas-iphone/qr?print=1')
-            .then(r => r.text())
-            .then(svg => loadImage(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))))
+          loadImage('/api/reservas-iphone/qr?print=1')
         ]);
 
-        const W = posterImg.naturalWidth;   // 1080
-        const H = posterImg.naturalHeight;  // 1489
+        const W = posterImg.naturalWidth  || 1080;
+        const H = posterImg.naturalHeight || 1489;
 
         const cvs = document.getElementById('cvs');
         cvs.width  = W;
         cvs.height = H;
         const ctx = cvs.getContext('2d');
-
-        // Dibujar poster
         ctx.drawImage(posterImg, 0, 0);
 
         // Posición del QR en el poster (1080x1489)
@@ -140,23 +136,22 @@
         const qrY    = Math.round(H * 0.462);
         const qrSize = Math.round(W * 0.248);
 
-        // Fondo blanco + QR encima
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(qrX, qrY, qrSize, qrSize);
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-        cvs.toBlob(blob => {
-          const a = Object.assign(document.createElement('a'), {
-            href: URL.createObjectURL(blob),
-            download: 'poster-reserva-iphone18.png'
-          });
-          document.body.appendChild(a); a.click(); a.remove();
-          btn.textContent = '⬇ Descargar PNG';
-          btn.disabled = false;
-        }, 'image/png');
+        // toDataURL is synchronous — stays inside try/catch
+        const dataUrl = cvs.toDataURL('image/png');
+        const a = Object.assign(document.createElement('a'), {
+          href: dataUrl,
+          download: 'poster-reserva-iphone18.png'
+        });
+        document.body.appendChild(a); a.click(); a.remove();
 
       } catch (e) {
-        console.error(e);
+        console.error('Error generando poster:', e);
+        alert('No se pudo generar la imagen: ' + e.message);
+      } finally {
         btn.textContent = '⬇ Descargar PNG';
         btn.disabled = false;
       }

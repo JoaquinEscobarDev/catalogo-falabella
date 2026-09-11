@@ -132,9 +132,10 @@
         ctx.drawImage(posterImg, 0, 0);
 
         // Posición del QR en el poster (1080x1489)
-        const qrX    = Math.round(W * 0.493);
-        const qrY    = Math.round(H * 0.448);
-        const qrSize = Math.round(W * 0.275);
+        // Verde: x=611-892, y=593-862 → interior (-15px borde cada lado)
+        const qrX    = Math.round(W * 0.582);  // 628px
+        const qrY    = Math.round(H * 0.408);  // 607px
+        const qrSize = Math.round(W * 0.232);  // 251px
 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(qrX, qrY, qrSize, qrSize);

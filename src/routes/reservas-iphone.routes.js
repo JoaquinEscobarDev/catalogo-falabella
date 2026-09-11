@@ -14,10 +14,10 @@ router.get('/reservas-iphone/qr', asyncHandler(async (req, res) => {
   const color = print
     ? { dark: '#000000', light: '#ffffff' }
     : { dark: '#e6edf3', light: '#0d1117' };
-  const svg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 300, color });
-  res.setHeader('Content-Type', 'image/svg+xml');
+  const buffer = await QRCode.toBuffer(url, { margin: 1, width: 300, color });
+  res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'no-cache');
-  res.send(svg);
+  res.send(buffer);
 }));
 
 module.exports = router;

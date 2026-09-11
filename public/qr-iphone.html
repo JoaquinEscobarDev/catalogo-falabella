@@ -116,14 +116,10 @@
       btn.textContent = 'Generando…';
       btn.disabled = true;
       try {
-        // Load poster and QR in parallel
-        // For SVG without intrinsic size: fetch text → set width/height → blob URL
+        // Load poster and QR PNG in parallel
         const [posterImg, qrImg] = await Promise.all([
           loadImage('/poster-iphone18.jpg'),
-          fetch('/api/reservas-iphone/qr?print=1').then(r => r.text()).then(svg => {
-            const fixed = svg.replace('<svg ', '<svg width="300" height="300" ');
-            return loadImage(URL.createObjectURL(new Blob([fixed], { type: 'image/svg+xml' })));
-          })
+          loadImage('/api/reservas-iphone/qr?print=1')
         ]);
 
         const W = posterImg.naturalWidth  || 1080;

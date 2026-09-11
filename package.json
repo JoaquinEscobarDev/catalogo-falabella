@@ -4,7 +4,7 @@
   "description": "Seguimiento de precios de productos Falabella",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node migrations/run.js && node server.js",
     "dev": "nodemon server.js",
     "migrate": "node migrations/run.js",
     "migrate:from-neon": "node scripts/migrate-from-neon.js",

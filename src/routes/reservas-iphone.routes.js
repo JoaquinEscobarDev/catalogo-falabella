@@ -14,11 +14,9 @@ router.get('/reservas-iphone/qr', asyncHandler(async (req, res) => {
   const color = print
     ? { dark: '#000000', light: '#ffffff' }
     : { dark: '#e6edf3', light: '#0d1117' };
-  let svg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 300, color });
-  // Add explicit dimensions so browsers can draw it on canvas via <img>
-  svg = svg.replace('<svg ', '<svg width="300" height="300" ');
+  const svg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 300, color });
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', 'no-cache');
   res.send(svg);
 }));
 

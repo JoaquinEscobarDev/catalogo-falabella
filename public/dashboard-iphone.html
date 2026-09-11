@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Reservas iPhone 18</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
   <style>
     :root {
       --iphone: #79c0ff;
@@ -65,29 +64,17 @@
     .stat-card.promax .stat-value { color: #f0883e; }
     .stat-card.duo   .stat-value { color: var(--verde); }
 
-    /* ── Charts ── */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 28px;
-    }
-    .chart-card {
-      background: var(--surface); border: 1px solid var(--borde);
-      border-radius: var(--radius); padding: 20px;
-    }
-    .chart-card h3 { font-size: .9rem; color: var(--texto-suave); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
-    .chart-wrap { position: relative; height: 200px; }
-
     /* ── QR card ── */
     .qr-card {
       background: var(--surface); border: 1px solid var(--borde);
-      border-radius: var(--radius); padding: 20px;
-      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      border-radius: var(--radius); padding: 16px 20px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
     }
-    .qr-card h3 { font-size: .9rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .5px; }
-    .qr-card img { width: 180px; height: 180px; border-radius: 8px; background: var(--surface-2); }
-    .qr-card a { font-size: .8rem; color: var(--iphone); text-decoration: none; }
+    .qr-card img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; }
+    .qr-card-text { display: flex; flex-direction: column; gap: 4px; }
+    .qr-card-text span { font-size: .78rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .5px; }
+    .qr-card-text a { font-size: .9rem; color: var(--iphone); text-decoration: none; font-weight: 600; }
 
     /* ── Tabla ── */
     .table-section { background: var(--surface); border: 1px solid var(--borde); border-radius: var(--radius); overflow: hidden; }
@@ -164,25 +151,13 @@
       <div class="stat-card duo">  <div class="stat-label">iPhone Duo</div><div class="stat-value" id="statDuo">—</div></div>
     </div>
 
-    <!-- Charts + QR -->
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h3>Por modelo</h3>
-        <div class="chart-wrap"><canvas id="chartModelo"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <h3>Por almacenamiento</h3>
-        <div class="chart-wrap"><canvas id="chartAlmac"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <h3>Por color</h3>
-        <div class="chart-wrap"><canvas id="chartColor"></canvas></div>
-      </div>
-      <div class="qr-card">
-        <h3>QR Formulario</h3>
-        <img src="/api/reservas-iphone/qr" alt="QR Reserva iPhone 18" id="qrImg">
+    <!-- QR -->
+    <div class="qr-card">
+      <img src="/api/reservas-iphone/qr" alt="QR Reserva iPhone 18">
+      <div class="qr-card-text">
+        <span>QR Formulario</span>
         <a href="/reserva-iphone" target="_blank">/reserva-iphone</a>
-        <a href="/qr-iphone" target="_blank" class="btn-sm" style="margin-top:4px">Pantalla completa →</a>
+        <a href="/qr-iphone" target="_blank" style="margin-top:4px;font-size:.82rem">Pantalla completa →</a>
       </div>
     </div>
 
@@ -215,13 +190,6 @@
   </div>
 
   <script>
-    const COLORES_CHART = {
-      'iPhone 18 Pro':     '#bc8cff',
-      'iPhone 18 Pro Max': '#f0883e',
-      'iPhone Duo':        '#3fb950',
-    };
-    const PALETA = ['#79c0ff','#bc8cff','#f0883e','#3fb950','#e3b341','#f85149','#58a6ff','#d2a8ff','#ffa657'];
-
     let todasLasReservas = [];
 
     function count(arr, key) {
@@ -237,54 +205,6 @@
     function badgeModelo(modelo) {
       const cls = modelo.includes('Pro Max') ? 'badge-promax' : modelo.includes('Pro') ? 'badge-pro' : 'badge-duo';
       return `<span class="badge ${cls}">${modelo}</span>`;
-    }
-
-    let chartM, chartA, chartC;
-
-    function buildCharts(reservas) {
-      const byModelo = count(reservas, 'modelo');
-      const byAlmac  = count(reservas, 'almacenamiento');
-      const byColor  = count(reservas, 'color');
-
-      const barOpts = (labels, data, colors) => ({
-        type: 'bar',
-        data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
-        options: {
-          responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: '#8b949e', font: { size: 11 } }, grid: { color: '#30363d' } },
-            y: { ticks: { color: '#8b949e', stepSize: 1, font: { size: 11 } }, grid: { color: '#30363d' } }
-          }
-        }
-      });
-
-      const doughnutOpts = (labels, data, colors) => ({
-        type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { color: '#e6edf3', font: { size: 11 }, padding: 12, boxWidth: 12 } } }
-        }
-      });
-
-      if (chartM) chartM.destroy();
-      if (chartA) chartA.destroy();
-      if (chartC) chartC.destroy();
-
-      const mLabels = Object.keys(byModelo);
-      chartM = new Chart(document.getElementById('chartModelo'), barOpts(
-        mLabels, mLabels.map(l => byModelo[l]), mLabels.map(l => COLORES_CHART[l] || '#79c0ff')
-      ));
-
-      const aLabels = Object.keys(byAlmac).sort();
-      chartA = new Chart(document.getElementById('chartAlmac'), barOpts(
-        aLabels, aLabels.map(l => byAlmac[l]), PALETA
-      ));
-
-      const cLabels = Object.keys(byColor);
-      chartC = new Chart(document.getElementById('chartColor'), doughnutOpts(
-        cLabels, cLabels.map(l => byColor[l]), PALETA
-      ));
     }
 
     function renderTabla(reservas) {
@@ -356,19 +276,9 @@
         console.error('Error cargando reservas:', e);
       }
 
-      // 2. Render stats y tabla (siempre, aunque los datos estén vacíos)
+      // 2. Render stats y tabla
       actualizarStats(todasLasReservas);
       renderTabla(todasLasReservas);
-
-      // 3. Gráficos (Chart.js puede estar bloqueado por el browser — no es crítico)
-      try {
-        buildCharts(todasLasReservas);
-      } catch (e) {
-        console.warn('Gráficos no disponibles:', e.message);
-        document.querySelectorAll('.chart-wrap').forEach(el => {
-          el.innerHTML = '<p style="color:var(--texto-suave);font-size:.85rem;padding:20px 0">Gráficos bloqueados por el navegador</p>';
-        });
-      }
     }
 
     cargar();

@@ -3,15 +3,15 @@ const repo = require('../repositories/reservasIphoneRepository');
 const MODELOS_VALIDOS = ['iPhone 18 Pro', 'iPhone 18 Pro Max', 'iPhone Duo'];
 
 const ALMACENAMIENTO_POR_MODELO = {
-  'iPhone 18 Pro':     ['128GB', '256GB', '512GB', '1TB'],
-  'iPhone 18 Pro Max': ['256GB', '512GB', '1TB'],
+  'iPhone 18 Pro':     ['256GB', '512GB', '1TB', '2TB'],
+  'iPhone 18 Pro Max': ['256GB', '512GB', '1TB', '2TB'],
   'iPhone Duo':        ['128GB', '256GB', '512GB'],
 };
 
 const COLORES_POR_MODELO = {
-  'iPhone 18 Pro':     ['Negro Titanio', 'Blanco Titanio', 'Natural Titanio', 'Desierto Titanio'],
-  'iPhone 18 Pro Max': ['Negro Titanio', 'Blanco Titanio', 'Natural Titanio', 'Desierto Titanio'],
-  'iPhone Duo':        ['Negro', 'Blanco', 'Rosa', 'Azul', 'Verde', 'Ultramarino'],
+  'iPhone 18 Pro':     ['Burdeos', 'Azul Glacial', 'Negro', 'Plata'],
+  'iPhone 18 Pro Max': ['Burdeos', 'Azul Glacial', 'Negro', 'Plata'],
+  'iPhone Duo':        ['Blanco', 'Negro'],
 };
 
 function err(msg, status = 400) {

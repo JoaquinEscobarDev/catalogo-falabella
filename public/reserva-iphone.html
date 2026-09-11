@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reserva iPhone 18</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    :root {
+      --iphone: #79c0ff;
+      --iphone-dark: #58a6ff;
+      --iphone-glow: rgba(121, 192, 255, 0.15);
+    }
+
+    .page-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .hero-logo {
+      font-size: 3rem;
+      margin-bottom: 8px;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--iphone), #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      color: var(--texto-suave);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--borde);
+      border-radius: var(--radius);
+      padding: 32px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: var(--sombra);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--texto-suave);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    input, select {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      color: var(--texto);
+      font-size: 1rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+    }
+    input:focus, select:focus {
+      border-color: var(--iphone);
+      box-shadow: 0 0 0 3px var(--iphone-glow);
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+      cursor: pointer;
+    }
+    select:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    select option { background: var(--surface-2); }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, var(--iphone), #bc8cff);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s, transform 0.15s;
+      font-family: inherit;
+    }
+    .btn-submit:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-submit:active:not(:disabled) { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #mensaje {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: none;
+    }
+    #mensaje.ok  { background: rgba(63,185,80,.15); border: 1px solid rgba(63,185,80,.4); color: var(--verde); }
+    #mensaje.err { background: rgba(248,81,73,.15);  border: 1px solid rgba(248,81,73,.4);  color: var(--rojo); }
+
+    .success-screen {
+      text-align: center;
+      display: none;
+    }
+    .success-screen .check { font-size: 4rem; margin-bottom: 12px; }
+    .success-screen h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; color: var(--verde); }
+    .success-screen p  { color: var(--texto-suave); margin-bottom: 24px; }
+    .btn-otra {
+      background: var(--surface-2);
+      border: 1px solid var(--borde);
+      color: var(--texto);
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .btn-otra:hover { border-color: var(--iphone); }
+
+    @media (max-width: 500px) {
+      .card { padding: 24px 18px; }
+      .hero h1 { font-size: 1.6rem; }
+      .row-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="hero">
+      <div class="hero-logo">📱</div>
+      <h1>Reserva iPhone 18</h1>
+      <p>Completa el formulario y nos contactamos contigo cuando llegue tu modelo.</p>
+    </div>
+
+    <div class="card">
+      <form id="form" autocomplete="off">
+        <div class="row-2">
+          <div class="form-group">
+            <label for="nombre">Nombre</label>
+            <input type="text" id="nombre" name="nombre" placeholder="Juan" required>
+          </div>
+          <div class="form-group">
+            <label for="apellido">Apellido</label>
+            <input type="text" id="apellido" name="apellido" placeholder="Pérez" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="telefono">Teléfono</label>
+          <input type="tel" id="telefono" name="telefono" placeholder="+56 9 1234 5678" required>
+        </div>
+
+        <div class="form-group">
+          <label for="modelo">Modelo</label>
+          <select id="modelo" name="modelo" required>
+            <option value="">Selecciona un modelo</option>
+            <option value="iPhone 18 Pro">iPhone 18 Pro</option>
+            <option value="iPhone 18 Pro Max">iPhone 18 Pro Max</option>
+            <option value="iPhone Duo">iPhone Duo</option>
+          </select>
+        </div>
+
+        <div class="row-2">
+          <div class="form-group">
+            <label for="almacenamiento">Almacenamiento</label>
+            <select id="almacenamiento" name="almacenamiento" required disabled>
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="color">Color</label>
+            <select id="color" name="color" required disabled>
+              <option value="">—</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnEnviar">Reservar</button>
+        <div id="mensaje"></div>
+      </form>
+
+      <div class="success-screen" id="successScreen">
+        <div class="check">✅</div>
+        <h2>¡Reserva registrada!</h2>
+        <p>Te contactaremos al número ingresado cuando tu iPhone esté disponible.</p>
+        <button class="btn-otra" id="btnOtra">Hacer otra reserva</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const OPCIONES = {
+      'iPhone 18 Pro':     { almacenamiento: ['128GB','256GB','512GB','1TB'],    colores: ['Negro Titanio','Blanco Titanio','Natural Titanio','Desierto Titanio'] },
+      'iPhone 18 Pro Max': { almacenamiento: ['256GB','512GB','1TB'],            colores: ['Negro Titanio','Blanco Titanio','Natural Titanio','Desierto Titanio'] },
+      'iPhone Duo':        { almacenamiento: ['128GB','256GB','512GB'],          colores: ['Negro','Blanco','Rosa','Azul','Verde','Ultramarino'] },
+    };
+
+    const selModelo = document.getElementById('modelo');
+    const selAlmac  = document.getElementById('almacenamiento');
+    const selColor  = document.getElementById('color');
+
+    function poblarSelect(sel, opciones) {
+      sel.innerHTML = '<option value="">Selecciona</option>';
+      opciones.forEach(o => sel.insertAdjacentHTML('beforeend', `<option value="${o}">${o}</option>`));
+      sel.disabled = false;
+    }
+
+    selModelo.addEventListener('change', () => {
+      const m = selModelo.value;
+      if (!m) {
+        selAlmac.innerHTML = '<option value="">—</option>'; selAlmac.disabled = true;
+        selColor.innerHTML = '<option value="">—</option>'; selColor.disabled = true;
+        return;
+      }
+      poblarSelect(selAlmac, OPCIONES[m].almacenamiento);
+      poblarSelect(selColor,  OPCIONES[m].colores);
+    });
+
+    const form        = document.getElementById('form');
+    const btnEnviar   = document.getElementById('btnEnviar');
+    const msgEl       = document.getElementById('mensaje');
+    const successEl   = document.getElementById('successScreen');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btnEnviar.disabled = true;
+      btnEnviar.textContent = 'Enviando…';
+      msgEl.style.display = 'none';
+
+      const body = {
+        nombre:         document.getElementById('nombre').value,
+        apellido:       document.getElementById('apellido').value,
+        telefono:       document.getElementById('telefono').value,
+        modelo:         selModelo.value,
+        almacenamiento: selAlmac.value,
+        color:          selColor.value,
+      };
+
+      try {
+        const res  = await fetch('/api/reservas-iphone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error al guardar');
+        form.style.display = 'none';
+        successEl.style.display = 'block';
+      } catch (err) {
+        msgEl.className = 'err';
+        msgEl.textContent = err.message;
+        msgEl.style.display = 'block';
+        btnEnviar.disabled = false;
+        btnEnviar.textContent = 'Reservar';
+      }
+    });
+
+    document.getElementById('btnOtra').addEventListener('click', () => {
+      form.reset();
+      selAlmac.innerHTML = '<option value="">—</option>'; selAlmac.disabled = true;
+      selColor.innerHTML = '<option value="">—</option>'; selColor.disabled = true;
+      successEl.style.display = 'none';
+      form.style.display = 'block';
+    });
+  </script>
+</body>
+</html>

@@ -33,6 +33,26 @@ Desplegada como PWA instalable en Railway con PostgreSQL.
   - **Con interés**: calculadora con banco, número de cuotas y CAE editable. Cálculo con amortización francesa (cuota constante). Muestra cuota mensual, total a pagar y total en intereses
 - CAE por banco preconfigurado y editable por el usuario
 
+### Reserva iPhone 18
+
+Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se guardan en PostgreSQL (misma base de datos del catálogo) y persisten entre redeploys.
+
+**Páginas:**
+- `/reserva-iphone` — Formulario público para clientes. Campos: Nombre, Apellido, Teléfono, Modelo (iPhone 18 Pro / Pro Max / Duo), Almacenamiento y Color (selects dependientes del modelo). Confirmación sin recarga de página.
+- `/dashboard-iphone` — Dashboard interno (no enlazado públicamente). Muestra total de reservas, reservas por modelo/almacenamiento/color con gráficos (Chart.js), tabla completa con buscador y botón para exportar CSV.
+- `/qr-iphone` — Página de pantalla completa con el QR que apunta al formulario. Útil para mostrar en pantalla o imprimir.
+
+**API:**
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/reservas-iphone` | Crea una reserva (valida modelo/almacenamiento/color) |
+| `GET` | `/api/reservas-iphone` | Devuelve todas las reservas en JSON |
+| `GET` | `/api/reservas-iphone/qr` | Devuelve el QR en SVG apuntando al formulario |
+
+**Dónde quedan los datos:** tabla `reservas_iphone` en la misma base de datos PostgreSQL del catálogo (volumen Docker persistente en el VPS). La migración `003_reservas_iphone.sql` crea la tabla automáticamente al correr `npm run migrate`.
+
+---
+
 ### Lista de cambios de precio (ToDo)
 - Botón "Cambiar" en cada tarjeta para agregar un producto a la lista de pendientes
 - Panel lateral en escritorio y modal flotante en móvil
@@ -87,6 +107,9 @@ Desplegada como PWA instalable en Railway con PostgreSQL.
 | `POST` | `/api/todo/clear` | Limpia toda la lista |
 | `POST` | `/api/solicitar-refresh` | Solicita refresh de precios en segundo plano |
 | `GET` | `/api/solicitar-refresh/:id` | Consulta el estado de un refresh |
+| `POST` | `/api/reservas-iphone` | Crea una reserva iPhone 18 |
+| `GET` | `/api/reservas-iphone` | Lista todas las reservas iPhone 18 |
+| `GET` | `/api/reservas-iphone/qr` | QR SVG del formulario de reserva |
 
 ---
 

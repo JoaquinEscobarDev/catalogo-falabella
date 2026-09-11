@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR — Reserva iPhone 18</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      gap: 24px;
+      padding: 32px 16px;
+    }
+
+    .logo { font-size: 3.5rem; }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #79c0ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: var(--texto-suave);
+      font-size: 1.05rem;
+      max-width: 340px;
+    }
+
+    .qr-wrap {
+      background: var(--surface);
+      border: 1px solid var(--borde);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.5);
+    }
+    .qr-wrap img {
+      width: 260px;
+      height: 260px;
+      display: block;
+      border-radius: 8px;
+    }
+
+    .url-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--borde);
+      border-radius: 30px;
+      padding: 8px 20px;
+      font-size: 0.95rem;
+      color: #79c0ff;
+      font-family: monospace;
+      letter-spacing: 0.3px;
+    }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .btn-link {
+      background: var(--surface);
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      color: var(--texto);
+      padding: 9px 18px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color .2s;
+    }
+    .btn-link:hover { border-color: #79c0ff; }
+    .btn-link.primary {
+      background: linear-gradient(135deg, #79c0ff, #bc8cff);
+      color: #fff;
+      border: none;
+    }
+
+    @media print {
+      .actions { display: none; }
+      body { background: white; color: black; }
+      h1 { -webkit-text-fill-color: #000; }
+      .subtitle { color: #555; }
+      .qr-wrap { box-shadow: none; border: 1px solid #ddd; }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">📱</div>
+  <h1>Reserva tu iPhone 18</h1>
+  <p class="subtitle">Escanea el código QR o visita el link para registrar tu reserva</p>
+
+  <div class="qr-wrap">
+    <img src="/api/reservas-iphone/qr" alt="QR Reserva iPhone 18" id="qrImg">
+  </div>
+
+  <div class="url-chip" id="urlChip">/reserva-iphone</div>
+
+  <div class="actions">
+    <a href="/reserva-iphone" class="btn-link primary" target="_blank">Abrir formulario</a>
+    <a href="/dashboard-iphone" class="btn-link">Dashboard</a>
+    <button class="btn-link" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <script>
+    document.getElementById('urlChip').textContent = window.location.origin + '/reserva-iphone';
+  </script>
+</body>
+</html>

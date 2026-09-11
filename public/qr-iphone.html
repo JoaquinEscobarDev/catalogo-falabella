@@ -132,21 +132,27 @@
         ctx.drawImage(posterImg, 0, 0);
 
         // Posición del QR en el poster (1080x1489)
-        const qrX    = Math.round(W * 0.498);
-        const qrY    = Math.round(H * 0.462);
-        const qrSize = Math.round(W * 0.248);
+        const qrX    = Math.round(W * 0.493);
+        const qrY    = Math.round(H * 0.448);
+        const qrSize = Math.round(W * 0.275);
 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(qrX, qrY, qrSize, qrSize);
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-        // toDataURL is synchronous — stays inside try/catch
-        const dataUrl = cvs.toDataURL('image/png');
+        // toBlob wrapped as Promise so errors stay inside try/catch
+        const blob = await new Promise((resolve, reject) => {
+          try {
+            cvs.toBlob(b => b ? resolve(b) : reject(new Error('toBlob devolvió null')), 'image/png');
+          } catch (e) { reject(e); }
+        });
+        const blobUrl = URL.createObjectURL(blob);
         const a = Object.assign(document.createElement('a'), {
-          href: dataUrl,
+          href: blobUrl,
           download: 'poster-reserva-iphone18.png'
         });
         document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(blobUrl);
 
       } catch (e) {
         console.error('Error generando poster:', e);

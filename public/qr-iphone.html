@@ -116,37 +116,60 @@
       btn.textContent = 'Generando…';
       btn.disabled = true;
       try {
-        const res  = await fetch('/api/reservas-iphone/qr');
-        const svg  = await res.text();
-        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-        const url  = URL.createObjectURL(blob);
-        const img  = new Image();
-        img.onload = () => {
-          const size = 800;
-          const cvs  = document.getElementById('cvs');
-          cvs.width  = size;
-          cvs.height = size;
-          const ctx  = cvs.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, size, size);
-          ctx.drawImage(img, 0, 0, size, size);
-          URL.revokeObjectURL(url);
-          cvs.toBlob(pngBlob => {
-            const a = Object.assign(document.createElement('a'), {
-              href: URL.createObjectURL(pngBlob),
-              download: 'qr-reserva-iphone18.png'
-            });
-            document.body.appendChild(a); a.click(); a.remove();
-            btn.textContent = '⬇ Descargar PNG';
-            btn.disabled = false;
-          }, 'image/png');
-        };
-        img.src = url;
+        // Cargar poster y QR en paralelo
+        const [posterImg, qrImg] = await Promise.all([
+          loadImage('/poster-iphone18.jpg'),
+          fetch('/api/reservas-iphone/qr?print=1')
+            .then(r => r.text())
+            .then(svg => loadImage(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))))
+        ]);
+
+        const W = posterImg.naturalWidth;   // 1080
+        const H = posterImg.naturalHeight;  // 1489
+
+        const cvs = document.getElementById('cvs');
+        cvs.width  = W;
+        cvs.height = H;
+        const ctx = cvs.getContext('2d');
+
+        // Dibujar poster
+        ctx.drawImage(posterImg, 0, 0);
+
+        // Posición del QR en el poster (estimada sobre imagen 1080x1489)
+        const qrX    = Math.round(W * 0.505);
+        const qrY    = Math.round(H * 0.352);
+        const qrSize = Math.round(W * 0.225);
+
+        // Fondo blanco + QR encima
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(qrX, qrY, qrSize, qrSize);
+        ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+        cvs.toBlob(blob => {
+          const a = Object.assign(document.createElement('a'), {
+            href: URL.createObjectURL(blob),
+            download: 'poster-reserva-iphone18.png'
+          });
+          document.body.appendChild(a); a.click(); a.remove();
+          btn.textContent = '⬇ Descargar PNG';
+          btn.disabled = false;
+        }, 'image/png');
+
       } catch (e) {
+        console.error(e);
         btn.textContent = '⬇ Descargar PNG';
         btn.disabled = false;
       }
     });
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload  = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
   </script>
 </body>
 </html>

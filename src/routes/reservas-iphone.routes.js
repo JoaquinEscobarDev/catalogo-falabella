@@ -10,7 +10,11 @@ router.get('/reservas-iphone', ctrl.listar);
 
 router.get('/reservas-iphone/qr', asyncHandler(async (req, res) => {
   const url = `${req.protocol}://${req.get('host')}/reserva-iphone`;
-  const svg = await QRCode.toString(url, { type: 'svg', margin: 2, width: 300, color: { dark: '#e6edf3', light: '#0d1117' } });
+  const print = req.query.print === '1';
+  const color = print
+    ? { dark: '#000000', light: '#ffffff' }
+    : { dark: '#e6edf3', light: '#0d1117' };
+  const svg = await QRCode.toString(url, { type: 'svg', margin: 1, width: 300, color });
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.send(svg);

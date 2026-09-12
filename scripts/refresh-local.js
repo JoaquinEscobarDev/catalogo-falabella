@@ -11,6 +11,10 @@ const db = require('../src/config/database');
 const productService = require('../src/services/productService');
 
 async function main() {
+  // Limpiar cambios del día anterior antes de detectar los de hoy
+  await db.query('UPDATE price_history SET visto = TRUE WHERE visto = FALSE');
+  await db.query('DELETE FROM todo_items');
+
   const { rows } = await db.query('SELECT sku FROM products ORDER BY sku');
   console.log(`[${new Date().toLocaleString('es-CL')}] Refrescando ${rows.length} SKUs...`);
 

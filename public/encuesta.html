@@ -288,17 +288,23 @@
       TIENDAS_DISPLAY[tienda] || tienda;
 
     // Manejo visual de opciones
+    // e.preventDefault() evita el doble-toggle en iOS (label + input)
     document.querySelectorAll('.opciones').forEach(grupo => {
       grupo.querySelectorAll('.opcion').forEach(opcion => {
-        opcion.addEventListener('click', () => {
+        opcion.addEventListener('click', e => {
+          e.preventDefault();
           const input = opcion.querySelector('input');
           if (input.type === 'radio') {
-            grupo.querySelectorAll('.opcion').forEach(o => o.classList.remove('selected'));
+            grupo.querySelectorAll('.opcion').forEach(o => {
+              o.classList.remove('selected');
+              o.querySelector('input').checked = false;
+            });
             opcion.classList.add('selected');
             input.checked = true;
           } else {
-            opcion.classList.toggle('selected');
-            input.checked = opcion.classList.contains('selected');
+            const nuevoEstado = !opcion.classList.contains('selected');
+            opcion.classList.toggle('selected', nuevoEstado);
+            input.checked = nuevoEstado;
           }
           opcion.closest('.pregunta').classList.remove('has-error');
         });

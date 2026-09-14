@@ -7,5 +7,6 @@ router.use(require('./stock.routes'));
 router.use(require('./todo.routes'));
 router.use(require('./refresh.routes'));
 router.use(require('./reservas-iphone.routes'));
+router.use(require('./encuestas.routes'));
 
 module.exports = router;

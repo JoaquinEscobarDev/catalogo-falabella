@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Encuesta Electrónica — Falabella</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #00a859;
+      --brand-dark: #007a41;
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --texto: #1a1a1a;
+      --texto-suave: #666;
+      --borde: #e0e0e0;
+      --check: #00a859;
+      --radius: 12px;
+      --error: #d32f2f;
+    }
+    body { background: var(--bg); color: var(--texto); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    .header {
+      background: var(--brand);
+      color: #fff;
+      padding: 20px 20px 16px;
+      text-align: center;
+    }
+    .header .logo { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; }
+    .header .tienda-tag {
+      display: inline-block; margin-top: 6px;
+      background: rgba(255,255,255,.2); border-radius: 20px;
+      padding: 4px 14px; font-size: 0.85rem; font-weight: 600;
+    }
+
+    .wrap { max-width: 600px; margin: 0 auto; padding: 20px 16px 60px; }
+
+    .intro-card {
+      background: var(--card); border-radius: var(--radius); padding: 18px 20px;
+      margin-bottom: 20px; border-left: 4px solid var(--brand);
+    }
+    .intro-card h2 { font-size: 1rem; font-weight: 800; margin-bottom: 6px; color: var(--brand-dark); }
+    .intro-card p  { font-size: 0.88rem; color: var(--texto-suave); line-height: 1.5; }
+
+    .pregunta {
+      background: var(--card); border-radius: var(--radius); padding: 20px;
+      margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .pregunta-header {
+      display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px;
+    }
+    .num {
+      background: var(--brand); color: #fff; border-radius: 50%;
+      width: 28px; height: 28px; min-width: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; font-weight: 800;
+    }
+    .pregunta-texto { font-size: 0.95rem; font-weight: 700; line-height: 1.4; }
+    .tipo-tag { font-size: 0.72rem; color: var(--texto-suave); font-weight: 500; margin-top: 2px; }
+
+    .opciones { display: flex; flex-direction: column; gap: 8px; }
+
+    .opcion {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: var(--bg); border: 2px solid var(--borde);
+      border-radius: 10px; padding: 12px 14px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .opcion:hover { border-color: var(--brand); }
+    .opcion.selected { border-color: var(--brand); background: rgba(0,168,89,.08); }
+    .opcion input { display: none; }
+    .check-box {
+      width: 20px; height: 20px; min-width: 20px; border-radius: 50%;
+      border: 2px solid var(--borde); margin-top: 1px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .opcion.selected .check-box { background: var(--brand); border-color: var(--brand); }
+    .check-box::after { content: ''; display: none; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+    .opcion.selected .check-box::after { display: block; }
+
+    /* Checkbox para selección múltiple */
+    .opcion.multi .check-box { border-radius: 4px; }
+    .opcion.multi.selected .check-box { background: var(--brand); border-color: var(--brand); }
+    .opcion.multi.selected .check-box::after { content: '✓'; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 800; width: auto; height: auto; background: none; border-radius: 0; }
+
+    .opcion-label { font-size: 0.9rem; line-height: 1.4; }
+
+    .error-msg { color: var(--error); font-size: 0.8rem; font-weight: 600; margin-top: 8px; display: none; }
+    .pregunta.has-error .error-msg { display: block; }
+    .pregunta.has-error { border: 2px solid var(--error); }
+
+    .btn-enviar {
+      width: 100%; background: var(--brand); color: #fff;
+      border: none; border-radius: 12px; padding: 16px;
+      font-size: 1rem; font-weight: 800; cursor: pointer; margin-top: 8px;
+      font-family: inherit; transition: opacity .2s;
+    }
+    .btn-enviar:hover:not(:disabled) { opacity: 0.88; }
+    .btn-enviar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .success-screen {
+      display: none; text-align: center; padding: 40px 20px;
+      background: var(--card); border-radius: var(--radius);
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    .success-screen .icon { font-size: 4rem; margin-bottom: 16px; }
+    .success-screen h2 { font-size: 1.4rem; font-weight: 800; color: var(--brand-dark); margin-bottom: 8px; }
+    .success-screen p  { color: var(--texto-suave); font-size: 0.95rem; line-height: 1.5; }
+
+    .error-banner {
+      background: #ffebee; border: 1px solid #ef9a9a; border-radius: 10px;
+      padding: 12px 16px; color: var(--error); font-size: 0.88rem;
+      font-weight: 600; display: none; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">f· falabella</div>
+    <div class="tienda-tag" id="tiendaTag">Cargando…</div>
+  </header>
+
+  <div class="wrap">
+    <div class="intro-card">
+      <h2>ENCUESTA EXPERIENCIA DE COMPRA – ELECTRÓNICA</h2>
+      <p>Objetivo: Conocer qué buscan nuestros clientes al comprar productos de electrónica y cómo podemos mejorar la experiencia, la asesoría y nuestra propuesta de productos en tienda.</p>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <form id="form" novalidate>
+
+      <!-- P1 -->
+      <div class="pregunta" id="blk-p1">
+        <div class="pregunta-header">
+          <div class="num">1</div>
+          <div>
+            <div class="pregunta-texto">¿Qué es lo que más valoras para tener una buena experiencia al comprar productos de electrónica?</div>
+            <div class="tipo-tag">Selección única</div>
+          </div>
+        </div>
+        <div class="opciones" data-field="p1" data-tipo="single">
+          <label class="opcion"><input type="radio" name="p1" value="precio-o-promocion"><div class="check-box"></div><span class="opcion-label">Encontrar un buen precio o promoción</span></label>
+          <label class="opcion"><input type="radio" name="p1" value="asesoria-especializada"><div class="check-box"></div><span class="opcion-label">Recibir una asesoría especializada según mis necesidades</span></label>
+          <label class="opcion"><input type="radio" name="p1" value="conocer-y-probar-productos"><div class="check-box"></div><span class="opcion-label">Poder conocer y probar los productos antes de comprar</span></label>
+          <label class="opcion"><input type="radio" name="p1" value="variedad-marcas-productos"><div class="check-box"></div><span class="opcion-label">Encontrar variedad de marcas y productos</span></label>
+          <label class="opcion"><input type="radio" name="p1" value="experiencia-rapida-facil"><div class="check-box"></div><span class="opcion-label">Tener una experiencia de compra rápida y fácil</span></label>
+          <label class="opcion"><input type="radio" name="p1" value="garantia-servicio-postventa"><div class="check-box"></div><span class="opcion-label">Contar con garantía y servicio postventa</span></label>
+        </div>
+        <div class="error-msg">Por favor selecciona una opción.</div>
+      </div>
+
+      <!-- P2 -->
+      <div class="pregunta" id="blk-p2">
+        <div class="pregunta-header">
+          <div class="num">2</div>
+          <div>
+            <div class="pregunta-texto">¿Te gustaría que en tienda existieran más demostraciones de productos de electrónica para conocer su funcionamiento antes de comprar?</div>
+            <div class="tipo-tag">Sí / No</div>
+          </div>
+        </div>
+        <div class="opciones" data-field="p2" data-tipo="single">
+          <label class="opcion"><input type="radio" name="p2" value="si"><div class="check-box"></div><span class="opcion-label">Sí</span></label>
+          <label class="opcion"><input type="radio" name="p2" value="no"><div class="check-box"></div><span class="opcion-label">No</span></label>
+        </div>
+        <div class="error-msg">Por favor selecciona una opción.</div>
+      </div>
+
+      <!-- P3 -->
+      <div class="pregunta" id="blk-p3">
+        <div class="pregunta-header">
+          <div class="num">3</div>
+          <div>
+            <div class="pregunta-texto">¿Qué esperas de un asesor especialista al momento de comprar un producto de electrónica?</div>
+            <div class="tipo-tag">Selección múltiple</div>
+          </div>
+        </div>
+        <div class="opciones" data-field="p3" data-tipo="multiple">
+          <label class="opcion multi"><input type="checkbox" name="p3" value="conocimiento-profundo"><div class="check-box"></div><span class="opcion-label">Que conozca en profundidad los productos</span></label>
+          <label class="opcion multi"><input type="checkbox" name="p3" value="recomendar-necesidades"><div class="check-box"></div><span class="opcion-label">Que me recomiende según mis necesidades</span></label>
+          <label class="opcion multi"><input type="checkbox" name="p3" value="comparar-alternativas"><div class="check-box"></div><span class="opcion-label">Que pueda comparar diferentes alternativas</span></label>
+          <label class="opcion multi"><input type="checkbox" name="p3" value="explicar-simple"><div class="check-box"></div><span class="opcion-label">Que explique de manera simple las características y beneficios</span></label>
+          <label class="opcion multi"><input type="checkbox" name="p3" value="mejor-decision"><div class="check-box"></div><span class="opcion-label">Que me ayude a tomar la mejor decisión de compra</span></label>
+        </div>
+        <div class="error-msg">Por favor selecciona al menos una opción.</div>
+      </div>
+
+      <!-- P4 -->
+      <div class="pregunta" id="blk-p4">
+        <div class="pregunta-header">
+          <div class="num">4</div>
+          <div>
+            <div class="pregunta-texto">¿Qué dificultad encuentras normalmente al momento de elegir un producto de electrónica?</div>
+            <div class="tipo-tag">Selección única</div>
+          </div>
+        </div>
+        <div class="opciones" data-field="p4" data-tipo="single">
+          <label class="opcion"><input type="radio" name="p4" value="cual-producto-adaptarse"><div class="check-box"></div><span class="opcion-label">No sé cuál producto se adapta mejor a mis necesidades</span></label>
+          <label class="opcion"><input type="radio" name="p4" value="demasiadas-alternativas"><div class="check-box"></div><span class="opcion-label">Hay demasiadas alternativas y marcas</span></label>
+          <label class="opcion"><input type="radio" name="p4" value="entender-diferencias"><div class="check-box"></div><span class="opcion-label">Me cuesta entender las diferencias entre los productos</span></label>
+          <label class="opcion"><input type="radio" name="p4" value="informacion-insuficiente"><div class="check-box"></div><span class="opcion-label">No encuentro suficiente información en tienda</span></label>
+          <label class="opcion"><input type="radio" name="p4" value="precio-promociones"><div class="check-box"></div><span class="opcion-label">El precio/promociones dificultan mi decisión</span></label>
+          <label class="opcion"><input type="radio" name="p4" value="sin-dificultades"><div class="check-box"></div><span class="opcion-label">No tengo dificultades para elegir</span></label>
+        </div>
+        <div class="error-msg">Por favor selecciona una opción.</div>
+      </div>
+
+      <!-- P5 -->
+      <div class="pregunta" id="blk-p5">
+        <div class="pregunta-header">
+          <div class="num">5</div>
+          <div>
+            <div class="pregunta-texto">Si el vendedor te recomendara productos complementarios para mejorar el uso de tu compra, tú:</div>
+            <div class="tipo-tag">Selección única</div>
+          </div>
+        </div>
+        <div class="opciones" data-field="p5" data-tipo="single">
+          <label class="opcion"><input type="radio" name="p5" value="siempre-consideraria"><div class="check-box"></div><span class="opcion-label">Siempre los consideraría</span></label>
+          <label class="opcion"><input type="radio" name="p5" value="evaluaria-precio"><div class="check-box"></div><span class="opcion-label">Los evaluaría según el precio</span></label>
+          <label class="opcion"><input type="radio" name="p5" value="solo-descuento"><div class="check-box"></div><span class="opcion-label">Solo si tienen descuento</span></label>
+          <label class="opcion"><input type="radio" name="p5" value="rara-vez"><div class="check-box"></div><span class="opcion-label">Rara vez los compraría</span></label>
+          <label class="opcion"><input type="radio" name="p5" value="nunca"><div class="check-box"></div><span class="opcion-label">Nunca los compraría</span></label>
+        </div>
+        <div class="error-msg">Por favor selecciona una opción.</div>
+      </div>
+
+      <button type="submit" class="btn-enviar" id="btnEnviar">Enviar encuesta</button>
+    </form>
+
+    <div class="success-screen" id="successScreen">
+      <div class="icon">✅</div>
+      <h2>¡Gracias por tu respuesta!</h2>
+      <p>Tu opinión nos ayuda a mejorar la experiencia de compra en tienda.<br>¡Que tengas un excelente día!</p>
+    </div>
+  </div>
+
+  <script>
+    const TIENDAS_DISPLAY = {
+      'los-dominicos': 'Los Dominicos',
+      'parque-arauco': 'Parque Arauco',
+      'costanera':     'Costanera',
+      'plaza-egana':   'Plaza Egaña',
+    };
+
+    const tienda = window.location.pathname.split('/').pop();
+    document.getElementById('tiendaTag').textContent =
+      TIENDAS_DISPLAY[tienda] || tienda;
+
+    // Manejo visual de opciones
+    document.querySelectorAll('.opciones').forEach(grupo => {
+      grupo.querySelectorAll('.opcion').forEach(opcion => {
+        opcion.addEventListener('click', () => {
+          const input = opcion.querySelector('input');
+          if (input.type === 'radio') {
+            grupo.querySelectorAll('.opcion').forEach(o => o.classList.remove('selected'));
+            opcion.classList.add('selected');
+            input.checked = true;
+          } else {
+            opcion.classList.toggle('selected');
+            input.checked = opcion.classList.contains('selected');
+          }
+          opcion.closest('.pregunta').classList.remove('has-error');
+        });
+      });
+    });
+
+    function getValues(fieldName, tipo) {
+      if (tipo === 'single') {
+        const checked = document.querySelector(`input[name="${fieldName}"]:checked`);
+        return checked ? checked.value : null;
+      }
+      return Array.from(document.querySelectorAll(`input[name="${fieldName}"]:checked`)).map(i => i.value);
+    }
+
+    document.getElementById('form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const banner = document.getElementById('errorBanner');
+      banner.style.display = 'none';
+
+      const campos = [
+        { field: 'p1', tipo: 'single',   blk: 'blk-p1' },
+        { field: 'p2', tipo: 'single',   blk: 'blk-p2' },
+        { field: 'p3', tipo: 'multiple', blk: 'blk-p3' },
+        { field: 'p4', tipo: 'single',   blk: 'blk-p4' },
+        { field: 'p5', tipo: 'single',   blk: 'blk-p5' },
+      ];
+
+      let valid = true;
+      const body = { tienda };
+      for (const { field, tipo, blk } of campos) {
+        const val = getValues(field, tipo);
+        const ok  = tipo === 'multiple' ? val.length > 0 : !!val;
+        document.getElementById(blk).classList.toggle('has-error', !ok);
+        if (!ok) valid = false;
+        else body[field] = val;
+      }
+      if (!valid) {
+        document.querySelector('.has-error').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const btn = document.getElementById('btnEnviar');
+      btn.disabled = true; btn.textContent = 'Enviando…';
+
+      try {
+        const res  = await fetch('/api/encuestas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+        document.getElementById('form').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        banner.textContent = '⚠ No se pudo enviar: ' + err.message;
+        banner.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Enviar encuesta';
+      }
+    });
+  </script>
+</body>
+</html>

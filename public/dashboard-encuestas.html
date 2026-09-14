@@ -39,23 +39,36 @@
       font-size: .9rem; display: none; margin-bottom: 20px;
     }
 
-    /* Stats por tienda */
+    /* Stats — Total full-width arriba, 4 tiendas en 2x2 */
+    .stat-total {
+      background: var(--surface); border: 1px solid var(--borde);
+      border-radius: var(--radius); padding: 18px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .stat-total-label { font-size: .82rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-total-value { font-size: 2.4rem; font-weight: 900; color: #3fb950; line-height: 1; }
+
     .stats-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
-      gap: 14px; margin-bottom: 28px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 24px;
     }
     .stat-card {
       background: var(--surface); border: 1px solid var(--borde);
-      border-radius: var(--radius); padding: 16px 20px;
+      border-radius: var(--radius); padding: 14px 16px;
     }
-    .stat-label { font-size: .78rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-    .stat-value { font-size: 2rem; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: .75rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+    .stat-value { font-size: 1.8rem; font-weight: 800; line-height: 1; }
 
-    /* Filtro tienda */
+    /* Filtro tienda — scroll horizontal en móvil */
     .filtro-row {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; align-items: center;
+      display: flex; gap: 8px; margin-bottom: 24px; align-items: center;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; padding-bottom: 2px;
     }
-    .filtro-row span { font-size: .85rem; font-weight: 600; color: var(--texto-suave); }
+    .filtro-row::-webkit-scrollbar { display: none; }
+    .filtro-row span { font-size: .85rem; font-weight: 600; color: var(--texto-suave); white-space: nowrap; flex-shrink: 0; }
+    .filtro-row .btn-sm { white-space: nowrap; flex-shrink: 0; }
 
     /* Gráficos */
     .charts-section { display: flex; flex-direction: column; gap: 20px; margin-bottom: 32px; }
@@ -118,8 +131,14 @@
     <div class="error-banner" id="errorBanner"></div>
 
     <!-- Stats -->
-    <div class="stats-grid" id="statsGrid">
-      <div class="stat-card"><div class="stat-label">Total respuestas</div><div class="stat-value" id="statTotal" style="color:#3fb950">—</div></div>
+    <div class="stat-total">
+      <div>
+        <div class="stat-total-label">Total respuestas</div>
+        <div class="stat-total-value" id="statTotal">—</div>
+      </div>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="#3fb950" stroke-width="2" stroke-linecap="round"/><path d="M7 14l4-4 4 4 4-6" stroke="#3fb950" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Los Dominicos</div><div class="stat-value" id="statLD" style="color:#79c0ff">—</div></div>
       <div class="stat-card"><div class="stat-label">Parque Arauco</div><div class="stat-value" id="statPA" style="color:#bc8cff">—</div></div>
       <div class="stat-card"><div class="stat-label">Costanera</div><div class="stat-value" id="statCO" style="color:#f0883e">—</div></div>

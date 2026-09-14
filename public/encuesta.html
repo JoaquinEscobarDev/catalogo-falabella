@@ -312,11 +312,9 @@
     });
 
     function getValues(fieldName, tipo) {
-      if (tipo === 'single') {
-        const checked = document.querySelector(`input[name="${fieldName}"]:checked`);
-        return checked ? checked.value : null;
-      }
-      return Array.from(document.querySelectorAll(`input[name="${fieldName}"]:checked`)).map(i => i.value);
+      const grupo = document.querySelector(`[data-field="${fieldName}"]`);
+      const seleccionados = Array.from(grupo.querySelectorAll('.opcion.selected input')).map(i => i.value);
+      return tipo === 'single' ? (seleccionados[0] || null) : seleccionados;
     }
 
     document.getElementById('form').addEventListener('submit', async e => {

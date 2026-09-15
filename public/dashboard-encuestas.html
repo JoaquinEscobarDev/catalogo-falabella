@@ -11,16 +11,16 @@
 
     .dash-header {
       background: var(--surface); border-bottom: 1px solid var(--borde);
-      padding: 0 24px; position: sticky; top: 0; z-index: 100;
+      padding: 12px 20px; position: sticky; top: 0; z-index: 100;
     }
     .dash-header-inner {
       max-width: 1300px; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
-      height: 58px; gap: 12px;
+      gap: 12px;
     }
     .dash-title { font-size: 1.1rem; font-weight: 700; }
     .dash-title span { color: #3fb950; }
-    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
     .btn-sm {
       background: var(--surface-2); border: 1px solid var(--borde);
       color: var(--texto); border-radius: 8px; padding: 7px 14px;

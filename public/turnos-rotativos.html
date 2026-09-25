@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Turnos Rotativos — 13 semanas</title>
+<style>
+:root{
+  --bg:#0f1420; --panel:#161d2e; --panel2:#1d2740; --border:#2a3552;
+  --text:#e8ecf6; --muted:#9aa7c7; --accent:#4f8cff; --accent2:#7c9eff;
+  --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+  --jv-bg:#26406e; --jv-fg:#cfe0ff;
+  --mm-bg:#6b4a12; --mm-fg:#ffe3b0;
+  --ld-bg:#432a70; --ld-fg:#e5d4ff;
+  --sd-bg:#1f5c3a; --sd-fg:#d3f5e2;
+  --fixed-bg:#3a3f4d; --fixed-fg:#c9cede;
+  --radius:10px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+body{padding-bottom:60px;}
+h1,h2,h3{margin:0 0 8px;}
+h1{font-size:1.3rem;}
+h2{font-size:1.05rem;color:var(--accent2);}
+h3{font-size:0.95rem;color:var(--muted);}
+p{margin:4px 0;color:var(--muted);font-size:0.85rem;}
+a{color:var(--accent2);}
+header{position:sticky;top:0;z-index:50;background:var(--panel);border-bottom:1px solid var(--border);padding:10px 12px;}
+header .top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:8px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);}
+.export-btns{display:flex;gap:6px;flex-wrap:wrap;}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;margin-top:10px;padding-bottom:2px;-webkit-overflow-scrolling:touch;}
+nav.tabs button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:999px;font-size:0.78rem;cursor:pointer;white-space:nowrap;}
+nav.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+main{padding:12px;max-width:1400px;margin:0 auto;}
+section.tab{display:none;}
+section.tab.active{display:block;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
+.grid{display:grid;gap:10px;}
+.grid.cols-2{grid-template-columns:1fr 1fr;}
+.grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+@media(max-width:720px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr;}}
+label{display:block;font-size:0.78rem;color:var(--muted);margin-bottom:4px;}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+  padding:8px;border-radius:6px;font-size:0.85rem;font-family:inherit;
+}
+textarea{min-height:140px;font-family:ui-monospace,Consolas,monospace;font-size:0.8rem;resize:vertical;}
+button{cursor:pointer;font-family:inherit;}
+.btn{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;}
+.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+.btn.small{padding:5px 10px;font-size:0.75rem;}
+.btn.danger{background:var(--danger);color:#fff;border:none;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);padding:4px 10px;border-radius:999px;font-size:0.75rem;}
+.pill button{background:none;border:none;color:var(--danger);font-size:0.85rem;line-height:1;padding:0;}
+table{border-collapse:collapse;width:100%;font-size:0.78rem;}
+th,td{border:1px solid var(--border);padding:5px 7px;text-align:center;white-space:nowrap;}
+th{background:var(--panel2);color:var(--muted);position:sticky;top:0;}
+.table-wrap{overflow-x:auto;max-width:100%;border-radius:8px;}
+td.name-cell,th.name-cell{position:sticky;left:0;background:var(--panel2);text-align:left;z-index:2;min-width:130px;}
+.cell-JV{background:var(--jv-bg);color:var(--jv-fg);}
+.cell-MM{background:var(--mm-bg);color:var(--mm-fg);}
+.cell-LD{background:var(--ld-bg);color:var(--ld-fg);}
+.cell-SD{background:var(--sd-bg);color:var(--sd-fg);}
+.cell-FIXED{background:var(--fixed-bg);color:var(--fixed-fg);}
+.hl-full{box-shadow:inset 0 0 0 3px var(--ok);}
+.hl-partial{box-shadow:inset 0 0 0 3px var(--warn);}
+.area-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:0.75rem;color:var(--muted);margin-top:6px;}
+.legend span.box{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+.worker-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;}
+.worker-row{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:0.8rem;}
+.worker-row .flex1{flex:1;}
+.badge{font-size:0.68rem;padding:2px 6px;border-radius:4px;background:var(--panel);border:1px solid var(--border);color:var(--muted);}
+.badge.anchor{color:var(--warn);border-color:var(--warn);}
+.badge.fixed{color:var(--muted);}
+.warning-box{background:#3a2410;border:1px solid var(--warn);color:#ffd699;padding:10px;border-radius:8px;font-size:0.82rem;margin:8px 0;}
+.error-box{background:#3a1414;border:1px solid var(--danger);color:#ffb3b3;padding:10px;border-radius:8px;font-size:0.82rem;margin:8px 0;}
+.ok-box{background:#0f2e1c;border:1px solid var(--ok);color:#bdf5cf;padding:10px;border-radius:8px;font-size:0.82rem;margin:8px 0;}
+.opt-option{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--panel2);}
+.opt-option.chosen{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok);}
+.opt-option h3{color:var(--text);margin-bottom:4px;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:8px;}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;}
+.stat .v{font-size:1.1rem;font-weight:600;}
+.stat .l{font-size:0.68rem;color:var(--muted);}
+.test-item{padding:6px 8px;border-radius:6px;font-size:0.8rem;margin-bottom:4px;}
+.test-pass{background:#0f2e1c;color:#bdf5cf;}
+.test-fail{background:#3a1414;color:#ffb3b3;}
+footer{text-align:center;color:var(--muted);font-size:0.72rem;padding:20px;}
+.slider-row{display:flex;align-items:center;gap:8px;}
+.slider-row input[type=range]{flex:1;}
+.small-note{font-size:0.72rem;color:var(--muted);}
+.close-x{cursor:pointer;color:var(--danger);}
+select[multiple]{min-height:100px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="top">
+    <div class="brand"><span class="dot"></span><h1>Simulador de Turnos Rotativos (13 semanas)</h1></div>
+    <div class="export-btns">
+      <button class="btn secondary small" id="btnExportPdf">Exportar PDF</button>
+      <button class="btn secondary small" id="btnExportXlsx">Exportar Excel</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="datos" class="active">Datos</button>
+    <button data-tab="esquema">Esquema</button>
+    <button data-tab="simulacion">Simulación 13 sem.</button>
+    <button data-tab="cambios">Cambios propuestos</button>
+    <button data-tab="cobertura">Cobertura</button>
+    <button data-tab="optimizador">Optimizador</button>
+    <button data-tab="pruebas">Pruebas</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ===================== TAB: DATOS ===================== -->
+<section class="tab active" id="tab-datos">
+  <div class="card">
+    <h2>1. Trabajadores</h2>
+    <p>Formato por línea: <code>nombre;área;semana;fijo</code> — "fijo" = sí/no (turno especial lunes-viernes, libre sábado-domingo, no rota). Ejemplo cargado abajo: reemplázalo por tu lista real.</p>
+    <textarea id="inputWorkers"></textarea>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn" id="btnParseWorkers">Cargar lista</button>
+      <button class="btn secondary" id="btnAddWorkerRow">+ Agregar persona manualmente</button>
+      <span class="small-note" id="parseMsg"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Personas cargadas</h3>
+    <div class="worker-list" id="workerList"></div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>2. Fechas</h2>
+      <label>Fecha de referencia del horario cargado (lunes)</label>
+      <input type="date" id="refDate">
+      <label style="margin-top:8px;">Fecha objetivo de proyección (lunes)</label>
+      <input type="date" id="targetDate">
+      <div id="dateMsg" class="small-note" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>3. Personas ancla (no se mueven en el optimizador)</h2>
+      <p>Siguen su ciclo normal, pero el optimizador nunca les reasigna semana.</p>
+      <select id="anchorSelect" multiple></select>
+    </div>
+  </div>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>4. Pares con la misma semana</h2>
+      <div class="row">
+        <select id="pairA" style="flex:1"></select>
+        <select id="pairB" style="flex:1"></select>
+        <button class="btn small" id="btnAddPair">Agregar</button>
+      </div>
+      <div id="pairList" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>5. Nunca deben coincidir (mismo par de días)</h2>
+      <div class="row">
+        <select id="neverA" style="flex:1"></select>
+        <select id="neverB" style="flex:1"></select>
+        <button class="btn small" id="btnAddNever">Agregar</button>
+      </div>
+      <div id="neverList" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>6. Prioridad de protección</h2>
+    <p>1 = normal. Más alto = se protege más (pesa más en el costo). Menos de 1 = absorbe más coincidencias.</p>
+    <div id="weightList"></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: ESQUEMA ===================== -->
+<section class="tab" id="tab-esquema">
+  <div class="card">
+    <h2>Esquema de semanas — fecha objetivo</h2>
+    <p>Quién queda en cada semana del ciclo, en la fecha objetivo proyectada. Usa la <b>propuesta aplicada</b> del optimizador si hay una elegida; si no, la proyección natural.</p>
+    <div id="esquemaGrid"></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: SIMULACION ===================== -->
+<section class="tab" id="tab-simulacion">
+  <div class="card">
+    <h2>Simulación de las 13 semanas</h2>
+    <div class="row" style="margin-bottom:8px;">
+      <label style="margin:0;width:auto;">Resaltar coincidencias con:</label>
+      <select id="highlightPerson" style="max-width:260px;"></select>
+    </div>
+    <div class="legend">
+      <span><span class="box cell-JV"></span>JV — Jueves y Viernes</span>
+      <span><span class="box cell-MM"></span>MM — Martes y Miércoles</span>
+      <span><span class="box cell-LD"></span>LD — Lunes y Domingo</span>
+      <span><span class="box cell-SD"></span>SD — Sábado y Domingo</span>
+      <span><span class="box cell-FIXED"></span>Turno fijo (Sáb-Dom)</span>
+      <span><span class="box" style="box-shadow:inset 0 0 0 3px var(--ok);background:transparent;"></span>Coincidencia total</span>
+      <span><span class="box" style="box-shadow:inset 0 0 0 3px var(--warn);background:transparent;"></span>Coincidencia parcial (1 día)</span>
+    </div>
+    <div class="table-wrap"><table id="simTable"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Matriz de coincidencias por par de personas</h2>
+    <p>Semanas (de 13) con el mismo par de días libres, y semanas con al menos un día libre en común.</p>
+    <div class="table-wrap"><table id="matrixTable"></table></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: CAMBIOS ===================== -->
+<section class="tab" id="tab-cambios">
+  <div class="card">
+    <h2>Cambios propuestos</h2>
+    <p>Semana que le tocaría de forma natural en la fecha objetivo vs. la semana propuesta (según la opción del optimizador aplicada).</p>
+    <div class="table-wrap"><table id="cambiosTable"></table></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: COBERTURA ===================== -->
+<section class="tab" id="tab-cobertura">
+  <div class="card">
+    <h2>Cobertura por día — Actual vs. Propuesta</h2>
+    <p>Cantidad de personas libres por día, para cada una de las 13 semanas proyectadas desde la fecha objetivo.</p>
+    <div class="table-wrap"><table id="coverageTable"></table></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: OPTIMIZADOR ===================== -->
+<section class="tab" id="tab-optimizador">
+  <div class="card">
+    <h2>Optimizador</h2>
+    <label>Personas a optimizar (movibles, no ancla ni fijas)</label>
+    <select id="optMovable" multiple></select>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn" id="btnRunOptimizer">Ejecutar optimización</button>
+      <span class="small-note" id="optStatus"></span>
+    </div>
+    <div id="optWarnings"></div>
+  </div>
+  <div class="card">
+    <h3>Mejores 5 opciones</h3>
+    <div id="optResults"></div>
+  </div>
+</section>
+
+<!-- ===================== TAB: PRUEBAS ===================== -->
+<section class="tab" id="tab-pruebas">
+  <div class="card">
+    <h2>Pruebas del ciclo y de las coincidencias</h2>
+    <button class="btn" id="btnRunTests">Ejecutar pruebas</button>
+    <div id="testResults" style="margin-top:10px;"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>Simulador de turnos rotativos — todo el cálculo ocurre en tu navegador, sin backend.</footer>
+
+<!-- CDN libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script>
+/* =========================================================================
+   CONSTANTES DEL CICLO
+   ========================================================================= */
+const WEEK_TYPES = {1:'JV',2:'MM',3:'LD',4:'SD',5:'JV',6:'MM',7:'LD',8:'SD',9:'JV',10:'MM',11:'LD',12:'SD',13:'SD'};
+const PAIR_INFO = {
+  JV:{label:'Jueves y Viernes', days:['Jue','Vie']},
+  MM:{label:'Martes y Miércoles', days:['Mar','Mié']},
+  LD:{label:'Lunes y Domingo', days:['Lun','Dom']},
+  SD:{label:'Sábado y Domingo', days:['Sáb','Dom']}
+};
+const DAY_ORDER = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const FIXED_DAYS_OFF = ['Sáb','Dom'];
+const ROW_BANDS = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,null,null,null]];
+const COL_ORDER = ['JV','MM','LD','SD'];
+
+function mod13(n){ return ((n%13)+13)%13; }
+function advanceWeek(week, steps){ if(steps===undefined) steps=1; return mod13(week-1+steps)+1; }
+function forwardDistance(fromWeek, toWeek){ return mod13(toWeek-fromWeek); }
+function weekTypeOf(week){ return WEEK_TYPES[week]; }
+function daysOffOfWeek(week){ return PAIR_INFO[weekTypeOf(week)].days; }
+function overlapDays(a,b){ return a.filter(d=>b.includes(d)); }
+
+function simulatePairCoincidence(weekA, weekB){
+  let same=0, share=0;
+  for(let n=0;n<13;n++){
+    const wa=advanceWeek(weekA,n), wb=advanceWeek(weekB,n);
+    const ta=weekTypeOf(wa), tb=weekTypeOf(wb);
+    if(ta===tb) same++;
+    if(overlapDays(PAIR_INFO[ta].days, PAIR_INFO[tb].days).length>0) share++;
+  }
+  return {same, share};
+}
+const _diffCache = new Map();
+function diffOf(weekA, weekB){ return mod13(weekB-weekA); }
+function coincidenceByDiff(diff){
+  diff = mod13(diff);
+  if(_diffCache.has(diff)) return _diffCache.get(diff);
+  const r = simulatePairCoincidence(1, 1+diff);
+  _diffCache.set(diff, r);
+  return r;
+}
+function pairCoincidence(weekA, weekB){ return coincidenceByDiff(diffOf(weekA, weekB)); }
+
+function computeSafeDiffs(){
+  const arr=[];
+  for(let d=1; d<13; d++){ if(coincidenceByDiff(d).same===0) arr.push(d); }
+  return arr;
+}
+function computeMaxMutualSafeGroup(){
+  const safe = new Set(computeSafeDiffs());
+  let best = [];
+  function bt(start, current){
+    if(current.length>best.length) best = current.slice();
+    for(let v=start; v<13; v++){
+      let ok=true;
+      for(const u of current){ if(!safe.has(mod13(v-u))){ ok=false; break; } }
+      if(ok){ current.push(v); bt(v+1, current); current.pop(); }
+    }
+  }
+  bt(0, []);
+  return best.map(x=>x+1);
+}
+
+/* =========================================================================
+   FECHAS
+   ========================================================================= */
+function parseDateInput(value){
+  if(!value) return null;
+  const [y,m,d] = value.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function daysBetween(d1,d2){ return Math.round((d2-d1)/86400000); }
+function weeksElapsedBetween(ref, target){ return Math.floor(daysBetween(ref,target)/7); }
+function isMonday(date){ return date.getDay()===1; }
+function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
+function fmtDate(date){ return date.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
+
+/* =========================================================================
+   ESTADO GLOBAL
+   ========================================================================= */
+let state = {
+  workers: [],       // {id,name,area,currentWeek,fixed,isAnchor}
+  samePairs: [],      // [[idA,idB], ...]
+  neverPairs: [],      // [[idA,idB], ...]
+  weights: {},         // id -> number
+  refDate: null,
+  targetDate: null,
+  highlightId: null,
+  optMovableIds: [],
+  optResults: [],
+  appliedOptionIndex: null
+};
+let idCounter = 1;
+function newId(){ return 'w' + (idCounter++); }
+
+function saveState(){
+  try{
+    const s = JSON.parse(JSON.stringify(state));
+    s.refDate = state.refDate ? state.refDate.toISOString() : null;
+    s.targetDate = state.targetDate ? state.targetDate.toISOString() : null;
+    localStorage.setItem('turnos_state_v1', JSON.stringify(s));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem('turnos_state_v1');
+    if(!raw) return false;
+    const s = JSON.parse(raw);
+    s.refDate = s.refDate ? new Date(s.refDate) : null;
+    s.targetDate = s.targetDate ? new Date(s.targetDate) : null;
+    state = Object.assign(state, s);
+    idCounter = 1;
+    state.workers.forEach(w=>{ const n = parseInt(w.id.replace('w','')); if(!isNaN(n) && n>=idCounter) idCounter = n+1; });
+    return true;
+  }catch(e){ return false; }
+}
+
+function getWorker(id){ return state.workers.find(w=>w.id===id); }
+function isAnchorId(id){ const w=getWorker(id); return w && w.isAnchor; }
+function weightOf(id){ return state.weights[id] !== undefined ? state.weights[id] : 1; }
+
+/* =========================================================================
+   PARSEO DE TRABAJADORES
+   ========================================================================= */
+function parseWorkersText(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const workers = [];
+  const errors = [];
+  lines.forEach((line, idx)=>{
+    const parts = line.split(';').map(p=>p.trim());
+    if(parts.length<3){ errors.push(`Línea ${idx+1}: formato inválido ("${line}")`); return; }
+    const [name, area, semanaStr, fijoStr] = parts;
+    const semana = parseInt(semanaStr, 10);
+    if(!name){ errors.push(`Línea ${idx+1}: falta nombre`); return; }
+    const fixed = /^(s|si|sí|true|1|x)$/i.test((fijoStr||'').trim());
+    if(!fixed && (isNaN(semana) || semana<1 || semana>13)){
+      errors.push(`Línea ${idx+1}: semana inválida ("${semanaStr}")`); return;
+    }
+    workers.push({ id:newId(), name, area: area||'Sin área', currentWeek: fixed?null:semana, fixed, isAnchor:false });
+  });
+  return {workers, errors};
+}
+
+/* =========================================================================
+   PROYECCIÓN
+   ========================================================================= */
+function stepsToTarget(){
+  if(!state.refDate || !state.targetDate) return 0;
+  return weeksElapsedBetween(state.refDate, state.targetDate);
+}
+function statusQuoWeekAt(worker, extraSteps){
+  if(worker.fixed) return null;
+  const steps = stepsToTarget() + (extraSteps||0);
+  return advanceWeek(worker.currentWeek, steps);
+}
+function proposedWeekAt(worker, extraSteps){
+  if(worker.fixed) return null;
+  if(state.appliedOptionIndex!==null && state.optResults[state.appliedOptionIndex]){
+    const option = state.optResults[state.appliedOptionIndex];
+    if(option.perPerson[worker.id]!==undefined){
+      return advanceWeek(option.perPerson[worker.id], extraSteps||0);
+    }
+  }
+  return statusQuoWeekAt(worker, extraSteps);
+}
+
+/* =========================================================================
+   COLORES POR ÁREA
+   ========================================================================= */
+function areaColor(area){
+  let hash=0;
+  for(let i=0;i<area.length;i++){ hash = (hash*31 + area.charCodeAt(i))|0; }
+  const hue = Math.abs(hash)%360;
+  return `hsl(${hue} 65% 55%)`;
+}
+
+/* =========================================================================
+   RENDER: LISTA DE TRABAJADORES / SELECTS
+   ========================================================================= */
+function renderWorkerList(){
+  const el = document.getElementById('workerList');
+  if(state.workers.length===0){ el.innerHTML = '<p>No hay personas cargadas.</p>'; return; }
+  el.innerHTML = state.workers.map(w=>{
+    const badges = [];
+    if(w.fixed) badges.push('<span class="badge fixed">fijo</span>');
+    else badges.push(`<span class="badge">sem. ${w.currentWeek}</span>`);
+    if(w.isAnchor) badges.push('<span class="badge anchor">ancla</span>');
+    return `<div class="worker-row">
+      <span class="area-dot" style="background:${areaColor(w.area)}"></span>
+      <span class="flex1">${w.name} <span class="small-note">(${w.area})</span></span>
+      ${badges.join(' ')}
+      <button class="btn small danger" data-remove="${w.id}">✕</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-remove');
+      state.workers = state.workers.filter(w=>w.id!==id);
+      state.samePairs = state.samePairs.filter(p=>!p.includes(id));
+      state.neverPairs = state.neverPairs.filter(p=>!p.includes(id));
+      delete state.weights[id];
+      state.optMovableIds = state.optMovableIds.filter(x=>x!==id);
+      fullRefresh();
+    });
+  });
+}
+
+function movableWorkers(){ return state.workers.filter(w=>!w.fixed && !w.isAnchor); }
+function nonFixedWorkers(){ return state.workers.filter(w=>!w.fixed); }
+
+function populateSelects(){
+  const anchorSel = document.getElementById('anchorSelect');
+  anchorSel.innerHTML = nonFixedWorkers().map(w=>`<option value="${w.id}" ${w.isAnchor?'selected':''}>${w.name}</option>`).join('');
+
+  const fillPairSelect = (elId)=>{
+    const el = document.getElementById(elId);
+    const prev = el.value;
+    el.innerHTML = '<option value="">—</option>' + state.workers.filter(w=>!w.fixed).map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+    if(prev) el.value = prev;
+  };
+  fillPairSelect('pairA'); fillPairSelect('pairB');
+  fillPairSelect('neverA'); fillPairSelect('neverB');
+
+  const hp = document.getElementById('highlightPerson');
+  const prevHp = hp.value;
+  hp.innerHTML = '<option value="">(ninguna)</option>' + nonFixedWorkers().map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+  hp.value = state.highlightId || prevHp || '';
+
+  const optSel = document.getElementById('optMovable');
+  const selectedSet = new Set(state.optMovableIds);
+  optSel.innerHTML = movableWorkers().map(w=>`<option value="${w.id}" ${selectedSet.has(w.id)?'selected':''}>${w.name}</option>`).join('');
+}
+
+function renderWeightList(){
+  const el = document.getElementById('weightList');
+  const workers = nonFixedWorkers();
+  if(workers.length===0){ el.innerHTML='<p>No hay personas cargadas.</p>'; return; }
+  el.innerHTML = workers.map(w=>{
+    const val = weightOf(w.id);
+    return `<div class="slider-row" style="margin-bottom:6px;">
+      <span style="width:140px;font-size:0.8rem;">${w.name}</span>
+      <input type="range" min="0.25" max="3" step="0.25" value="${val}" data-weight="${w.id}">
+      <span class="small-note" style="width:34px;" data-weightval="${w.id}">${val}x</span>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-weight]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const id = inp.getAttribute('data-weight');
+      state.weights[id] = parseFloat(inp.value);
+      document.querySelector(`[data-weightval="${id}"]`).textContent = inp.value+'x';
+      saveState();
+    });
+  });
+}
+
+function renderPairList(){
+  const el = document.getElementById('pairList');
+  if(state.samePairs.length===0){ el.innerHTML = '<p class="small-note">Sin pares configurados.</p>'; return; }
+  el.innerHTML = state.samePairs.map((p,idx)=>{
+    const a=getWorker(p[0]), b=getWorker(p[1]);
+    if(!a||!b) return '';
+    return `<div class="pill">${a.name} = ${b.name} <button data-idx="${idx}">✕</button></div>`;
+  }).join('');
+  el.querySelectorAll('button[data-idx]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.samePairs.splice(parseInt(btn.getAttribute('data-idx')),1); fullRefresh(); });
+  });
+}
+function renderNeverList(){
+  const el = document.getElementById('neverList');
+  if(state.neverPairs.length===0){ el.innerHTML = '<p class="small-note">Sin restricciones configuradas.</p>'; return; }
+  el.innerHTML = state.neverPairs.map((p,idx)=>{
+    const a=getWorker(p[0]), b=getWorker(p[1]);
+    if(!a||!b) return '';
+    return `<div class="pill">${a.name} ≠ ${b.name} <button data-idx="${idx}">✕</button></div>`;
+  }).join('');
+  el.querySelectorAll('button[data-idx]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.neverPairs.splice(parseInt(btn.getAttribute('data-idx')),1); fullRefresh(); });
+  });
+}
+
+/* =========================================================================
+   RENDER: ESQUEMA
+   ========================================================================= */
+function renderEsquema(){
+  const el = document.getElementById('esquemaGrid');
+  const byWeek = {};
+  for(let w=1; w<=13; w++) byWeek[w]=[];
+  nonFixedWorkers().forEach(w=>{
+    const wk = proposedWeekAt(w,0);
+    if(wk) byWeek[wk].push(w);
+  });
+  let html = '<div class="table-wrap"><table><thead><tr><th></th>' + COL_ORDER.map(c=>`<th>${c}<br><span class="small-note">${PAIR_INFO[c].days.join('/')}</span></th>`).join('') + '</tr></thead><tbody>';
+  ROW_BANDS.forEach(band=>{
+    html += '<tr><td class="name-cell">Semanas ' + band.filter(x=>x).join(', ') + '</td>';
+    band.forEach(weekNum=>{
+      if(weekNum===null){ html += '<td></td>'; return; }
+      const people = byWeek[weekNum];
+      const type = weekTypeOf(weekNum);
+      html += `<td class="cell-${type}" style="text-align:left;min-width:160px;"><b>Sem. ${weekNum}</b><br>` +
+        (people.length ? people.map(p=>`<span class="area-dot" style="background:${areaColor(p.area)}"></span>${p.name}`).join('<br>') : '<span class="small-note">—</span>') +
+        '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+/* =========================================================================
+   RENDER: SIMULACION 13 SEMANAS
+   ========================================================================= */
+function renderSimulacion(){
+  const table = document.getElementById('simTable');
+  const workers = nonFixedWorkers();
+  const fixedList = state.workers.filter(w=>w.fixed);
+  const base = state.targetDate;
+  const highlightId = state.highlightId;
+  const highlightWorker = highlightId ? getWorker(highlightId) : null;
+
+  let head = '<thead><tr><th class="name-cell">Persona</th>';
+  for(let n=0;n<13;n++){
+    const d = base ? addDays(base, n*7) : null;
+    head += `<th>Sem+${n}${d?('<br>'+fmtDate(d)):''}</th>`;
+  }
+  head += '</tr></thead>';
+
+  let body = '<tbody>';
+  workers.forEach(w=>{
+    const startWeek = proposedWeekAt(w,0);
+    body += `<tr><td class="name-cell"><span class="area-dot" style="background:${areaColor(w.area)}"></span>${w.name}</td>`;
+    for(let n=0;n<13;n++){
+      const wk = advanceWeek(startWeek, n);
+      const type = weekTypeOf(wk);
+      let cls = `cell-${type}`;
+      if(highlightWorker && highlightWorker.id!==w.id){
+        const hStart = proposedWeekAt(highlightWorker,0);
+        const hWeek = advanceWeek(hStart, n);
+        const hType = weekTypeOf(hWeek);
+        if(hType===type) cls += ' hl-full';
+        else if(overlapDays(PAIR_INFO[type].days, PAIR_INFO[hType].days).length>0) cls += ' hl-partial';
+      }
+      body += `<td class="${cls}">${type}<br><span style="font-size:0.65rem;">sem ${wk}</span></td>`;
+    }
+    body += '</tr>';
+  });
+  fixedList.forEach(w=>{
+    body += `<tr><td class="name-cell"><span class="area-dot" style="background:${areaColor(w.area)}"></span>${w.name} <span class="small-note">(fijo)</span></td>`;
+    for(let n=0;n<13;n++){ body += `<td class="cell-FIXED">SD<br><span style="font-size:0.65rem;">fijo</span></td>`; }
+    body += '</tr>';
+  });
+  body += '</tbody>';
+  table.innerHTML = head + body;
+
+  renderMatrix();
+}
+
+function renderMatrix(){
+  const table = document.getElementById('matrixTable');
+  const workers = nonFixedWorkers();
+  if(workers.length<2){ table.innerHTML = '<tr><td>Se necesitan al menos 2 personas con ciclo.</td></tr>'; return; }
+  let head = '<thead><tr><th class="name-cell">Persona</th>' + workers.map(w=>`<th>${w.name}</th>`).join('') + '</tr></thead>';
+  let body = '<tbody>';
+  workers.forEach(a=>{
+    body += `<tr><td class="name-cell">${a.name}</td>`;
+    workers.forEach(b=>{
+      if(a.id===b.id){ body += '<td>—</td>'; return; }
+      const wa = proposedWeekAt(a,0), wb = proposedWeekAt(b,0);
+      const r = pairCoincidence(wa, wb);
+      let cls='';
+      if(r.same>0) cls='hl-full'; else if(r.share>0) cls='hl-partial';
+      body += `<td class="${cls}">${r.same} / ${r.share}</td>`;
+    });
+    body += '</tr>';
+  });
+  body += '</tbody>';
+  table.innerHTML = head + body;
+}
+
+/* =========================================================================
+   RENDER: CAMBIOS PROPUESTOS
+   ========================================================================= */
+function renderCambios(){
+  const table = document.getElementById('cambiosTable');
+  const workers = movableWorkers();
+  let head = '<thead><tr><th class="name-cell">Persona</th><th>Semana actual (natural)</th><th>Semana propuesta</th><th>Semanas que adelanta</th></tr></thead>';
+  let body = '<tbody>';
+  workers.forEach(w=>{
+    const sq = statusQuoWeekAt(w,0);
+    const pw = proposedWeekAt(w,0);
+    const adv = forwardDistance(sq, pw);
+    body += `<tr><td class="name-cell">${w.name}</td><td class="cell-${weekTypeOf(sq)}">${sq} (${weekTypeOf(sq)})</td><td class="cell-${weekTypeOf(pw)}">${pw} (${weekTypeOf(pw)})</td><td>${adv===0?'—':adv}</td></tr>`;
+  });
+  body += '</tbody>';
+  table.innerHTML = head + body;
+}
+
+/* =========================================================================
+   COBERTURA
+   ========================================================================= */
+function computeCoverageGrid(useProposed){
+  const grid = []; // grid[n][day] = count
+  for(let n=0;n<13;n++){
+    const row = {}; DAY_ORDER.forEach(d=>row[d]=0);
+    nonFixedWorkers().forEach(w=>{
+      const startWeek = useProposed ? proposedWeekAt(w,0) : statusQuoWeekAt(w,0);
+      const wk = advanceWeek(startWeek, n);
+      daysOffOfWeek(wk).forEach(d=>row[d]++);
+    });
+    state.workers.filter(w=>w.fixed).forEach(()=>{ FIXED_DAYS_OFF.forEach(d=>row[d]++); });
+    grid.push(row);
+  }
+  return grid;
+}
+function renderCobertura(){
+  const table = document.getElementById('coverageTable');
+  const actual = computeCoverageGrid(false);
+  const propuesta = computeCoverageGrid(true);
+
+  let head = '<thead><tr><th rowspan="2" class="name-cell">Semana</th>';
+  DAY_ORDER.forEach(d=>{ head += `<th colspan="2">${d}</th>`; });
+  head += '</tr><tr>';
+  DAY_ORDER.forEach(()=>{ head += '<th>Actual</th><th>Propuesta</th>'; });
+  head += '</tr></thead>';
+
+  let body = '<tbody>';
+  for(let n=0;n<13;n++){
+    body += `<tr><td class="name-cell">Sem+${n}</td>`;
+    DAY_ORDER.forEach(d=>{
+      const a = actual[n][d], p = propuesta[n][d];
+      const diff = p-a;
+      const diffTxt = diff===0?'':(diff>0?` <span style="color:var(--warn)">(+${diff})</span>`:` <span style="color:var(--ok)">(${diff})</span>`);
+      body += `<td>${a}</td><td>${p}${diffTxt}</td>`;
+    });
+    body += '</tr>';
+  }
+  // summary rows
+  const summarize = (grid)=>{
+    const res = {};
+    DAY_ORDER.forEach(d=>{
+      const vals = grid.map(r=>r[d]);
+      res[d] = { max:Math.max(...vals), min:Math.min(...vals), avg:(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) };
+    });
+    return res;
+  };
+  const sA = summarize(actual), sP = summarize(propuesta);
+  ['max','min','avg'].forEach(stat=>{
+    const label = stat==='max'?'Máximo':stat==='min'?'Mínimo':'Promedio';
+    body += `<tr><td class="name-cell"><b>${label}</b></td>`;
+    DAY_ORDER.forEach(d=>{ body += `<td><b>${sA[d][stat]}</b></td><td><b>${sP[d][stat]}</b></td>`; });
+    body += '</tr>';
+  });
+  body += '</tbody>';
+  table.innerHTML = head + body;
+}
+
+/* =========================================================================
+   OPTIMIZADOR
+   ========================================================================= */
+function buildOptimizerEntities(movableIds){
+  const anchors = state.workers.filter(w=>w.isAnchor && !w.fixed).map(w=>({id:w.id, week: statusQuoWeekAt(w,0)}));
+  const anchorWeekById = {}; anchors.forEach(a=>anchorWeekById[a.id]=a.week);
+
+  const used = new Set();
+  const entities = [];
+  // merge same-week pairs where at least one member is in movableIds
+  state.samePairs.forEach(([a,b])=>{
+    const aMov = movableIds.includes(a), bMov = movableIds.includes(b);
+    if(!aMov && !bMov) return;
+    if(used.has(a) || used.has(b)) return;
+    let domain;
+    if(anchorWeekById[a]!==undefined) domain=[anchorWeekById[a]];
+    else if(anchorWeekById[b]!==undefined) domain=[anchorWeekById[b]];
+    else domain = Array.from({length:13},(_,i)=>i+1);
+    entities.push({ id:'pair:'+a+':'+b, members:[a,b], domain });
+    used.add(a); used.add(b);
+  });
+  movableIds.forEach(id=>{
+    if(used.has(id)) return;
+    entities.push({ id:id, members:[id], domain: Array.from({length:13},(_,i)=>i+1) });
+    used.add(id);
+  });
+  // order: singleton-domain first, then most never-pair constraints
+  const neverCount = (member)=> state.neverPairs.filter(([a,b])=>a===member||b===member).length;
+  entities.sort((e1,e2)=>{
+    const s1 = e1.domain.length===1?0:1, s2=e2.domain.length===1?0:1;
+    if(s1!==s2) return s1-s2;
+    const n1 = Math.max(...e1.members.map(neverCount)), n2 = Math.max(...e2.members.map(neverCount));
+    return n2-n1;
+  });
+  return {entities, anchors};
+}
+
+function otherEndOfNeverPair(member){
+  const res = [];
+  state.neverPairs.forEach(([a,b])=>{
+    if(a===member) res.push(b);
+    if(b===member) res.push(a);
+  });
+  return res;
+}
+
+function checkAssignment(entities, assignment, newIdx, anchors){
+  const eNew = entities[newIdx];
+  const wNew = assignment[eNew.id];
+  for(const anc of anchors){
+    if(wNew===anc.week) return false;
+  }
+  for(let i=0;i<newIdx;i++){
+    if(assignment[entities[i].id]===wNew) return false;
+  }
+  for(const member of eNew.members){
+    const others = otherEndOfNeverPair(member);
+    for(const otherId of others){
+      const anc = anchors.find(a=>a.id===otherId);
+      if(anc){
+        if(pairCoincidence(wNew, anc.week).same!==0) return false;
+        continue;
+      }
+      for(let i=0;i<newIdx;i++){
+        if(entities[i].members.includes(otherId)){
+          if(pairCoincidence(wNew, assignment[entities[i].id]).same!==0) return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+function costContribution(entities, assignment, newIdx, anchors){
+  const eNew = entities[newIdx];
+  const wNew = assignment[eNew.id];
+  let cost = 0;
+  eNew.members.forEach(m=>{
+    const wm = weightOf(m);
+    anchors.forEach(anc=>{
+      const wa = weightOf(anc.id);
+      const r = pairCoincidence(wNew, anc.week);
+      cost += wm*wa*(r.same*2 + (r.share-r.same));
+    });
+    for(let i=0;i<newIdx;i++){
+      entities[i].members.forEach(m2=>{
+        const wm2 = weightOf(m2);
+        const r = pairCoincidence(wNew, assignment[entities[i].id]);
+        cost += wm*wm2*(r.same*2 + (r.share-r.same));
+      });
+    }
+  });
+  return cost;
+}
+
+function coverageStdDev(grid){
+  const allVals = [];
+  grid.forEach(row=>DAY_ORDER.forEach(d=>allVals.push(row[d])));
+  const mean = allVals.reduce((a,b)=>a+b,0)/allVals.length;
+  const variance = allVals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/allVals.length;
+  return Math.sqrt(variance);
+}
+
+function runOptimizer(movableIds){
+  const warnings = [];
+  if(movableIds.length===0) return {results:[], warnings:['Selecciona al menos una persona movible.'], capped:false};
+
+  // feasibility check for never-coincide clusters
+  const maxGroup = computeMaxMutualSafeGroup().length;
+  // find connected clusters among selected+anchors formed purely by never-pairs (approx: any group where all pairs are never-pairs)
+  const involved = new Set();
+  state.neverPairs.forEach(([a,b])=>{ if(movableIds.includes(a)||movableIds.includes(b)){ involved.add(a); involved.add(b); } });
+  if(involved.size>0){
+    const idsArr = [...involved];
+    let allMutual = idsArr.length>1;
+    for(let i=0;i<idsArr.length && allMutual;i++){
+      for(let j=i+1;j<idsArr.length && allMutual;j++){
+        const has = state.neverPairs.some(([a,b])=>(a===idsArr[i]&&b===idsArr[j])||(a===idsArr[j]&&b===idsArr[i]));
+        if(!has) allMutual = false;
+      }
+    }
+    if(allMutual && idsArr.length>maxGroup){
+      warnings.push(`Restricción imposible de cumplir: pediste que ${idsArr.length} personas nunca coincidan entre sí, pero el ciclo de 13 semanas permite un máximo de ${maxGroup} personas mutuamente sin coincidencias. Habrá coincidencias inevitables.`);
+    }
+  }
+
+  const {entities, anchors} = buildOptimizerEntities(movableIds);
+
+  let estimatedNodes = entities.reduce((acc,e)=>acc*e.domain.length,1);
+  if(estimatedNodes>50000000){
+    warnings.push('El espacio de búsqueda es muy grande; la optimización podría truncarse. Considera reducir el número de personas a optimizar.');
+  }
+
+  const results = [];
+  const NODE_CAP = 2500000;
+  let nodeCount=0, capped=false;
+  const assignment = {};
+
+  function insertResult(assignFull, accCost){
+    const perPerson = {};
+    entities.forEach(e=>{ e.members.forEach(m=>{ perPerson[m]=assignFull[e.id]; }); });
+    let forwardSum=0;
+    entities.forEach(e=>{ e.members.forEach(m=>{
+      const w = getWorker(m);
+      forwardSum += forwardDistance(statusQuoWeekAt(w,0), assignFull[e.id]);
+    });});
+    // coverage std with this assignment applied
+    const tempApplied = state.appliedOptionIndex;
+    const savedResults = state.optResults;
+    state.optResults = [{perPerson}];
+    state.appliedOptionIndex = 0;
+    const grid = computeCoverageGrid(true);
+    state.appliedOptionIndex = tempApplied;
+    state.optResults = savedResults;
+    const cov = coverageStdDev(grid);
+
+    results.push({ perPerson, cost:accCost, forwardSum, coverageStd:cov });
+    results.sort((a,b)=> a.cost-b.cost || a.forwardSum-b.forwardSum || a.coverageStd-b.coverageStd);
+    if(results.length>5) results.length=5;
+  }
+
+  function backtrack(idx, accCost){
+    if(capped) return;
+    nodeCount++;
+    if(nodeCount>NODE_CAP){ capped=true; return; }
+    if(idx===entities.length){ insertResult(assignment, accCost); return; }
+    const e = entities[idx];
+    for(const w of e.domain){
+      assignment[e.id]=w;
+      if(checkAssignment(entities, assignment, idx, anchors)){
+        const add = costContribution(entities, assignment, idx, anchors);
+        const newAcc = accCost+add;
+        if(results.length<5 || newAcc <= results[results.length-1].cost){
+          backtrack(idx+1, newAcc);
+        }
+      }
+      if(capped){ delete assignment[e.id]; return; }
+    }
+    delete assignment[e.id];
+  }
+  backtrack(0,0);
+  if(capped) warnings.push('La búsqueda se truncó por tamaño (demasiadas combinaciones). Los resultados mostrados son los mejores encontrados hasta el corte, no necesariamente el óptimo global.');
+  if(results.length===0) warnings.push('No se encontró ninguna asignación que cumpla todas las restricciones duras. Revisa los pares y las restricciones de "nunca coincidir".');
+  return {results, warnings, capped};
+}
+
+function renderOptimizerResults(runResult){
+  const el = document.getElementById('optResults');
+  const warnEl = document.getElementById('optWarnings');
+  warnEl.innerHTML = (runResult.warnings||[]).map(w=>`<div class="warning-box">${w}</div>`).join('');
+  if(!runResult.results || runResult.results.length===0){ el.innerHTML = '<p>Sin resultados.</p>'; return; }
+  el.innerHTML = runResult.results.map((opt, idx)=>{
+    const chosen = state.appliedOptionIndex===idx;
+    const rows = Object.keys(opt.perPerson).map(id=>{
+      const w = getWorker(id);
+      const sq = statusQuoWeekAt(w,0);
+      const pw = opt.perPerson[id];
+      const adv = forwardDistance(sq,pw);
+      return `<tr><td>${w.name}</td><td>${sq}</td><td>${pw}</td><td>${adv===0?'—':adv}</td></tr>`;
+    }).join('');
+    return `<div class="opt-option ${chosen?'chosen':''}">
+      <h3>Opción ${idx+1} ${chosen?'✓ aplicada':''}</h3>
+      <div class="stat-grid">
+        <div class="stat"><div class="v">${opt.cost.toFixed(1)}</div><div class="l">Costo ponderado</div></div>
+        <div class="stat"><div class="v">${opt.forwardSum}</div><div class="l">Semanas adelantadas (total)</div></div>
+        <div class="stat"><div class="v">${opt.coverageStd.toFixed(2)}</div><div class="l">Desv. cobertura</div></div>
+      </div>
+      <div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Persona</th><th>Sem. actual</th><th>Sem. propuesta</th><th>Adelanta</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <button class="btn small" style="margin-top:8px;" data-apply="${idx}">${chosen?'Quitar aplicación':'Aplicar esta opción'}</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-apply]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = parseInt(btn.getAttribute('data-apply'));
+      state.appliedOptionIndex = state.appliedOptionIndex===idx ? null : idx;
+      fullRefresh();
+    });
+  });
+}
+
+/* =========================================================================
+   PRUEBAS
+   ========================================================================= */
+function runTests(){
+  const results = [];
+  function assertEq(name, actual, expected){
+    const pass = JSON.stringify(actual)===JSON.stringify(expected);
+    results.push({name, pass, actual, expected});
+  }
+  assertEq('advanceWeek(13) vuelve a 1', advanceWeek(13), 1);
+  assertEq('advanceWeek(1) avanza a 2', advanceWeek(1), 2);
+  assertEq('weekTypeOf(1) es JV', weekTypeOf(1), 'JV');
+  assertEq('weekTypeOf(13) es SD', weekTypeOf(13), 'SD');
+  assertEq('forwardDistance(13,1) = 1 (avanzar, nunca retroceder)', forwardDistance(13,1), 1);
+  assertEq('forwardDistance(1,13) = 12', forwardDistance(1,13), 12);
+  assertEq('desfase 2 -> 0 coincidencias', coincidenceByDiff(2).same, 0);
+  assertEq('desfase 3 -> 0 coincidencias', coincidenceByDiff(3).same, 0);
+  assertEq('desfase 6 -> 0 coincidencias', coincidenceByDiff(6).same, 0);
+  assertEq('desfase 7 -> 0 coincidencias', coincidenceByDiff(7).same, 0);
+  assertEq('desfase 10 -> 0 coincidencias', coincidenceByDiff(10).same, 0);
+  assertEq('desfase 11 -> 0 coincidencias', coincidenceByDiff(11).same, 0);
+  assertEq('desfase 4 -> 9 coincidencias', coincidenceByDiff(4).same, 9);
+  assertEq('desfase 5 -> 5 coincidencias', coincidenceByDiff(5).same, 5);
+  assertEq('desfase 8 -> 5 coincidencias', coincidenceByDiff(8).same, 5);
+  assertEq('desfase 1 -> 1 coincidencia', coincidenceByDiff(1).same, 1);
+  assertEq('desfase 12 -> 1 coincidencia', coincidenceByDiff(12).same, 1);
+  assertEq('LD y SD comparten Domingo', overlapDays(PAIR_INFO.LD.days, PAIR_INFO.SD.days), ['Dom']);
+
+  const group = computeMaxMutualSafeGroup();
+  assertEq('máximo de personas mutuamente sin coincidir = 3', group.length, 3);
+  let allSafe = true;
+  for(let i=0;i<group.length;i++) for(let j=i+1;j<group.length;j++){
+    if(simulatePairCoincidence(group[i],group[j]).same!==0) allSafe=false;
+  }
+  assertEq('el grupo encontrado realmente no coincide nunca entre sí', allSafe, true);
+
+  const ref = new Date(2026,8,21); // lunes 21/09/2026
+  const target = new Date(2026,9,12); // lunes 12/10/2026
+  assertEq('21/09/2026 a 12/10/2026 son 3 semanas', weeksElapsedBetween(ref,target), 3);
+  assertEq('semana 1 tras 3 semanas es la 4', advanceWeek(1,3), 4);
+
+  const table = document.getElementById('testResults');
+  const passCount = results.filter(r=>r.pass).length;
+  table.innerHTML = `<div class="${passCount===results.length?'ok-box':'error-box'}">${passCount}/${results.length} pruebas correctas</div>` +
+    results.map(r=>`<div class="test-item ${r.pass?'test-pass':'test-fail'}">${r.pass?'✅':'❌'} ${r.name}${r.pass?'':` — obtenido: ${JSON.stringify(r.actual)}, esperado: ${JSON.stringify(r.expected)}`}</div>`).join('');
+}
+
+/* =========================================================================
+   EXPORTACION PDF
+   ========================================================================= */
+function exportPdf(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  let y = 30;
+  doc.setFontSize(16);
+  doc.text('Simulador de Turnos Rotativos — 13 semanas', 30, y);
+  y += 16;
+  doc.setFontSize(9);
+  doc.text(`Fecha objetivo: ${state.targetDate?fmtDate(state.targetDate):'-'}  |  Referencia: ${state.refDate?fmtDate(state.refDate):'-'}`, 30, y);
+  y += 14;
+
+  // Esquema
+  const byWeek = {}; for(let w=1;w<=13;w++) byWeek[w]=[];
+  nonFixedWorkers().forEach(w=>{ const wk=proposedWeekAt(w,0); if(wk) byWeek[wk].push(w.name); });
+  const esquemaRows = [];
+  for(let w=1; w<=13; w++){ esquemaRows.push([w, weekTypeOf(w), byWeek[w].join(', ')||'—']); }
+  doc.autoTable({ startY:y, head:[['Semana','Tipo','Personas']], body:esquemaRows, styles:{fontSize:8}, margin:{left:30,right:30} });
+  y = doc.lastAutoTable.finalY + 16;
+
+  // Cambios propuestos
+  const cambiosRows = movableWorkers().map(w=>{
+    const sq = statusQuoWeekAt(w,0), pw = proposedWeekAt(w,0);
+    return [w.name, `${sq} (${weekTypeOf(sq)})`, `${pw} (${weekTypeOf(pw)})`, forwardDistance(sq,pw)||'—'];
+  });
+  if(cambiosRows.length){
+    doc.addPage();
+    y=30;
+    doc.setFontSize(13); doc.text('Cambios propuestos', 30, y); y+=10;
+    doc.autoTable({ startY:y, head:[['Persona','Semana actual','Semana propuesta','Adelanta']], body:cambiosRows, styles:{fontSize:8}, margin:{left:30,right:30} });
+  }
+
+  // Cobertura
+  const actual = computeCoverageGrid(false), propuesta = computeCoverageGrid(true);
+  const covHead = ['Semana', ...DAY_ORDER.flatMap(d=>[d+' Act.', d+' Prop.'])];
+  const covRows = [];
+  for(let n=0;n<13;n++){
+    covRows.push(['Sem+'+n, ...DAY_ORDER.flatMap(d=>[actual[n][d], propuesta[n][d]])]);
+  }
+  doc.addPage(); y=30;
+  doc.setFontSize(13); doc.text('Cobertura por día — Actual vs Propuesta', 30, y); y+=10;
+  doc.autoTable({ startY:y, head:[covHead], body:covRows, styles:{fontSize:6.5}, margin:{left:20,right:20} });
+
+  doc.save('turnos-rotativos.pdf');
+}
+
+/* =========================================================================
+   EXPORTACION EXCEL
+   ========================================================================= */
+async function exportXlsx(){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Simulador de Turnos Rotativos';
+
+  const wsDatos = wb.addWorksheet('Datos');
+  wsDatos.addRow(['Nombre','Área','Semana actual','Fijo','Ancla']);
+  state.workers.forEach(w=>{ wsDatos.addRow([w.name, w.area, w.fixed?'':w.currentWeek, w.fixed?'Sí':'No', w.isAnchor?'Sí':'No']); });
+  wsDatos.columns.forEach(c=>c.width=18);
+
+  const wsSim = wb.addWorksheet('Simulación 13 semanas');
+  const header = ['Persona']; for(let n=0;n<13;n++) header.push('Sem+'+n);
+  wsSim.addRow(header);
+  const fillFor = {JV:'FFCFE0FF', MM:'FFFFE3B0', LD:'FFE5D4FF', SD:'FFD3F5E2', FIXED:'FFC9CEDE'};
+  nonFixedWorkers().forEach(w=>{
+    const startWeek = proposedWeekAt(w,0);
+    const row = [w.name];
+    for(let n=0;n<13;n++){ const wk = advanceWeek(startWeek,n); row.push(weekTypeOf(wk)+' (sem '+wk+')'); }
+    const r = wsSim.addRow(row);
+    for(let n=0;n<13;n++){ const wk=advanceWeek(startWeek,n); r.getCell(n+2).fill = {type:'pattern',pattern:'solid',fgColor:{argb:fillFor[weekTypeOf(wk)]}}; }
+  });
+  state.workers.filter(w=>w.fixed).forEach(w=>{
+    const row = [w.name+' (fijo)']; for(let n=0;n<13;n++) row.push('SD (fijo)');
+    const r = wsSim.addRow(row);
+    for(let n=0;n<13;n++) r.getCell(n+2).fill = {type:'pattern',pattern:'solid',fgColor:{argb:fillFor.FIXED}};
+  });
+  wsSim.columns.forEach(c=>c.width=14);
+
+  const wsCambios = wb.addWorksheet('Cambios propuestos');
+  wsCambios.addRow(['Persona','Semana actual','Semana propuesta','Adelanta']);
+  movableWorkers().forEach(w=>{
+    const sq = statusQuoWeekAt(w,0), pw = proposedWeekAt(w,0);
+    wsCambios.addRow([w.name, sq, pw, forwardDistance(sq,pw)]);
+  });
+  wsCambios.columns.forEach(c=>c.width=18);
+
+  const wsCov = wb.addWorksheet('Cobertura');
+  const covHeader = ['Semana']; DAY_ORDER.forEach(d=>{ covHeader.push(d+' Actual'); covHeader.push(d+' Propuesta'); });
+  wsCov.addRow(covHeader);
+  const actual = computeCoverageGrid(false), propuesta = computeCoverageGrid(true);
+  for(let n=0;n<13;n++){
+    const row = ['Sem+'+n];
+    DAY_ORDER.forEach(d=>{ row.push(actual[n][d]); row.push(propuesta[n][d]); });
+    wsCov.addRow(row);
+  }
+  // formula row: promedio con fórmula real de Excel
+  const avgRowIdx = wsCov.rowCount+1;
+  const avgRow = ['Promedio (fórmula)'];
+  DAY_ORDER.forEach((d,i)=>{
+    const colActual = 2 + i*2, colProp = 3 + i*2;
+    const colLetterA = wsCov.getColumn(colActual).letter, colLetterP = wsCov.getColumn(colProp).letter;
+    avgRow.push({formula:`AVERAGE(${colLetterA}2:${colLetterA}${wsCov.rowCount})`});
+    avgRow.push({formula:`AVERAGE(${colLetterP}2:${colLetterP}${wsCov.rowCount})`});
+  });
+  wsCov.addRow(avgRow);
+  wsCov.columns.forEach(c=>c.width=13);
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/octet-stream'});
+  saveAs(blob, 'turnos-rotativos.xlsx');
+}
+
+/* =========================================================================
+   MENSAJES / VALIDACIONES
+   ========================================================================= */
+function renderDateMsg(){
+  const el = document.getElementById('dateMsg');
+  if(!state.refDate || !state.targetDate){ el.textContent = 'Ingresa ambas fechas.'; return; }
+  const msgs = [];
+  if(!isMonday(state.refDate)) msgs.push('La fecha de referencia no es lunes.');
+  if(!isMonday(state.targetDate)) msgs.push('La fecha objetivo no es lunes.');
+  const steps = stepsToTarget();
+  msgs.push(`Semanas transcurridas: ${steps}${steps<0?' (fecha objetivo anterior a la referencia — revisa las fechas)':''}`);
+  el.innerHTML = msgs.join(' · ');
+}
+
+/* =========================================================================
+   REFRESH GENERAL
+   ========================================================================= */
+function fullRefresh(){
+  renderWorkerList();
+  populateSelects();
+  renderWeightList();
+  renderPairList();
+  renderNeverList();
+  renderDateMsg();
+  renderEsquema();
+  renderSimulacion();
+  renderCambios();
+  renderCobertura();
+  saveState();
+}
+
+/* =========================================================================
+   EVENTOS
+   ========================================================================= */
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('section.tab').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+btn.getAttribute('data-tab')).classList.add('active');
+});
+
+document.getElementById('btnParseWorkers').addEventListener('click', ()=>{
+  const text = document.getElementById('inputWorkers').value;
+  const {workers, errors} = parseWorkersText(text);
+  state.workers = workers;
+  state.samePairs = []; state.neverPairs = []; state.weights = {}; state.optMovableIds=[]; state.appliedOptionIndex=null; state.optResults=[];
+  document.getElementById('parseMsg').textContent = errors.length ? `${workers.length} cargadas, ${errors.length} con error: ${errors.join(' | ')}` : `${workers.length} personas cargadas correctamente.`;
+  fullRefresh();
+});
+
+document.getElementById('btnAddWorkerRow').addEventListener('click', ()=>{
+  const name = prompt('Nombre:'); if(!name) return;
+  const area = prompt('Área:','General') || 'General';
+  const fixedAns = confirm('¿Es turno fijo (lunes a viernes, libre sábado-domingo)? Aceptar = Sí');
+  let currentWeek = null;
+  if(!fixedAns){
+    const w = parseInt(prompt('Semana actual del ciclo (1-13):','1'),10);
+    currentWeek = (isNaN(w)||w<1||w>13) ? 1 : w;
+  }
+  state.workers.push({id:newId(), name, area, currentWeek, fixed:fixedAns, isAnchor:false});
+  fullRefresh();
+});
+
+document.getElementById('refDate').addEventListener('change', (e)=>{ state.refDate = parseDateInput(e.target.value); fullRefresh(); });
+document.getElementById('targetDate').addEventListener('change', (e)=>{ state.targetDate = parseDateInput(e.target.value); fullRefresh(); });
+
+document.getElementById('anchorSelect').addEventListener('change', (e)=>{
+  const selected = Array.from(e.target.selectedOptions).map(o=>o.value);
+  state.workers.forEach(w=>{ w.isAnchor = selected.includes(w.id); });
+  fullRefresh();
+});
+
+document.getElementById('btnAddPair').addEventListener('click', ()=>{
+  const a = document.getElementById('pairA').value, b = document.getElementById('pairB').value;
+  if(!a||!b||a===b) return;
+  state.samePairs.push([a,b]);
+  fullRefresh();
+});
+document.getElementById('btnAddNever').addEventListener('click', ()=>{
+  const a = document.getElementById('neverA').value, b = document.getElementById('neverB').value;
+  if(!a||!b||a===b) return;
+  state.neverPairs.push([a,b]);
+  fullRefresh();
+});
+
+document.getElementById('highlightPerson').addEventListener('change', (e)=>{ state.highlightId = e.target.value || null; renderSimulacion(); saveState(); });
+
+document.getElementById('optMovable').addEventListener('change', (e)=>{
+  state.optMovableIds = Array.from(e.target.selectedOptions).map(o=>o.value);
+  saveState();
+});
+document.getElementById('btnRunOptimizer').addEventListener('click', ()=>{
+  document.getElementById('optStatus').textContent = 'Calculando...';
+  setTimeout(()=>{
+    const runResult = runOptimizer(state.optMovableIds);
+    state.optResults = runResult.results;
+    state.appliedOptionIndex = null;
+    document.getElementById('optStatus').textContent = `${runResult.results.length} opciones encontradas.`;
+    renderOptimizerResults(runResult);
+    saveState();
+  }, 20);
+});
+
+document.getElementById('btnRunTests').addEventListener('click', runTests);
+document.getElementById('btnExportPdf').addEventListener('click', exportPdf);
+document.getElementById('btnExportXlsx').addEventListener('click', exportXlsx);
+
+/* =========================================================================
+   DATOS DE EJEMPLO / INICIALIZACION
+   ========================================================================= */
+const SAMPLE_TEXT = `Trabajador A;Ventas;1;no
+Trabajador B;Ventas;2;no
+Trabajador C;Ventas;3;no
+Trabajador D;Caja;4;no
+Trabajador E;Caja;7;no
+Trabajador F;Bodega;5;no
+Trabajador G;Bodega;9;no
+Jefa de Área;Jefatura;1;no
+Trabajador H;Ventas;1;si`;
+
+function init(){
+  const loaded = loadState();
+  if(!loaded || state.workers.length===0){
+    document.getElementById('inputWorkers').value = SAMPLE_TEXT;
+    const {workers} = parseWorkersText(SAMPLE_TEXT);
+    state.workers = workers;
+    const jefa = state.workers.find(w=>w.name==='Jefa de Área');
+    if(jefa) jefa.isAnchor = true;
+    const a = state.workers.find(w=>w.name==='Trabajador A');
+    const b = state.workers.find(w=>w.name==='Trabajador B');
+    if(a&&b) state.samePairs.push([a.id,b.id]);
+    const c = state.workers.find(w=>w.name==='Trabajador C');
+    if(c&&jefa){ state.neverPairs.push([c.id, jefa.id]); state.weights[c.id]=2; }
+    state.refDate = new Date(2026,8,21);
+    state.targetDate = new Date(2026,8,21);
+  } else {
+    document.getElementById('inputWorkers').value = SAMPLE_TEXT;
+  }
+  if(state.refDate) document.getElementById('refDate').value = state.refDate.toISOString().slice(0,10);
+  if(state.targetDate) document.getElementById('targetDate').value = state.targetDate.toISOString().slice(0,10);
+  fullRefresh();
+}
+init();
+</script>
+</body>
+</html>

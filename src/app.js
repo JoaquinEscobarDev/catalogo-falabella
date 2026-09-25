@@ -13,6 +13,7 @@ app.get('/qr-iphone',            (req, res) => res.sendFile(path.join(__dirname,
 app.get('/encuesta/:tienda',     (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'encuesta.html')));
 app.get('/dashboard-encuestas',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard-encuestas.html')));
 app.get('/qr-encuestas',         (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'qr-encuestas.html')));
+app.get('/turnos-rotativos',     (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'turnos-rotativos.html')));
 
 // Respuestas de API nunca se deben cachear en el navegador
 app.use('/api', (req, res, next) => {

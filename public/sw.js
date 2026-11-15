@@ -1,4 +1,4 @@
-const CACHE = 'catalogo-v9';
+const CACHE = 'catalogo-v10';
 
 // index.html NO está en esta lista: siempre debe venir de la red para
 // evitar desincronización entre HTML cacheado y JS/CSS nuevos.

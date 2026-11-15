@@ -54,6 +54,11 @@ async function getCategoryName(sku) {
   return r.rows[0]?.nombre || null;
 }
 
+async function findMarcas() {
+  const { rows } = await db.query(`SELECT DISTINCT marca FROM products WHERE marca IS NOT NULL AND marca <> ''`);
+  return rows.map(r => r.marca);
+}
+
 async function findAllSkus() {
   const { rows } = await db.query('SELECT sku FROM products ORDER BY sku');
   return rows.map(r => r.sku);
@@ -149,5 +154,5 @@ async function search(q) {
 
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getCategoryName, findAllSkus, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
+  getPriceData, getCategoryName, findAllSkus, findMarcas, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
 };

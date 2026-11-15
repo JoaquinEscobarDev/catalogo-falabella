@@ -18,6 +18,7 @@
 //   node scripts/worker-telefono.js            queda corriendo
 //   node scripts/worker-telefono.js --probar       prueba unos productos y sale
 //   node scripts/worker-telefono.js --diagnostico  muestra qué responde Falabella
+//   node scripts/worker-telefono.js --cupones      busca cupones de campaña ahora y muestra cuáles encontró
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -57,6 +58,40 @@ async function probar() {
 
 // Muestra qué responde Falabella a cada variante de curl, usando el producto
 // actualizado más recientemente (el que con más seguridad sigue existiendo).
+// Busca los cupones de la página de cupones de Falabella, los guarda y muestra
+// qué encontró, incluido lo que no supo interpretar (para poder mejorarlo).
+async function cupones() {
+  const cuponesAutoService = require('../src/services/cuponesAutoService');
+  const fmt = n => `$${Number(n).toLocaleString('es-CL')}`;
+  console.log('Buscando cupones en la página de cupones de Falabella...\n');
+  const r = await cuponesAutoService.buscar({ log: () => {} });
+
+  for (const p of r.resumen.paginas) {
+    console.log(p.ok
+      ? `Página leída (${p.kb} KB, ${p.nextData ? 'con' : 'sin'} datos internos): ${p.cupones} cupones con marca, ${p.sinMarca} sin marca`
+      : `No se pudo leer ${p.url}: ${p.error}`);
+  }
+  if (r.cupones.length) {
+    console.log('\nAplicados automáticamente:');
+    for (const c of r.cupones) {
+      const desc = c.tipo === 'porcentaje' ? `${c.valor}%` : fmt(c.valor);
+      const extra = [c.tope && `tope ${fmt(c.tope)}`, c.minimo && `mínimo ${fmt(c.minimo)}`, c.soloCMR && 'solo CMR', c.vence && `hasta ${c.vence}`].filter(Boolean).join(', ');
+      console.log(`  ${c.codigo} — ${desc}${extra ? ` (${extra})` : ''} — ${c.alcance === 'todos' ? 'todo el sitio' : `marca ${c.alcanceValor}`}`);
+    }
+  }
+  if (r.sinAlcance.length) {
+    console.log('\nEncontrados pero sin marca de tu catálogo (no se aplican):');
+    for (const c of r.sinAlcance) console.log(`  ${c.codigo} — ${c.texto.slice(0, 110)}`);
+  }
+  if (r.candidatos.length) {
+    console.log('\nTextos con "cupón" que no se pudieron interpretar:');
+    for (const t of r.candidatos.slice(0, 8)) console.log(`  · ${t.slice(0, 140)}`);
+  }
+  if (r.resumen.ok && !r.cupones.length && !r.sinAlcance.length && !r.candidatos.length) {
+    console.log('\nLa página no menciona cupones en texto (pueden estar solo como imágenes).');
+  }
+}
+
 async function diagnostico() {
   const { rows } = await db.query(
     'SELECT sku FROM products WHERE nombre IS NOT NULL ORDER BY price_updated_at DESC NULLS LAST LIMIT 1'
@@ -72,8 +107,9 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  if (process.argv.includes('--probar') || process.argv.includes('--diagnostico')) {
-    await (process.argv.includes('--probar') ? probar() : diagnostico());
+  const modo = ['--probar', '--diagnostico', '--cupones'].find(m => process.argv.includes(m));
+  if (modo) {
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones })[modo]();
     await db.end();
     return;
   }

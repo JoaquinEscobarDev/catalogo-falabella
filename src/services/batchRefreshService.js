@@ -5,6 +5,7 @@ const db = require('../config/database');
 const env = require('../config/env');
 const productService = require('./productService');
 const scraperService = require('./scraperService');
+const cuponesAutoService = require('./cuponesAutoService');
 const stockService = require('./stockService');
 const productsRepository = require('../repositories/productsRepository');
 const refreshRequestsRepository = require('../repositories/refreshRequestsRepository');
@@ -133,6 +134,10 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
   let r = { ok: 0, fail: 0, cambios: 0, viaDirecta: 0, bloqueado: false };
   let estado = 'error';
   try {
+    // Cupones de campaña de la página de cupones: tarda unos segundos y, si
+    // falla, el refresh de precios sigue igual.
+    await cuponesAutoService.buscar({ log }).catch(e => log(`Cupones automáticos: error (${e.message}).`));
+
     r = await refrescarSkus(skus, {
       fetchFn, log,
       antesDelPrimerOk: limpiar ? async () => {

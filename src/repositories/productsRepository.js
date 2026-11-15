@@ -54,6 +54,31 @@ async function getCategoryName(sku) {
   return r.rows[0]?.nombre || null;
 }
 
+// Cupones vistos en la ficha de cada producto. Solo de productos actualizados
+// en los últimos 3 días: si la ficha ya no muestra el cupón, el refresh lo
+// borra (products.cupon = NULL) y deja de aparecer.
+async function findCuponesEnFichas() {
+  const { rows } = await db.query(`
+    SELECT p.sku, p.nombre, p.marca, p.cupon, c.nombre AS categoria
+    FROM products p JOIN categories c ON c.id = p.category_id
+    WHERE p.cupon IS NOT NULL AND p.price_updated_at > NOW() - INTERVAL '3 days'
+    ORDER BY p.nombre
+  `);
+  return rows;
+}
+
+// Cuántos productos hay por marca y por categoría, para decir a cuántos
+// productos aplica cada cupón.
+async function contarProductos() {
+  const [marcas, categorias, total] = await Promise.all([
+    db.query(`SELECT UPPER(marca) AS clave, COUNT(*)::int AS n FROM products WHERE marca IS NOT NULL GROUP BY UPPER(marca)`),
+    db.query(`SELECT c.nombre AS clave, COUNT(*)::int AS n FROM products p JOIN categories c ON c.id = p.category_id GROUP BY c.nombre`),
+    db.query(`SELECT COUNT(*)::int AS n FROM products`),
+  ]);
+  const aObjeto = rows => Object.fromEntries(rows.map(r => [r.clave, r.n]));
+  return { porMarca: aObjeto(marcas.rows), porCategoria: aObjeto(categorias.rows), total: total.rows[0].n };
+}
+
 async function findMarcas() {
   const { rows } = await db.query(`SELECT DISTINCT marca FROM products WHERE marca IS NOT NULL AND marca <> ''`);
   return rows.map(r => r.marca);
@@ -154,5 +179,5 @@ async function search(q) {
 
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getCategoryName, findAllSkus, findMarcas, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
+  getPriceData, getCategoryName, findAllSkus, findMarcas, findCuponesEnFichas, contarProductos, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
 };

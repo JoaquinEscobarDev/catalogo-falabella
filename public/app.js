@@ -1323,6 +1323,52 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
     return `🤖 Última búsqueda automática (${cuando}): ${b.aplicados} cupón(es) aplicados por marca.`;
   }
 
+  const FUENTES = {
+    pagina: '🤖 Página de cupones',
+    ficha:  '🏷️ Ficha del producto',
+    manual: '✍️ Agregado a mano',
+  };
+
+  function alcanceCupon(c, conteo) {
+    const n = cant => (cant ? ` · ${cant} producto${cant === 1 ? '' : 's'}` : '');
+    if (c.fuente === 'ficha') {
+      const nombres = c.ejemplos.map(p => p.nombre || p.sku).join(', ');
+      const resto = c.productos - c.ejemplos.length;
+      return `${c.productos} producto${c.productos === 1 ? '' : 's'}: ${nombres}${resto > 0 ? ` y ${resto} más` : ''}`;
+    }
+    switch (c.alcance) {
+      case 'todos':     return `Todos los productos${n(conteo?.total)}`;
+      case 'marca':     return `Marca ${c.alcanceValor}${n(conteo?.porMarca?.[String(c.alcanceValor).toUpperCase()])}`;
+      case 'categoria': return `Categoría ${c.alcanceValor}${n(conteo?.porCategoria?.[c.alcanceValor])}`;
+      case 'sku':       return `SKU ${c.alcanceValor}`;
+      default:          return '';
+    }
+  }
+
+  function itemCupon(c, conteo) {
+    const descuento = c.tipo
+      ? descripcionCupon(c).split('<br>')[0]
+      : esc(c.texto || 'Cupón disponible, sin monto informado');
+    let vence = '';
+    if (c.vence) {
+      const [a, m, d] = c.vence.split('-');
+      vence = ` · vence el ${d}/${m}/${a}`;
+    }
+    return `
+      <li class="cupon-item">
+        <div class="cupon-item-cuerpo">
+          <div class="cupon-item-fila">
+            <span class="cupon-item-codigo">${c.codigo ? esc(c.codigo) : 'Sin código'}</span>
+            <span class="cupon-item-fuente cupon-fuente-${c.fuente}">${FUENTES[c.fuente]}</span>
+          </div>
+          <div class="cupon-item-desc">${descuento}</div>
+          <div class="cupon-item-alcance">${esc(alcanceCupon(c, conteo))}${vence}</div>
+          ${c.fuente === 'pagina' && c.texto ? `<div class="cupon-item-texto">“${esc(c.texto.slice(0, 160))}”</div>` : ''}
+        </div>
+        ${c.fuente === 'manual' ? `<button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>` : ''}
+      </li>`;
+  }
+
   async function cargarCupones() {
     let datos;
     try {
@@ -1333,24 +1379,21 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
       return;
     }
     // Compatibilidad: versiones anteriores del servidor devolvían solo la lista.
-    const cupones = Array.isArray(datos) ? datos : (datos?.cupones || []);
+    const tabla  = Array.isArray(datos) ? datos : (datos?.cupones || []);
+    const fichas = Array.isArray(datos) ? [] : (datos?.enFichas || []);
+    const conteo = Array.isArray(datos) ? null : datos?.conteo;
+
+    const todos = [
+      ...tabla.map(c => ({ ...c, fuente: c.origen === 'automatico' ? 'pagina' : 'manual' })),
+      ...fichas.map(c => ({ ...c, fuente: 'ficha' })),
+    ].sort((x, y) => (y.tipo ? 1 : 0) - (x.tipo ? 1 : 0)); // primero los que traen descuento
+
     const estadoBusqueda = Array.isArray(datos) ? '' : `<li class="cupones-busqueda">${esc(textoBusqueda(datos?.busqueda))}</li>`;
-    if (!cupones.length) {
-      cuponesLista.innerHTML = estadoBusqueda + '<li class="cupones-vacio">No hay cupones cargados.</li>';
-      return;
-    }
-    cuponesLista.innerHTML = estadoBusqueda + cupones.map(c => {
-      const auto = c.origen === 'automatico';
-      return `
-      <li class="cupon-item${c.vencido ? ' cupon-item-vencido' : ''}">
-        <div>
-          <span class="cupon-item-codigo">${esc(c.codigo)}</span>${c.vencido ? ' <span class="cupon-item-tag">Vencido</span>' : ''}${auto ? ' <span class="cupon-item-auto">🤖 Automático</span>' : ''}
-          <div class="cupon-item-desc">${descripcionCupon(c)}</div>
-          ${auto && c.texto ? `<div class="cupon-item-texto">“${esc(c.texto.slice(0, 160))}”</div>` : ''}
-        </div>
-        ${auto ? '' : `<button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>`}
-      </li>`;
-    }).join('');
+    const titulo = `<li class="cupones-titulo">Cupones vigentes (${todos.length})</li>`;
+    cuponesLista.innerHTML = titulo + estadoBusqueda + (todos.length
+      ? todos.map(c => itemCupon(c, conteo)).join('')
+      : '<li class="cupones-vacio">No hay cupones vigentes por ahora.</li>');
+
     cuponesLista.querySelectorAll('.cupon-item-borrar').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('¿Eliminar este cupón?')) return;

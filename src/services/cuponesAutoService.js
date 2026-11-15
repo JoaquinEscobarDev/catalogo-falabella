@@ -29,6 +29,7 @@ async function buscar({ log = () => {} } = {}) {
   const resumen = { en: new Date().toISOString(), ok: false, aplicados: 0, sinMarca: 0, paginas: [] };
   const cupones = [];
   const sinAlcance = [];
+  const sinMonto = [];
   const candidatos = [];
 
   for (const url of urls()) {
@@ -40,6 +41,7 @@ async function buscar({ log = () => {} } = {}) {
       resumen.paginas.push({ url, ok: true, kb: Math.round(html.length / 1024), nextData: r.tieneNextData, cupones: r.cupones.length, sinMarca: r.sinAlcance.length });
       cupones.push(...r.cupones);
       sinAlcance.push(...r.sinAlcance);
+      sinMonto.push(...(r.sinMonto || []));
       candidatos.push(...r.candidatos);
     } catch (e) {
       resumen.paginas.push({ url, ok: false, error: e.message });
@@ -60,9 +62,9 @@ async function buscar({ log = () => {} } = {}) {
   if (!resumen.ok) {
     log(`Cupones automáticos: no se pudo leer la página de cupones (${resumen.paginas.map(p => p.error).join('; ')}).`);
   } else {
-    log(`Cupones automáticos: ${unicos.length} aplicados por marca${sinAlcance.length ? `, ${sinAlcance.length} sin marca reconocible` : ''}.`);
+    log(`Cupones automáticos: ${unicos.length} aplicados${sinAlcance.length ? `, ${sinAlcance.length} sin marca reconocible` : ''}.`);
   }
-  return { resumen, cupones: unicos, sinAlcance, candidatos };
+  return { resumen, cupones: unicos, sinAlcance, sinMonto, candidatos };
 }
 
 async function ultimoResumen() {

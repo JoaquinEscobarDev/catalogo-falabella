@@ -193,6 +193,7 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
       origen: c.origen === 'automatico' ? 'falabella' : 'manual',
       id: c.id, codigo: c.codigo, tipo: c.tipo, valor: c.valor,
       tope: c.tope, minimo: c.minimo, soloCMR: c.soloCMR, texto: c.texto || null, vence: c.vence,
+      general: !!c.general,
     });
   }
 

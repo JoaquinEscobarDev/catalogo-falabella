@@ -819,6 +819,43 @@ function contextoCupon(sku, fetchFn) {
   return contextoFicha(sku, { reTexto: /cup[oó]n|coupon/i, reClave: /coupon|cup[oó]n/i, nada: 'la ficha no menciona cupones.' }, fetchFn);
 }
 
+// Diagnóstico: lee la colección "Falabella Connect" (equipos vendidos con
+// plan) y muestra cómo vienen sus productos, para saber de dónde sacar la
+// compañía, el valor del plan y el precio del equipo con plan.
+async function diagnosticoColeccionConnect() {
+  const url = `${env.falabellaBaseUrl}/falabella-cl/collection/falabella-connect`;
+  const { http, html } = await fetchPagina(url);
+  const lineas = [`Colección Falabella Connect: HTTP ${http} · ${Math.round(html.length / 1024)} KB`];
+  const titulo = (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+  if (titulo) lineas.push(`título: ${titulo.trim().slice(0, 100)}`);
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) { lineas.push('La página no trae datos internos.'); return lineas; }
+  const pp = JSON.parse(m[1])?.props?.pageProps || {};
+  const results = pp.results || pp.initialData?.state?.results || pp.searchResult?.state?.results || [];
+  lineas.push(`productos en la página: ${results.length}${pp.pagination ? ` · total ${pp.pagination.count ?? '?'}` : ''}`);
+  if (!results.length) { lineas.push(`claves de la página: ${Object.keys(pp).slice(0, 12).join(', ')}`); return lineas; }
+
+  const RE = /plan|entel|movistar|\bwom\b|claro|mensual|portab|l[ií]nea nueva|operator|operador/i;
+  const corto = v => String(typeof v === 'object' ? JSON.stringify(v) : v).replace(/\s+/g, ' ').slice(0, 110);
+  lineas.push(`campos de un producto: ${Object.keys(results[0]).join(', ').slice(0, 300)}`);
+  for (const item of results.slice(0, 4)) {
+    lineas.push('', `• ${item.displayName || item.name} (id ${item.skuId || item.productId || item.id})`);
+    for (const p of item.prices || []) lineas.push(`  precio ${p.type}: ${corto(p.price)}${p.label ? ` (${p.label})` : ''}`);
+    let n = 0;
+    (function visitar(nodo, ruta, prof) {
+      if (nodo == null || prof > 6 || n >= 6) return;
+      if (typeof nodo === 'string') { if (RE.test(nodo) || RE.test(ruta)) { lineas.push(`  ${ruta}: ${corto(nodo)}`); n++; } return; }
+      if (typeof nodo !== 'object') return;
+      for (const [k, v] of Object.entries(nodo)) {
+        if (k === 'prices' || k === 'displayName') continue;
+        visitar(v, Array.isArray(nodo) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k), prof + 1);
+      }
+    })(item, '', 0);
+    lineas.push(`  la app lee: ${JSON.stringify(detectarPlan(item))}`);
+  }
+  return lineas;
+}
+
 function contextoPlan(sku, fetchFn) {
   return contextoFicha(sku, {
     reTexto: /\b(entel|movistar|wom|claro)\b|portabilidad|l[ií]nea nueva|\/mes|mensual|\bplan\b/i,
@@ -830,6 +867,7 @@ function contextoPlan(sku, fetchFn) {
 module.exports = {
   contextoCupon,
   contextoPlan,
+  diagnosticoColeccionConnect,
   fetchPagina,
   hayInternet,
   diagnostico,

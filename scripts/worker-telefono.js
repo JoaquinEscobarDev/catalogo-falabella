@@ -21,6 +21,7 @@
 //   node scripts/worker-telefono.js --cupones      busca cupones de campaña ahora y muestra cuáles encontró
 //   node scripts/worker-telefono.js --cupon-producto SKU   muestra qué dice la ficha de ese producto sobre su cupón
 //   node scripts/worker-telefono.js --plan-producto SKU    muestra qué dice la ficha de un equipo Connect sobre su plan
+//   node scripts/worker-telefono.js --connect-coleccion    muestra cómo vienen los equipos de la colección Falabella Connect
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -78,16 +79,20 @@ async function cupones() {
     for (const c of r.cupones) {
       const desc = c.tipo === 'porcentaje' ? `${c.valor}%` : fmt(c.valor);
       const extra = [c.tope && `tope ${fmt(c.tope)}`, c.minimo && `mínimo ${fmt(c.minimo)}`, c.soloCMR && 'solo CMR', c.vence && `hasta ${c.vence}`].filter(Boolean).join(', ');
-      console.log(`  ${c.codigo} — ${desc}${extra ? ` (${extra})` : ''} — ${c.alcance === 'todos' ? 'todo el sitio' : `marca ${c.alcanceValor}`}`);
+      console.log(`  ${c.codigo} — ${desc}${extra ? ` (${extra})` : ''} — ${c.alcance === 'todos' ? (c.general ? 'todo el sitio (cupón general de campaña)' : 'todo el sitio') : `marca ${c.alcanceValor}`}`);
+      if (c.texto) console.log(`     "${c.texto.slice(0, 200)}"`);
     }
   }
   if (r.sinAlcance.length) {
     console.log('\nEncontrados pero sin marca de tu catálogo (no se aplican):');
     for (const c of r.sinAlcance) console.log(`  ${c.codigo} — ${c.texto.slice(0, 110)}`);
   }
+  if (r.sinMonto?.length) {
+    console.log(`\nCódigos encontrados sin monto legible: ${r.sinMonto.join(', ')}`);
+  }
   if (r.candidatos.length) {
     console.log('\nTextos con "cupón" que no se pudieron interpretar:');
-    for (const t of r.candidatos.slice(0, 8)) console.log(`  · ${t.slice(0, 140)}`);
+    for (const t of r.candidatos.slice(0, 8)) console.log(`  · ${t.slice(0, 300)}`);
   }
   if (r.resumen.ok && !r.cupones.length && !r.sinAlcance.length && !r.candidatos.length) {
     console.log('\nLa página no menciona cupones en texto (pueden estar solo como imágenes).');
@@ -109,7 +114,7 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
@@ -124,7 +129,8 @@ async function main() {
       const { producto } = await scraperService.scrapeProducto(sku, scraperService.fetchDirectoConReintentos);
       console.log('', 'La app lee:', JSON.stringify(producto?.plan || null));
     };
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto })[modo]();
+    const coleccion = async () => { for (const l of await scraperService.diagnosticoColeccionConnect()) console.log(l); };
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion })[modo]();
     await db.end();
     return;
   }

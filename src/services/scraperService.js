@@ -227,6 +227,9 @@ async function fetchConPlaywrightFallback(url) {
         playwrightMarkSuccess();
         return html;
       } catch (pe) {
+        // BLOCKED = la página cargó pero sin datos (challenge). Cualquier otro
+        // mensaje es un problema del browser mismo y conviene verlo en el log.
+        if (pe.message !== 'BLOCKED') console.log(`playwright falló: ${String(pe.message).split('\n')[0]}`);
         if (attempt === PLAYWRIGHT_RETRIES) {
           playwrightMarkFailure();
           throw new Error('BLOCKED');
@@ -496,7 +499,98 @@ async function fetchStockEnVivo(sku) {
   return { stock: tienda.stockQuantity?.number ?? null, storeName: tienda.storeName };
 }
 
+// ── Diagnóstico ──
+// Prueba cada camino hacia Falabella por separado y cuenta qué pasó, para
+// distinguir "Cloudflare bloquea esta IP" de "el browser no arranca" sin
+// tener que leer los logs del servidor. Lo expone GET /api/diagnostico.
+
+function curlCrudo(url, { proxy = false, accept = 'text/html' } = {}) {
+  const args = [
+    '-sL', '-o', '-', '-D', '-',
+    '-H', `User-Agent: ${USER_AGENT}`,
+    '-H', `Accept: ${accept}`,
+    '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
+    '--max-time', '20',
+    '-w', '\n__CURL__ %{http_code} %{remote_ip} %{time_total}',
+  ];
+  if (proxy && env.proxyUrl) args.push('--proxy', env.proxyUrl);
+  args.push(url);
+  return new Promise(resolve => {
+    execFile('curl', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout = '') => {
+      const m = stdout.match(/\n__CURL__ (\d+) (\S*) (\S+)$/);
+      const cuerpo = m ? stdout.slice(0, m.index) : stdout;
+      const cabecera = n => (cuerpo.match(new RegExp(`^${n}:\\s*(.+)$`, 'im')) || [])[1]?.trim() || null;
+      resolve({
+        error: err ? String(err.message).split('\n')[0].slice(0, 200) : null,
+        http: m ? Number(m[1]) : null,
+        segundos: m ? Number(m[3]) : null,
+        bytes: cuerpo.length,
+        conDatos: cuerpo.includes('__NEXT_DATA__'),
+        titulo: (cuerpo.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1]?.trim().slice(0, 120) || null,
+        server: cabecera('server'),
+        cfMitigated: cabecera('cf-mitigated'),
+        cfRay: cabecera('cf-ray'),
+        muestra: cuerpo.includes('__NEXT_DATA__') ? null : cuerpo.replace(/\s+/g, ' ').slice(-300),
+      });
+    });
+  });
+}
+
+async function diagnosticoBrowser(url) {
+  const t = Date.now();
+  const r = { arranco: false, http: null, urlFinal: null, titulo: null, conDatos: false, error: null, segundos: null };
+  await playwrightSlot();
+  let page = null;
+  try {
+    await cerrarSesion(); // sesión limpia: que no influyan cookies de antes
+    const { context } = await obtenerSesion();
+    r.arranco = true;
+    page = await context.newPage();
+    const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    r.http = resp ? resp.status() : null;
+    await page.waitForFunction(
+      () => document.readyState !== 'loading' && document.getElementById('__NEXT_DATA__') !== null,
+      undefined,
+      { timeout: 20000 }
+    ).catch(() => {});
+    r.urlFinal = page.url();
+    r.titulo = (await page.title().catch(() => '')).slice(0, 120);
+    const html = await page.content();
+    r.conDatos = html.includes('__NEXT_DATA__');
+    if (!r.conDatos) r.muestra = (await page.evaluate(() => document.body?.innerText || '').catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+  } catch (e) {
+    r.error = String(e.message).split('\n')[0].slice(0, 300);
+  } finally {
+    await cerrarSesion();
+    playwrightRelease();
+    r.segundos = Math.round((Date.now() - t) / 100) / 10;
+  }
+  return r;
+}
+
+async function diagnostico(sku) {
+  const pagina = urlDirecta(sku);
+  const [ipSalida, curlDirecto, curlBusqueda, stock] = await Promise.all([
+    curlCrudo('https://api.ipify.org').then(x => (x.http === 200 ? x.muestra?.trim().split(' ').pop() : null) || x.error),
+    curlCrudo(pagina),
+    curlCrudo(urlBusqueda(sku)),
+    curlCrudo(`${env.falabellaBaseUrl}/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`, { accept: 'application/json' }),
+  ]);
+  const curlConProxy = env.proxyUrl ? await curlCrudo(pagina, { proxy: true }) : null;
+  const browser = await diagnosticoBrowser(pagina);
+
+  let conclusion;
+  if (curlDirecto.conDatos || curlBusqueda.conDatos) conclusion = 'OK: el servidor lee Falabella directo con curl.';
+  else if (curlConProxy?.conDatos) conclusion = 'OK: el servidor lee Falabella a través del proxy.';
+  else if (browser.conDatos) conclusion = 'OK: curl está bloqueado pero el browser pasa el challenge.';
+  else if (!browser.arranco || (browser.error && browser.http == null)) conclusion = 'PROBLEMA DEL BROWSER: Chromium no arrancó o no pudo navegar (ver browser.error). No es necesariamente un bloqueo.';
+  else conclusion = `BLOQUEADO: Falabella/Cloudflare rechaza a esta IP tanto por curl (HTTP ${curlDirecto.http}) como por browser (HTTP ${browser.http}).${env.proxyUrl ? ' El proxy configurado tampoco pasa.' : ' Hace falta un proxy residencial (PROXY_URL).'}`;
+
+  return { conclusion, sku, ipSalida, proxyConfigurado: !!env.proxyUrl, curlDirecto, curlBusqueda, curlConProxy, browser, stock };
+}
+
 module.exports = {
+  diagnostico,
   fetchDirectoConReintentos,
   fetchConPlaywrightFallback,
   scrapeProducto,

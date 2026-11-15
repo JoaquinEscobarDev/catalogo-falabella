@@ -7,5 +7,6 @@ router.post('/solicitar-refresh', refreshController.solicitar);
 router.get('/solicitar-refresh/:id', refreshController.estado);
 router.post('/refresh-total', refreshController.solicitarTotal);
 router.get('/estado', refreshController.resumen);
+router.get('/diagnostico', refreshController.diagnostico);
 
 module.exports = router;

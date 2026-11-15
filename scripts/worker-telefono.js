@@ -83,7 +83,8 @@ async function main() {
   await worker.iniciar({
     fetchFn: scraperService.fetchDirectoConReintentos,
     detalle: os.hostname(),
-    log: console.log,
+    // Con la hora adelante: sirve para ver el ritmo y cuándo se detuvo.
+    log: msg => console.log(String(msg).replace(/^(\s*)(OK|FAIL|\.\.\.)/, `$1${hora()} $2`)),
   });
 }
 

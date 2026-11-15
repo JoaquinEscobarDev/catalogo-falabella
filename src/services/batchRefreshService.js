@@ -41,7 +41,20 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
       if (i >= skus.length) return;
       const sku = skus[i];
       try {
-        const res = await productService.refreshSku(sku, fetchFn);
+        // Si lo que falla es la conexión a la base (la red del teléfono se
+        // cortó un momento), se espera y se reintenta el mismo producto: no
+        // es un bloqueo de Falabella y no debe contar como tal.
+        let res;
+        for (let intento = 1; ; intento++) {
+          try {
+            res = await productService.refreshSku(sku, fetchFn);
+            break;
+          } catch (e) {
+            if (!db.esErrorDeConexion(e) || intento >= 4) throw e;
+            log(`  ...  sin conexión a la base, reintentando ${sku} en 20 s`);
+            await new Promise(res2 => setTimeout(res2, 20000));
+          }
+        }
         if (!res.ok) throw new Error('sin datos');
         if (antesDelPrimerOk) await (limpieza ||= antesDelPrimerOk());
         r.ok++;
@@ -52,11 +65,11 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
         if (conStock) await stockService.refreshStock(sku).catch(() => {});
       } catch (e) {
         r.fail++;
-        fallosSeguidos++;
+        if (!db.esErrorDeConexion(e)) fallosSeguidos++;
         log(`  FAIL ${sku} - ${e.message}`);
       }
       hechos++;
-      if (onAvance) await onAvance(hechos, r);
+      if (onAvance) await Promise.resolve(onAvance(hechos, r)).catch(() => {});
       if (fallosSeguidos >= FALLOS_SEGUIDOS_PARA_CORTAR && !cortar) {
         cortar = true;
         log(`  Cortado: ${fallosSeguidos} productos seguidos sin respuesta (bloqueo de Falabella).`);

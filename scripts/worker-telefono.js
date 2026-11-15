@@ -20,6 +20,7 @@
 //   node scripts/worker-telefono.js --diagnostico  muestra qué responde Falabella
 //   node scripts/worker-telefono.js --cupones      busca cupones de campaña ahora y muestra cuáles encontró
 //   node scripts/worker-telefono.js --cupon-producto SKU   muestra qué dice la ficha de ese producto sobre su cupón
+//   node scripts/worker-telefono.js --plan-producto SKU    muestra qué dice la ficha de un equipo Connect sobre su plan
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -108,14 +109,22 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
       if (!sku) { console.log('Falta el SKU, por ejemplo: --cupon-producto 80659213'); return; }
       for (const l of await scraperService.contextoCupon(sku)) console.log(l);
     };
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto })[modo]();
+    const planProducto = async () => {
+      const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
+      if (!sku) { console.log('Falta el SKU, por ejemplo: --plan-producto 17354672'); return; }
+      for (const l of await scraperService.contextoPlan(sku)) console.log(l);
+      // Y lo que la app entiende hoy de esa ficha:
+      const { producto } = await scraperService.scrapeProducto(sku, scraperService.fetchDirectoConReintentos);
+      console.log('', 'La app lee:', JSON.stringify(producto?.plan || null));
+    };
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto })[modo]();
     await db.end();
     return;
   }

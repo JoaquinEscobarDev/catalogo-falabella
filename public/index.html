@@ -22,6 +22,7 @@
       </div>
       <button class="btn-search-global" id="btnSearchGlobal" title="Buscar producto">🔍</button>
       <button class="btn-search-global btn-cupones-global" id="btnCupones" title="Cupones de descuento">🎟️</button>
+      <button class="btn-search-global btn-cupones-global" id="btnConnect" title="Planes Connect">📶</button>
       <div class="header-actions" id="headerActions" style="display:none">
         <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
       </div>
@@ -223,6 +224,22 @@
           <p id="msgCupon" class="msg"></p>
         </form>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal planes Connect -->
+  <div class="cuotas-overlay" id="connectOverlay">
+    <div class="cuotas-sheet">
+      <div class="cuotas-sheet-header">
+        <span>📶 Planes Connect</span>
+        <button class="cuotas-close" id="connectClose">✕</button>
+      </div>
+      <div class="connect-tabs" id="connectTabs">
+        <button type="button" data-tab="planes" class="active">Planes</button>
+        <button type="button" data-tab="simulador">Simulador</button>
+        <button type="button" data-tab="ventas">Ventas</button>
+      </div>
+      <div class="cupones-body" id="connectBody"></div>
     </div>
   </div>
 

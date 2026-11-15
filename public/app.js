@@ -414,6 +414,9 @@ function renderGrid() {
   grid.querySelectorAll('.btn-cuotas').forEach(btn => {
     btn.addEventListener('click', () => abrirCuotasModal(btn.dataset.sku));
   });
+  grid.querySelectorAll('.btn-simular').forEach(btn => {
+    btn.addEventListener('click', () => simularDesdeProducto(btn.dataset.sku));
+  });
 }
 
 function badgeStock(sku) {
@@ -555,6 +558,7 @@ function tarjeta({ sku, alias }, idx = -1) {
     : '';
 
   const bloqueCupon = bloqueCupones(prod);
+  const bloqueConnect = bloquePlan(prod, sku);
 
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
   const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
@@ -591,6 +595,7 @@ function tarjeta({ sku, alias }, idx = -1) {
           </div>
           <div class="card-precios">${bloquePrecio}</div>
           ${bloqueCupon}
+          ${bloqueConnect}
           ${bloqueDespacho}
           ${bloqueCuotas}
           ${bloqueGarantia}
@@ -909,6 +914,10 @@ async function buscarProductos(q) {
     btn.addEventListener('click', () => abrirCuotasModal(btn.dataset.sku));
   });
 
+  searchBody.querySelectorAll('.btn-simular').forEach(btn => {
+    btn.addEventListener('click', () => { cerrarBusqueda(); simularDesdeProducto(btn.dataset.sku); });
+  });
+
   // Botón cambiar funciona igual que en el grid
   searchBody.querySelectorAll('.btn-cambiar').forEach(btn => {
     btn.addEventListener('click', () => toggleTodo(btn.dataset.sku));
@@ -919,7 +928,7 @@ async function buscarProductos(q) {
     const cat = resultados[i]?.categoria;
     el.style.cursor = 'pointer';
     el.addEventListener('click', e => {
-      if (e.target.closest('.btn-cambiar') || e.target.closest('.card-link')) return;
+      if (e.target.closest('.btn-cambiar') || e.target.closest('.card-link') || e.target.closest('.btn-cuotas') || e.target.closest('.btn-simular')) return;
       cerrarBusqueda();
       abrirCategoria(cat);
     });
@@ -1454,4 +1463,457 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
   $('cuponesClose').addEventListener('click', cerrarCupones);
   cuponesOverlay.addEventListener('click', e => { if (e.target === cuponesOverlay) cerrarCupones(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarCupones(); });
+}
+
+
+// ══════════════════════════════════════════
+// PLANES CONNECT (portabilidad / línea nueva)
+// ══════════════════════════════════════════
+
+const TIPO_PLAN = { portabilidad: 'Portabilidad', linea_nueva: 'Línea nueva', ambos: 'Portabilidad o línea nueva' };
+const COMPANIAS_CONNECT = ['Entel', 'Movistar', 'WOM', 'Claro'];
+
+// Bloque de la tarjeta para un equipo vendido con plan.
+function bloquePlan(prod, sku) {
+  const p = prod.plan;
+  if (!p || !p.compania) return '';
+  const equipo = prod.precioOferta || prod.precio;
+  const precios = [];
+  if (equipo) precios.push(`Equipo ${fmtPesos(equipo)}`);
+  if (p.mensual) precios.push(`plan ${fmtPesos(p.mensual)}/mes`);
+  const detalle = [p.nombre, p.gigas && !String(p.nombre || '').includes(String(p.gigas)) ? `${p.gigas} GB` : null].filter(Boolean).join(' · ');
+  return `
+    <div class="card-plan">
+      <div class="card-plan-titulo">📶 Connect ${esc(p.compania)}${p.tipo ? ` · ${TIPO_PLAN[p.tipo]}` : ''}</div>
+      ${detalle ? `<div class="card-plan-nombre">${esc(detalle)}</div>` : ''}
+      ${precios.length ? `<div class="card-plan-precio">${precios.join(' + ')}</div>` : ''}
+      <button class="btn-simular" data-sku="${esc(sku)}">🧮 Simular</button>
+    </div>`;
+}
+
+const connectOverlay = document.getElementById('connectOverlay');
+const connectBody    = document.getElementById('connectBody');
+const connectTabs    = document.getElementById('connectTabs');
+const btnConnect     = document.getElementById('btnConnect');
+
+let connectDatos = null;          // { manuales, detectados }
+let connectTab   = 'planes';
+let simEstado    = { equipo: '', sku: '', precio: '', planKey: '', mensual: '', compania: '', plan: '', meses: '12', cuotas: '1' };
+let ventaPrefill = null;
+let ventasMes    = null;
+
+function leerVendedor() { try { return localStorage.getItem('connect-vendedor') || ''; } catch { return ''; } }
+function guardarVendedor(v) { try { localStorage.setItem('connect-vendedor', v || ''); } catch { /* sin almacenamiento */ } }
+
+// Todos los planes (detectados + manuales) en una sola lista para los selects.
+function todosLosPlanes() {
+  if (!connectDatos) return [];
+  const det = connectDatos.detectados.map((p, i) => ({ ...p, key: `d${i}`, fuente: 'ficha' }));
+  const man = connectDatos.manuales.map(p => ({ ...p, key: `m${p.id}`, fuente: 'manual' }));
+  return [...det, ...man].filter(p => p.mensual);
+}
+
+function etiquetaPlan(p) {
+  return [p.compania, p.nombre, p.mensual ? `${fmtPesos(p.mensual)}/mes` : null, p.tipo ? TIPO_PLAN[p.tipo] : null].filter(Boolean).join(' · ');
+}
+
+async function cargarPlanesConnect() {
+  try {
+    const r = await fetch('/api/connect/planes');
+    connectDatos = await r.json();
+  } catch {
+    connectDatos = { manuales: [], detectados: [] };
+  }
+}
+
+function abrirConnect(tab = 'planes') {
+  if (!connectOverlay) return;
+  connectTab = tab;
+  connectOverlay.classList.add('open');
+  renderConnect();
+  cargarPlanesConnect().then(renderConnect);
+}
+
+function renderConnect() {
+  connectTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === connectTab));
+  if (connectTab === 'planes') renderPlanesConnect();
+  else if (connectTab === 'simulador') renderSimulador();
+  else renderVentas();
+}
+
+// ── Pestaña Planes ──
+function renderPlanesConnect() {
+  if (!connectDatos) { connectBody.innerHTML = '<p class="cupones-vacio">Cargando…</p>'; return; }
+  const det = connectDatos.detectados;
+  const man = connectDatos.manuales;
+  const item = (p, fuente, extra) => `
+    <li class="cupon-item">
+      <div class="cupon-item-cuerpo">
+        <div class="cupon-item-fila">
+          <span class="cupon-item-codigo">${esc(p.compania)}</span>
+          <span class="cupon-item-fuente cupon-fuente-${fuente === 'ficha' ? 'ficha' : 'manual'}">${fuente === 'ficha' ? '🏷️ Ficha del equipo' : '✍️ Agregado a mano'}</span>
+        </div>
+        <div class="cupon-item-desc">${esc([p.nombre, p.mensual ? `${fmtPesos(p.mensual)}/mes` : 'Valor mensual no informado', p.gigas ? `${p.gigas} GB` : null, p.minutos].filter(Boolean).join(' · '))}</div>
+        <div class="cupon-item-alcance">${esc(p.tipo ? TIPO_PLAN[p.tipo] : 'Tipo no informado')}${extra ? ` · ${esc(extra)}` : ''}</div>
+      </div>
+      <div class="connect-item-acciones">
+        ${p.mensual ? `<button class="btn-secondary connect-btn-chico" data-simular="${p.key}">🧮 Simular</button>` : ''}
+        ${fuente === 'manual' ? `<button class="todo-clear" data-borrar-plan="${p.id}">Eliminar</button>` : ''}
+      </div>
+    </li>`;
+
+  const planes = todosLosPlanes();
+  const porKey = Object.fromEntries(planes.map(p => [p.key, p]));
+  const detItems = det.map((p, i) => {
+    const nombres = p.equipos.slice(0, 2).map(e => e.nombre).join(', ');
+    const resto = p.equipos.length - 2;
+    return item({ ...p, key: `d${i}` }, 'ficha', `${p.equipos.length} equipo${p.equipos.length === 1 ? '' : 's'}: ${nombres}${resto > 0 ? ` y ${resto} más` : ''}`);
+  });
+  const manItems = man.map(p => item({ ...p, key: `m${p.id}` }, 'manual', p.notas));
+
+  connectBody.innerHTML = `
+    <p class="cupones-ayuda">Los planes se leen solos de la ficha de cada equipo Connect en cada actualización de precios. Si falta alguno, agregalo abajo.</p>
+    <ul class="cupones-lista">
+      <li class="cupones-titulo">Planes (${det.length + man.length})</li>
+      ${det.length + man.length ? detItems.join('') + manItems.join('') : '<li class="cupones-vacio">Todavía no hay planes. Aparecen solos cuando se actualizan los precios de los equipos Connect, o podés agregarlos a mano.</li>'}
+    </ul>
+    <form id="formPlan" class="cupon-form" autocomplete="off">
+      <h3>Agregar plan</h3>
+      <div class="cupon-form-fila">
+        <label>Compañía
+          <select id="planCompania">${COMPANIAS_CONNECT.map(c => `<option>${c}</option>`).join('')}</select>
+        </label>
+        <label>Valor mensual
+          <input type="text" id="planMensual" inputmode="numeric" placeholder="$ 24.990" required />
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Nombre (opcional)
+          <input type="text" id="planNombre" placeholder="Plan Libre 300GB" maxlength="60" />
+        </label>
+        <label>Tipo
+          <select id="planTipo">
+            <option value="ambos">Portabilidad o línea nueva</option>
+            <option value="portabilidad">Solo portabilidad</option>
+            <option value="linea_nueva">Solo línea nueva</option>
+          </select>
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Gigas (opcional)
+          <input type="text" id="planGigas" inputmode="numeric" placeholder="300" />
+        </label>
+        <label>Minutos (opcional)
+          <input type="text" id="planMinutos" placeholder="Ilimitados" maxlength="40" />
+        </label>
+      </div>
+      <button type="submit" class="btn-primary">Guardar plan</button>
+      <p id="msgPlan" class="msg"></p>
+    </form>`;
+
+  connectBody.querySelectorAll('[data-simular]').forEach(btn => btn.addEventListener('click', () => {
+    const p = porKey[btn.dataset.simular];
+    if (!p) return;
+    const equipo = p.equipos?.[0];
+    simEstado = {
+      ...simEstado, planKey: p.key, mensual: String(p.mensual || ''), compania: p.compania, plan: p.nombre || '',
+      ...(equipo ? { equipo: equipo.nombre, sku: equipo.sku, precio: String(equipo.precio || '') } : {}),
+    };
+    connectTab = 'simulador';
+    renderConnect();
+  }));
+  connectBody.querySelectorAll('[data-borrar-plan]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('¿Eliminar este plan?')) return;
+    await fetch(`/api/connect/planes/${btn.dataset.borrarPlan}`, { method: 'DELETE' });
+    await cargarPlanesConnect();
+    renderConnect();
+  }));
+  document.getElementById('formPlan').addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('msgPlan');
+    const body = {
+      compania: document.getElementById('planCompania').value,
+      mensual: document.getElementById('planMensual').value,
+      nombre: document.getElementById('planNombre').value,
+      tipo: document.getElementById('planTipo').value,
+      gigas: document.getElementById('planGigas').value,
+      minutos: document.getElementById('planMinutos').value,
+    };
+    try {
+      const r = await fetch('/api/connect/planes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'No se pudo guardar');
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = err.message; return;
+    }
+    await cargarPlanesConnect();
+    renderConnect();
+  });
+}
+
+// ── Pestaña Simulador ──
+function renderSimulador() {
+  const planes = todosLosPlanes();
+  const opciones = planes.map(p => `<option value="${p.key}"${simEstado.planKey === p.key ? ' selected' : ''}>${esc(etiquetaPlan(p))}</option>`).join('');
+  connectBody.innerHTML = `
+    <p class="cupones-ayuda">Cuánto paga el cliente en total por el equipo más el plan.</p>
+    <form id="formSim" class="cupon-form" autocomplete="off">
+      <label>Equipo (opcional)
+        <input type="text" id="simEquipo" value="${esc(simEstado.equipo)}" placeholder="Samsung Galaxy A17 128GB" />
+      </label>
+      <div class="cupon-form-fila">
+        <label>Precio del equipo
+          <input type="text" id="simPrecio" inputmode="numeric" value="${esc(simEstado.precio)}" placeholder="$ 149.990" />
+        </label>
+        <label>Cuotas del equipo
+          <select id="simCuotas">
+            ${['1', '3', '6', '12', '24'].map(n => `<option value="${n}"${simEstado.cuotas === n ? ' selected' : ''}>${n === '1' ? 'Al contado' : `${n} cuotas sin interés`}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <label>Plan
+        <select id="simPlan">
+          <option value="">Otro valor (escribirlo abajo)</option>
+          ${opciones}
+        </select>
+      </label>
+      <div class="cupon-form-fila">
+        <label>Valor mensual del plan
+          <input type="text" id="simMensual" inputmode="numeric" value="${esc(simEstado.mensual)}" placeholder="$ 24.990" />
+        </label>
+        <label>Meses a calcular
+          <select id="simMeses">
+            ${['6', '12', '18', '24'].map(n => `<option value="${n}"${simEstado.meses === n ? ' selected' : ''}>${n} meses</option>`).join('')}
+          </select>
+        </label>
+      </div>
+    </form>
+    <div class="connect-resultado" id="simResultado"></div>
+    <button class="btn-primary connect-btn-ancho" id="simVender">📝 Registrar venta con estos datos</button>`;
+
+  const $ = id => document.getElementById(id);
+  const num = v => parseInt(String(v || '').replace(/\D/g, ''), 10) || 0;
+  const porKey = Object.fromEntries(planes.map(p => [p.key, p]));
+
+  function calcular() {
+    simEstado = {
+      ...simEstado,
+      equipo: $('simEquipo').value, precio: $('simPrecio').value, mensual: $('simMensual').value,
+      meses: $('simMeses').value, cuotas: $('simCuotas').value, planKey: $('simPlan').value,
+    };
+    const precio = num(simEstado.precio);
+    const mensual = num(simEstado.mensual);
+    const meses = num(simEstado.meses);
+    const cuotas = num(simEstado.cuotas);
+    const res = $('simResultado');
+    if (!precio && !mensual) { res.innerHTML = '<p class="cupones-vacio">Ingresá el precio del equipo y el valor del plan.</p>'; return; }
+
+    const cuotaEquipo = cuotas > 1 ? Math.ceil(precio / cuotas) : 0;
+    const total = precio + mensual * meses;
+    const filas = [];
+    if (cuotas > 1) {
+      filas.push(['Pago mensual', `${fmtPesos(mensual + cuotaEquipo)}`, `plan ${fmtPesos(mensual)} + cuota del equipo ${fmtPesos(cuotaEquipo)} (${cuotas} cuotas)`]);
+      if (cuotas < meses) filas.push(['Después de la cuota ' + cuotas, fmtPesos(mensual), 'solo el plan']);
+      if (cuotas > meses) filas.push(['Ojo', '', `las cuotas del equipo siguen después del mes ${meses}`]);
+    } else {
+      filas.push(['Pago hoy', fmtPesos(precio), 'equipo al contado']);
+      filas.push(['Pago mensual', fmtPesos(mensual), 'solo el plan']);
+    }
+    filas.push([`Total en ${meses} meses`, fmtPesos(total), `equipo ${fmtPesos(precio)} + plan ${fmtPesos(mensual)} × ${meses}`]);
+    if (meses) filas.push(['Promedio mensual', fmtPesos(Math.round(total / meses)), '']);
+    res.innerHTML = filas.map(([t, v, d]) => `
+      <div class="connect-fila"><span class="connect-fila-titulo">${esc(t)}</span><span class="connect-fila-valor">${esc(v)}</span></div>
+      ${d ? `<div class="connect-fila-detalle">${esc(d)}</div>` : ''}`).join('');
+  }
+
+  $('simPlan').addEventListener('change', () => {
+    const p = porKey[$('simPlan').value];
+    if (p) { $('simMensual').value = p.mensual || ''; simEstado.compania = p.compania; simEstado.plan = p.nombre || ''; }
+    calcular();
+  });
+  ['simEquipo', 'simPrecio', 'simMensual', 'simMeses', 'simCuotas'].forEach(id => $(id).addEventListener('input', calcular));
+  $('simVender').addEventListener('click', () => {
+    calcular();
+    const p = porKey[simEstado.planKey];
+    ventaPrefill = {
+      compania: p?.compania || simEstado.compania || '',
+      plan: p ? (p.nombre || '') : simEstado.plan,
+      mensual: simEstado.mensual, equipo: simEstado.equipo, sku: simEstado.sku, precioEquipo: simEstado.precio,
+      tipo: p?.tipo === 'linea_nueva' ? 'linea_nueva' : (p?.tipo === 'portabilidad' ? 'portabilidad' : ''),
+    };
+    connectTab = 'ventas';
+    renderConnect();
+  });
+  calcular();
+}
+
+// Abre el simulador con los datos de un producto de la grilla o la búsqueda.
+function simularDesdeProducto(sku) {
+  const prod = productosCache[sku];
+  if (!prod) return;
+  const p = prod.plan || {};
+  simEstado = {
+    ...simEstado,
+    equipo: prod.nombre || '', sku, precio: String(prod.precioOferta || prod.precio || ''),
+    mensual: String(p.mensual || ''), compania: p.compania || '', plan: p.nombre || '', planKey: '',
+  };
+  abrirConnect('simulador');
+}
+
+// ── Pestaña Ventas ──
+async function renderVentas() {
+  const pre = ventaPrefill || {};
+  const planes = todosLosPlanes();
+  const porKey = Object.fromEntries(planes.map(p => [p.key, p]));
+  connectBody.innerHTML = `
+    <form id="formVenta" class="cupon-form connect-form-venta" autocomplete="off">
+      <h3>Registrar venta</h3>
+      <div class="connect-tipo" role="radiogroup">
+        <label><input type="radio" name="ventaTipo" value="portabilidad"${pre.tipo === 'portabilidad' ? ' checked' : ''} required /> Portabilidad</label>
+        <label><input type="radio" name="ventaTipo" value="linea_nueva"${pre.tipo === 'linea_nueva' ? ' checked' : ''} /> Línea nueva</label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Compañía
+          <select id="ventaCompania">${COMPANIAS_CONNECT.map(c => `<option${pre.compania === c ? ' selected' : ''}>${c}</option>`).join('')}</select>
+        </label>
+        <label>Plan
+          <select id="ventaPlanSel">
+            <option value="">Escribirlo</option>
+            ${planes.map(p => `<option value="${p.key}">${esc(etiquetaPlan(p))}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Nombre del plan
+          <input type="text" id="ventaPlan" value="${esc(pre.plan || '')}" maxlength="80" />
+        </label>
+        <label>Valor mensual
+          <input type="text" id="ventaMensual" inputmode="numeric" value="${esc(pre.mensual || '')}" placeholder="$ 24.990" />
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Equipo (opcional)
+          <input type="text" id="ventaEquipo" value="${esc(pre.equipo || '')}" maxlength="120" />
+        </label>
+        <label>Precio del equipo
+          <input type="text" id="ventaPrecio" inputmode="numeric" value="${esc(pre.precioEquipo || '')}" />
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Cliente (opcional)
+          <input type="text" id="ventaCliente" maxlength="80" />
+        </label>
+        <label>Teléfono (opcional)
+          <input type="text" id="ventaTelefono" inputmode="tel" maxlength="20" />
+        </label>
+      </div>
+      <div class="cupon-form-fila">
+        <label>Vendedor
+          <input type="text" id="ventaVendedor" value="${esc(leerVendedor())}" maxlength="60" />
+        </label>
+        <label>Notas (opcional)
+          <input type="text" id="ventaNotas" maxlength="200" />
+        </label>
+      </div>
+      <input type="hidden" id="ventaSku" value="${esc(pre.sku || '')}" />
+      <button type="submit" class="btn-primary">Registrar venta</button>
+      <p id="msgVenta" class="msg"></p>
+    </form>
+    <div class="connect-ventas-cabecera">
+      <input type="month" id="ventasMes" value="${esc(ventasMes || '')}" />
+      <a class="btn-secondary connect-btn-chico" id="ventasCsv" href="#">⬇️ Exportar</a>
+    </div>
+    <div id="ventasResumen" class="connect-resumen"></div>
+    <ul class="cupones-lista" id="ventasLista"><li class="cupones-vacio">Cargando…</li></ul>`;
+  ventaPrefill = null;
+
+  const $ = id => document.getElementById(id);
+  $('ventaPlanSel').addEventListener('change', () => {
+    const p = porKey[$('ventaPlanSel').value];
+    if (!p) return;
+    $('ventaCompania').value = p.compania;
+    $('ventaPlan').value = p.nombre || '';
+    $('ventaMensual').value = p.mensual || '';
+  });
+  $('formVenta').addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = $('msgVenta');
+    const tipo = connectBody.querySelector('input[name="ventaTipo"]:checked')?.value;
+    guardarVendedor($('ventaVendedor').value);
+    const body = {
+      tipo, compania: $('ventaCompania').value, plan: $('ventaPlan').value, mensual: $('ventaMensual').value,
+      equipo: $('ventaEquipo').value, sku: $('ventaSku').value, precioEquipo: $('ventaPrecio').value,
+      cliente: $('ventaCliente').value, telefono: $('ventaTelefono').value,
+      vendedor: $('ventaVendedor').value, notas: $('ventaNotas').value,
+    };
+    try {
+      const r = await fetch('/api/connect/ventas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'No se pudo registrar');
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = err.message; return;
+    }
+    renderVentas();
+  });
+  $('ventasMes').addEventListener('change', () => { ventasMes = $('ventasMes').value; cargarVentas(); });
+  cargarVentas();
+}
+
+async function cargarVentas() {
+  const lista = document.getElementById('ventasLista');
+  if (!lista) return;
+  let d;
+  try {
+    const r = await fetch(`/api/connect/ventas${ventasMes ? `?mes=${encodeURIComponent(ventasMes)}` : ''}`);
+    d = await r.json();
+  } catch {
+    lista.innerHTML = '<li class="cupones-vacio">Error al cargar las ventas</li>';
+    return;
+  }
+  ventasMes = d.mes;
+  document.getElementById('ventasMes').value = d.mes;
+  document.getElementById('ventasCsv').href = `/api/connect/ventas.csv?mes=${encodeURIComponent(d.mes)}`;
+  const r = d.resumen;
+  const chips = [
+    `<span class="connect-chip connect-chip-total">${r.total} venta${r.total === 1 ? '' : 's'}</span>`,
+    ...Object.entries(r.porTipo).map(([t, n]) => `<span class="connect-chip">${esc(TIPO_PLAN[t] || t)}: ${n}</span>`),
+    ...Object.entries(r.porCompania).map(([c, n]) => `<span class="connect-chip">${esc(c)}: ${n}</span>`),
+  ];
+  document.getElementById('ventasResumen').innerHTML = chips.join('');
+
+  if (!d.ventas.length) { lista.innerHTML = '<li class="cupones-vacio">Sin ventas registradas en este mes.</li>'; return; }
+  lista.innerHTML = d.ventas.map(v => {
+    const f = new Date(v.fecha);
+    const fecha = `${f.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })} ${f.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+    const plan = [v.plan, v.mensual ? `${fmtPesos(v.mensual)}/mes` : null].filter(Boolean).join(' · ');
+    const quien = [v.cliente, v.telefono, v.vendedor ? `vendió ${v.vendedor}` : null].filter(Boolean).join(' · ');
+    return `
+      <li class="cupon-item">
+        <div class="cupon-item-cuerpo">
+          <div class="cupon-item-fila">
+            <span class="cupon-item-codigo">${esc(v.compania)}</span>
+            <span class="cupon-item-fuente ${v.tipo === 'portabilidad' ? 'cupon-fuente-pagina' : 'cupon-fuente-manual'}">${TIPO_PLAN[v.tipo]}</span>
+            <span class="cupon-item-alcance connect-fecha">${esc(fecha)}</span>
+          </div>
+          ${plan ? `<div class="cupon-item-desc">${esc(plan)}</div>` : ''}
+          ${v.equipo ? `<div class="cupon-item-alcance">${esc(v.equipo)}${v.precioEquipo ? ` · ${fmtPesos(v.precioEquipo)}` : ''}</div>` : ''}
+          ${quien ? `<div class="cupon-item-alcance">${esc(quien)}</div>` : ''}
+          ${v.notas ? `<div class="cupon-item-texto">${esc(v.notas)}</div>` : ''}
+        </div>
+        <button class="todo-clear" data-borrar-venta="${v.id}">Eliminar</button>
+      </li>`;
+  }).join('');
+  lista.querySelectorAll('[data-borrar-venta]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm('¿Eliminar esta venta del registro?')) return;
+    await fetch(`/api/connect/ventas/${btn.dataset.borrarVenta}`, { method: 'DELETE' });
+    cargarVentas();
+  }));
+}
+
+if (connectOverlay && connectBody && connectTabs && btnConnect) {
+  btnConnect.addEventListener('click', () => abrirConnect(connectTab));
+  connectTabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { connectTab = b.dataset.tab; renderConnect(); }));
+  document.getElementById('connectClose').addEventListener('click', () => connectOverlay.classList.remove('open'));
+  connectOverlay.addEventListener('click', e => { if (e.target === connectOverlay) connectOverlay.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') connectOverlay.classList.remove('open'); });
 }

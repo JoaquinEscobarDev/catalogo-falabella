@@ -16,9 +16,11 @@ DIR="$HOME/catalogo-falabella"
 echo "== 1/4 Instalando Node, git y curl =="
 # Hay que ACTUALIZAR todo antes de instalar: si git/curl nuevos quedan junto a
 # un openssl viejo, fallan con "CANNOT LINK EXECUTABLE ... libcurl.so".
-pkg update -y
-pkg upgrade -y -o Dpkg::Options::="--force-confnew"
-pkg install -y nodejs-lts git curl
+# Se usa apt y no pkg: pkg llama a curl para elegir mirror, y si curl ya quedó
+# roto por una actualización a medias, pkg tampoco funciona.
+apt update
+apt full-upgrade -y -o Dpkg::Options::="--force-confnew"
+apt install -y nodejs-lts git curl
 
 echo "== 2/4 Descargando el proyecto =="
 if [ -d "$DIR/.git" ]; then

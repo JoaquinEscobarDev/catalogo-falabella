@@ -1364,3 +1364,30 @@ main {
 .cupones-busqueda { font-size: .76rem; color: var(--texto-suave); line-height: 1.45; padding: 2px 2px 4px; list-style: none; }
 .cupon-item-auto  { font-size: .66rem; font-weight: 700; color: var(--azul); }
 .cupon-item-texto { font-size: .7rem; color: var(--texto-suave); margin-top: 3px; line-height: 1.35; overflow-wrap: anywhere; }
+
+/* ── Ventana de cupones: tarjeta centrada ── */
+#cuponesOverlay { align-items: center; padding: 16px; }
+#cuponesOverlay .cuotas-sheet {
+  border-radius: var(--radius);
+  border-bottom: 1px solid var(--borde);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  animation: fadeInUp .22s var(--ease);
+}
+#cuponesOverlay .cuotas-sheet-header { justify-content: center; text-align: center; padding: 14px 48px; }
+#cuponesOverlay .cuotas-close { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+#cuponesOverlay .cupones-ayuda { text-align: center; }
+#cuponesOverlay .cupon-form h3 { text-align: center; }
+
+.cupones-titulo { list-style: none; text-align: center; font-weight: 700; font-size: .9rem; padding-top: 2px; }
+.cupones-busqueda { text-align: center; }
+.cupon-item-cuerpo { min-width: 0; flex: 1; }
+.cupon-item-fila { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.cupon-item-fuente {
+  font-size: .64rem; font-weight: 700; padding: 1px 7px; border-radius: 20px;
+  border: 1px solid var(--borde); color: var(--texto-suave); white-space: nowrap;
+}
+.cupon-fuente-pagina { color: var(--azul); border-color: rgba(121,192,255,.35); }
+.cupon-fuente-ficha  { color: var(--naranja); border-color: rgba(240,136,62,.35); }
+.cupon-fuente-manual { color: var(--verde); border-color: rgba(63,185,80,.35); }
+.cupon-item-alcance { display: block; font-size: .72rem; color: var(--texto-suave); margin-top: 2px; overflow-wrap: anywhere; }

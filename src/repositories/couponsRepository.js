@@ -24,8 +24,21 @@ const SELECT = `
   FROM coupons`;
 
 async function findAll() {
-  const { rows } = await db.query(`${SELECT} WHERE ${AUTOMATICO_FRESCO} ORDER BY origen DESC, created_at DESC`);
+  const { rows } = await db.query(`${SELECT}
+    WHERE ${AUTOMATICO_FRESCO}
+      AND (vence IS NULL OR vence >= (NOW() AT TIME ZONE 'America/Santiago')::date)
+    ORDER BY origen DESC, created_at DESC`);
   return rows.map(mapRow);
+}
+
+// Los cupones vencidos (manuales o automáticos) se borran solos, y también
+// los automáticos que hace más de 3 días que no aparecen en la página.
+async function eliminarNoVigentes() {
+  await db.query(`
+    DELETE FROM coupons
+    WHERE (vence IS NOT NULL AND vence < (NOW() AT TIME ZONE 'America/Santiago')::date)
+       OR (origen = 'automatico' AND (detectado_en IS NULL OR detectado_en < NOW() - INTERVAL '3 days'))
+  `);
 }
 
 async function findVigentes() {
@@ -62,4 +75,4 @@ async function remove(id) {
   await db.query('DELETE FROM coupons WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findVigentes, insert, reemplazarAutomaticos, remove };
+module.exports = { findAll, findVigentes, insert, reemplazarAutomaticos, eliminarNoVigentes, remove };

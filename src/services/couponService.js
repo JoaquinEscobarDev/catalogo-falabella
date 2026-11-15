@@ -8,6 +8,7 @@
 
 const couponsRepository = require('../repositories/couponsRepository');
 const cuponesAutoService = require('./cuponesAutoService');
+const productsRepository = require('../repositories/productsRepository');
 
 function badRequest(msg) {
   const err = new Error(msg);
@@ -29,11 +30,40 @@ function normalizar(str) {
 // de cupones de Falabella) y los cargados a mano, más el resultado de la
 // última búsqueda automática.
 async function listAll() {
-  const [cupones, busqueda] = await Promise.all([
+  // Lo que ya no está vigente se borra antes de listar.
+  await couponsRepository.eliminarNoVigentes().catch(() => {});
+  const [cupones, fichas, conteo, busqueda] = await Promise.all([
     couponsRepository.findAll(),
+    productsRepository.findCuponesEnFichas(),
+    productsRepository.contarProductos(),
     cuponesAutoService.ultimoResumen(),
   ]);
-  return { cupones, busqueda };
+  return { cupones, enFichas: agruparCuponesDeFichas(fichas), conteo, busqueda };
+}
+
+// Un mismo cupón suele aparecer en la ficha de varios productos: se agrupa
+// (por código, o por su texto si no trae código) para listarlo una vez.
+function agruparCuponesDeFichas(filas) {
+  const grupos = new Map();
+  for (const f of filas) {
+    const c = f.cupon || {};
+    const clave = c.codigo || `${c.tipo || ''}|${c.valor || ''}|${normalizar(c.texto)}`;
+    if (!grupos.has(clave)) grupos.set(clave, { cupon: c, productos: [], marcas: new Set() });
+    const g = grupos.get(clave);
+    g.productos.push({ sku: f.sku, nombre: f.nombre, categoria: f.categoria });
+    if (f.marca) g.marcas.add(f.marca);
+  }
+  return [...grupos.values()].map(({ cupon: c, productos, marcas }) => {
+    const listaMarcas = [...marcas];
+    return {
+      codigo: c.codigo || null, tipo: c.tipo || null, valor: c.valor || null,
+      tope: c.tope || null, minimo: c.minimo || null, soloCMR: !!c.soloCMR,
+      texto: textoLegible(c.texto, listaMarcas.length === 1 ? listaMarcas[0] : null),
+      marcas: listaMarcas,
+      productos: productos.length,
+      ejemplos: productos.slice(0, 3),
+    };
+  }).sort((a, b) => b.productos - a.productos);
 }
 
 async function create(body) {

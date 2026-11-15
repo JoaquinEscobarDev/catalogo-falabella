@@ -417,6 +417,7 @@ function renderGrid() {
   grid.querySelectorAll('.btn-simular').forEach(btn => {
     btn.addEventListener('click', () => simularDesdeProducto(btn.dataset.sku));
   });
+  enlazarCuponesClickeables(grid);
 }
 
 function badgeStock(sku) {
@@ -433,7 +434,7 @@ function badgeStock(sku) {
 function bloqueCupones(prod) {
   const cupones = prod.cupones || [];
   if (!cupones.length) return '';
-  const MAX = 2;
+  const MAX = 3;
 
   const items = cupones.slice(0, MAX).map(c => {
     const condiciones = [];
@@ -463,9 +464,11 @@ function bloqueCupones(prod) {
       }
       cuerpo = filas.join('');
     }
+    // Tocar el cupón abre la lista de productos a los que aplica.
+    const datosCupon = c.id ? `data-cupon-id="${c.id}"` : (c.clave ? `data-cupon-clave="${esc(c.clave)}"` : '');
     return `
-      <div class="card-cupon${c.noAplica ? ' card-cupon-off' : ''}" title="${esc(c.texto || '')}">
-        <div class="cupon-titulo">${titulo}</div>
+      <div class="card-cupon${c.noAplica ? ' card-cupon-off' : ''}${datosCupon ? ' card-cupon-click' : ''}" ${datosCupon} title="${esc(c.explicacion || c.texto || '')}">
+        <div class="cupon-titulo">${titulo}${datosCupon ? ' <span class="cupon-ver">›</span>' : ''}</div>
         ${cuerpo}
         ${condiciones.length ? `<div class="cupon-cond">${condiciones.join(' · ')}</div>` : ''}
       </div>`;
@@ -918,6 +921,7 @@ async function buscarProductos(q) {
   searchBody.querySelectorAll('.btn-simular').forEach(btn => {
     btn.addEventListener('click', () => { cerrarBusqueda(); simularDesdeProducto(btn.dataset.sku); });
   });
+  enlazarCuponesClickeables(searchBody);
 
   // Botón cambiar funciona igual que en el grid
   searchBody.querySelectorAll('.btn-cambiar').forEach(btn => {
@@ -929,7 +933,7 @@ async function buscarProductos(q) {
     const cat = resultados[i]?.categoria;
     el.style.cursor = 'pointer';
     el.addEventListener('click', e => {
-      if (e.target.closest('.btn-cambiar') || e.target.closest('.card-link') || e.target.closest('.btn-cuotas') || e.target.closest('.btn-simular')) return;
+      if (e.target.closest('.btn-cambiar') || e.target.closest('.card-link') || e.target.closest('.btn-cuotas') || e.target.closest('.btn-simular') || e.target.closest('.card-cupon-click')) return;
       cerrarBusqueda();
       abrirCategoria(cat);
     });
@@ -1364,8 +1368,9 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
       const [a, m, d] = c.vence.split('-');
       vence = ` · vence el ${d}/${m}/${a}`;
     }
+    const datosCupon = c.fuente === 'ficha' ? `data-cupon-clave="${esc(c.clave || '')}"` : `data-cupon-id="${c.id}"`;
     return `
-      <li class="cupon-item">
+      <li class="cupon-item cupon-item-click" ${datosCupon} title="Ver productos">
         <div class="cupon-item-cuerpo">
           <div class="cupon-item-fila">
             <span class="cupon-item-codigo">${c.codigo ? esc(c.codigo) : 'Sin código'}</span>
@@ -1374,6 +1379,7 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
           <div class="cupon-item-desc">${descuento}</div>
           <div class="cupon-item-alcance">${esc(alcanceCupon(c, conteo))}${vence}</div>
           ${c.fuente === 'pagina' && c.texto ? `<div class="cupon-item-texto">“${esc(c.texto.slice(0, 160))}”</div>` : ''}
+          <div class="cupon-item-ver">Ver productos ›</div>
         </div>
         ${c.fuente === 'manual' ? `<button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>` : ''}
       </li>`;
@@ -1404,8 +1410,10 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
       ? todos.map(c => itemCupon(c, conteo)).join('')
       : '<li class="cupones-vacio">No hay cupones vigentes por ahora.</li>');
 
+    enlazarCuponesClickeables(cuponesLista);
     cuponesLista.querySelectorAll('.cupon-item-borrar').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // no abrir la lista de productos
         if (!confirm('¿Eliminar este cupón?')) return;
         await fetch(`/api/cupones/${btn.dataset.id}`, { method: 'DELETE' });
         await cargarCupones();
@@ -1951,4 +1959,98 @@ if (connectOverlay && connectBody && connectTabs && btnConnect) {
   document.getElementById('connectClose').addEventListener('click', () => connectOverlay.classList.remove('open'));
   connectOverlay.addEventListener('click', e => { if (e.target === connectOverlay) connectOverlay.classList.remove('open'); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') connectOverlay.classList.remove('open'); });
+}
+
+
+// ══════════════════════════════════════════
+// PRODUCTOS DE UN CUPÓN (ventana al tocar un cupón)
+// ══════════════════════════════════════════
+
+const cuponProdOverlay = document.getElementById('cuponProdOverlay');
+let cuponProdDatos = null;
+
+function enlazarCuponesClickeables(raiz) {
+  if (!cuponProdOverlay || !raiz) return;
+  raiz.querySelectorAll('[data-cupon-id], [data-cupon-clave]').forEach(el => {
+    el.addEventListener('click', e => {
+      // El botón Eliminar de un cupón manual tiene su propia acción.
+      if (e.target.closest('.cupon-item-borrar')) return;
+      e.stopPropagation();
+      abrirProductosCupon(el.dataset.cuponId ? { id: el.dataset.cuponId } : { clave: el.dataset.cuponClave });
+    });
+  });
+}
+
+async function abrirProductosCupon({ id, clave }) {
+  const titulo = document.getElementById('cuponProdTitulo');
+  const lista = document.getElementById('cuponProdLista');
+  const resumen = document.getElementById('cuponProdResumen');
+  const filtro = document.getElementById('cuponProdFiltro');
+  titulo.textContent = '🎟️ Cargando…';
+  resumen.textContent = '';
+  filtro.value = '';
+  lista.innerHTML = '<li class="cupones-vacio">Cargando productos…</li>';
+  cuponProdOverlay.classList.add('open');
+
+  try {
+    const qs = id ? `id=${encodeURIComponent(id)}` : `clave=${encodeURIComponent(clave)}`;
+    const r = await fetch(`/api/cupones/productos?${qs}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'No se pudo cargar');
+    cuponProdDatos = d;
+  } catch (e) {
+    titulo.textContent = '🎟️ Cupón';
+    lista.innerHTML = `<li class="cupones-vacio">${esc(e.message)}</li>`;
+    return;
+  }
+
+  const c = cuponProdDatos.cupon;
+  titulo.textContent = `🎟️ ${c.codigo || 'Cupón'}${c.etiqueta ? ` −${c.etiqueta}` : ''}`;
+  const condiciones = [
+    c.tope ? `tope ${fmtPesos(c.tope)}` : null,
+    c.minimo ? `compra mínima ${fmtPesos(c.minimo)}` : null,
+    c.soloCMR ? 'solo con CMR' : null,
+    c.general ? 'cupón general del sitio: puede tener exclusiones' : null,
+  ].filter(Boolean);
+  const n = cuponProdDatos.productos.length;
+  resumen.textContent = [
+    `${n} producto${n === 1 ? '' : 's'}`,
+    ...condiciones,
+    c.explicacion || (!c.tipo && c.texto) || null,
+  ].filter(Boolean).join(' · ');
+  renderProductosCupon();
+}
+
+function renderProductosCupon() {
+  const lista = document.getElementById('cuponProdLista');
+  const q = normalizarTexto(document.getElementById('cuponProdFiltro').value).trim();
+  const productos = cuponProdDatos.productos.filter(p =>
+    !q || normalizarTexto(`${p.nombre || ''} ${p.sku} ${p.upc || ''} ${p.marca || ''}`).includes(q));
+  if (!productos.length) {
+    lista.innerHTML = '<li class="cupones-vacio">Sin productos que coincidan.</li>';
+    return;
+  }
+  lista.innerHTML = productos.map(p => {
+    const base = [];
+    if (p.precioOferta) base.push(`Oferta ${fmtPesos(p.precioOferta)}`);
+    else if (p.precio) base.push(`Precio ${fmtPesos(p.precio)}`);
+    if (p.precioCMR) base.push(`CMR ${fmtPesos(p.precioCMR)}`);
+    const conCupon = [];
+    if (p.precioFinal != null) conCupon.push(`con cupón <strong>${fmtPesos(p.precioFinal)}</strong>`);
+    if (p.precioFinalCMR != null) conCupon.push(`con cupón + CMR <strong>${fmtPesos(p.precioFinalCMR)}</strong>`);
+    return `
+      <li class="cupon-prod">
+        <div class="cupon-prod-nombre">${esc(p.nombre || 'Sin nombre todavía')}</div>
+        <div class="cupon-prod-ids">SKU ${esc(p.sku)}${p.upc ? ` · UPC ${esc(p.upc)}` : ''}</div>
+        <div class="cupon-prod-precios">${base.length ? esc(base.join(' · ')) : 'Sin precio'}${conCupon.length ? ` → ${conCupon.join(' · ')}` : ''}</div>
+      </li>`;
+  }).join('');
+}
+
+if (cuponProdOverlay) {
+  const cerrar = () => cuponProdOverlay.classList.remove('open');
+  document.getElementById('cuponProdClose').addEventListener('click', cerrar);
+  cuponProdOverlay.addEventListener('click', e => { if (e.target === cuponProdOverlay) cerrar(); });
+  document.getElementById('cuponProdFiltro').addEventListener('input', () => { if (cuponProdDatos) renderProductosCupon(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
 }

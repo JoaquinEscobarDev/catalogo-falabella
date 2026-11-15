@@ -17,4 +17,11 @@ const remove = asyncHandler(async (req, res) => {
   res.json({ ok: true });
 });
 
-module.exports = { list, create, remove };
+const productos = asyncHandler(async (req, res) => {
+  const id = req.query.id ? parseInt(req.query.id, 10) : null;
+  const clave = req.query.clave ? String(req.query.clave) : null;
+  if (!id && !clave) return res.status(400).json({ error: 'Falta el cupón' });
+  res.json(await couponService.productosDeCupon({ id, clave }));
+});
+
+module.exports = { list, create, remove, productos };

@@ -43,11 +43,16 @@ async function listAll() {
 
 // Un mismo cupón suele aparecer en la ficha de varios productos: se agrupa
 // (por código, o por su texto si no trae código) para listarlo una vez.
+// Identifica un cupón visto en las fichas: por su código o, si no trae, por su texto.
+function claveFicha(c) {
+  return (c && c.codigo) || `${c?.tipo || ''}|${c?.valor || ''}|${normalizar(c?.texto)}`;
+}
+
 function agruparCuponesDeFichas(filas) {
   const grupos = new Map();
   for (const f of filas) {
     const c = f.cupon || {};
-    const clave = c.codigo || `${c.tipo || ''}|${c.valor || ''}|${normalizar(c.texto)}`;
+    const clave = claveFicha(c);
     if (!grupos.has(clave)) grupos.set(clave, { cupon: c, productos: [], marcas: new Set() });
     const g = grupos.get(clave);
     g.productos.push({ sku: f.sku, nombre: f.nombre, categoria: f.categoria });
@@ -56,6 +61,7 @@ function agruparCuponesDeFichas(filas) {
   return [...grupos.values()].map(({ cupon: c, productos, marcas }) => {
     const listaMarcas = [...marcas];
     return {
+      clave: claveFicha(c),
       codigo: c.codigo || null, tipo: c.tipo || null, valor: c.valor || null,
       tope: c.tope || null, minimo: c.minimo || null, soloCMR: !!c.soloCMR,
       texto: textoLegible(c.texto, listaMarcas.length === 1 ? listaMarcas[0] : null),
@@ -177,7 +183,10 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
     lista.push({
       origen: 'falabella', codigo: auto.codigo || null, tipo: auto.tipo || null, valor: auto.valor || null,
       tope: auto.tope || null, minimo: auto.minimo || null, soloCMR: !!auto.soloCMR,
-      texto: textoLegible(auto.texto, producto.marca), vence: null, aviso: !auto.tipo,
+      // En la tarjeta va el texto tal como viene en la ficha (corto); la
+      // explicación larga queda para el detalle.
+      texto: auto.texto || null, explicacion: textoLegible(auto.texto, producto.marca),
+      vence: null, aviso: !auto.tipo, clave: claveFicha(auto),
     });
   }
   // Primero los automáticos y después los manuales: ante un mismo código,
@@ -197,17 +206,22 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
     });
   }
 
-  // Un aviso de la ficha sin monto ("este producto participa de una campaña de
-  // cupón") sobra si ya hay un cupón concreto, con su descuento, que aplica.
-  const hayConcreto = lista.some(c => c.tipo);
-  const finales = hayConcreto ? lista.filter(c => c.tipo) : lista;
-
-  return finales.map(c => {
+  // Se muestran todos: también los avisos de la ficha sin monto (campaña
+  // Philips, cupontel10...), que son propios del producto aunque además
+  // aplique un cupón general del sitio.
+  return lista.map(c => {
     const calc = c.tipo ? calcular(c, producto) : { precioFinal: null, descuento: null, precioFinalCMR: null, descuentoCMR: null, mejorPrecio: null };
     // noAplica: el cupón existe pero el precio no alcanza la compra mínima.
     const noAplica = !!c.tipo && calc.mejorPrecio == null;
     return { ...c, etiqueta: etiqueta(c), ...calc, noAplica };
-  }).sort((a, b) => (a.mejorPrecio ?? Infinity) - (b.mejorPrecio ?? Infinity));
+  // Orden: primero los cupones del producto con descuento, después los avisos
+  // de la ficha sin monto y al final los generales del sitio (CYBER10...).
+  }).sort((a, b) => rangoCupon(a) - rangoCupon(b) || (a.mejorPrecio ?? Infinity) - (b.mejorPrecio ?? Infinity));
+}
+
+function rangoCupon(c) {
+  if (c.general) return 2;
+  return c.tipo ? 0 : 1;
 }
 
 // Agrega `cupones` a un producto (o lista) ya mapeado desde la base.
@@ -221,4 +235,51 @@ async function vigentes() {
   return couponsRepository.findVigentes();
 }
 
-module.exports = { listAll, create, remove, vigentes, decorar, cuponesDe, calcular };
+// Productos a los que aplica un cupón, con sus precios y el precio final.
+//   { id }    → cupón de la tabla (página de cupones o cargado a mano)
+//   { clave } → cupón visto en las fichas de producto
+async function productosDeCupon({ id, clave }) {
+  const filas = await productsRepository.findParaCupones();
+  let cupon = null;
+  let lista = [];
+
+  if (id) {
+    cupon = (await couponsRepository.findVigentes()).find(c => c.id === Number(id));
+    if (!cupon) {
+      const err = new Error('El cupón ya no está vigente');
+      err.status = 404;
+      throw err;
+    }
+    lista = filas.filter(f => aplicaA(cupon, { marca: f.marca }, f.sku, f.categoria));
+  } else if (clave) {
+    lista = filas.filter(f => f.cupon && f.fresco && claveFicha(f.cupon) === clave);
+    if (lista.length) {
+      const c = lista[0].cupon;
+      cupon = {
+        codigo: c.codigo || null, tipo: c.tipo || null, valor: c.valor || null, tope: c.tope || null,
+        minimo: c.minimo || null, soloCMR: !!c.soloCMR, texto: c.texto || null,
+      };
+    }
+  }
+  if (!cupon) {
+    const err = new Error('No se encontró el cupón');
+    err.status = 404;
+    throw err;
+  }
+
+  const productos = lista.map(f => {
+    const prod = { precio: f.precio_normal, precioOferta: f.precio_oferta, precioCMR: f.precio_cmr };
+    const calc = cupon.tipo ? calcular(cupon, prod) : {};
+    return {
+      sku: f.sku, nombre: f.nombre, marca: f.marca, upc: f.upc || null, categoria: f.categoria,
+      precio: f.precio_normal, precioOferta: f.precio_oferta, precioCMR: f.precio_cmr,
+      precioFinal: calc.precioFinal ?? null, precioFinalCMR: calc.precioFinalCMR ?? null,
+    };
+  });
+  return {
+    cupon: { ...cupon, etiqueta: etiqueta(cupon), explicacion: cupon.tipo ? null : textoLegible(cupon.texto, null) },
+    productos,
+  };
+}
+
+module.exports = { listAll, create, remove, vigentes, decorar, cuponesDe, calcular, productosDeCupon };

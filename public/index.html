@@ -227,6 +227,21 @@
     </div>
   </div>
 
+  <!-- Modal productos de un cupón (se abre al tocar un cupón) -->
+  <div class="cuotas-overlay" id="cuponProdOverlay">
+    <div class="cuotas-sheet">
+      <div class="cuotas-sheet-header">
+        <span id="cuponProdTitulo">🎟️ Cupón</span>
+        <button class="cuotas-close" id="cuponProdClose">✕</button>
+      </div>
+      <div class="cupones-body">
+        <p class="cupones-ayuda" id="cuponProdResumen"></p>
+        <input type="text" id="cuponProdFiltro" class="cupon-prod-filtro" placeholder="Filtrar por nombre, SKU o UPC…" autocomplete="off" />
+        <ul class="cupones-lista" id="cuponProdLista"></ul>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal planes Connect -->
   <div class="cuotas-overlay" id="connectOverlay">
     <div class="cuotas-sheet">

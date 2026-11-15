@@ -19,4 +19,12 @@ async function getStock(sku) {
   }
 }
 
-module.exports = { getStock };
+// Fuerza la consulta en vivo (la usa el refresh automático para dejar el
+// stock al día junto con los precios).
+async function refreshStock(sku) {
+  const resultado = await scraperService.fetchStockEnVivo(sku);
+  await stockRepository.set(sku, resultado.stock, resultado.storeName);
+  return resultado;
+}
+
+module.exports = { getStock, refreshStock };

@@ -1253,3 +1253,109 @@ main {
   background: rgba(121,192,255,.1);
   border-color: var(--azul);
 }
+
+/* ══════════════════════════════════════════
+   CUPONES DE DESCUENTO
+══════════════════════════════════════════ */
+
+.btn-cupones-global { margin-left: 0; }
+
+.precio-cupon     { font-size: 1.1rem; font-weight: 800; color: var(--amarillo); }
+.precio-cupon-cmr { font-size: 1rem; font-weight: 700; }
+
+.card-cupon {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(227,179,65,.08);
+  border: 1px dashed rgba(227,179,65,.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card-cupon-off { opacity: .6; }
+.cupon-titulo { font-size: .76rem; font-weight: 600; color: var(--amarillo); overflow-wrap: anywhere; }
+.cupon-titulo strong { font-family: monospace; font-size: .8rem; letter-spacing: .3px; }
+.cupon-nota  { font-size: .72rem; color: var(--texto-suave); overflow-wrap: anywhere; }
+.cupon-cond  { font-size: .66rem; color: var(--texto-suave); }
+
+/* Modal de gestión */
+.cupones-body { padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.cupones-ayuda { font-size: .8rem; color: var(--texto-suave); line-height: 1.45; }
+.cupones-ayuda a { color: var(--azul); }
+.cupones-lista { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.cupones-vacio { font-size: .82rem; color: var(--texto-suave); text-align: center; padding: 10px 0; }
+.cupon-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+.cupon-item-vencido { opacity: .55; }
+.cupon-item-codigo { font-family: monospace; font-weight: 700; color: var(--amarillo); font-size: .9rem; overflow-wrap: anywhere; }
+.cupon-item-tag { font-size: .66rem; color: var(--rojo); font-weight: 700; }
+.cupon-item-desc { font-size: .76rem; color: var(--texto); margin-top: 2px; line-height: 1.4; }
+.cupon-item-alcance { color: var(--texto-suave); }
+.cupon-item-borrar { flex-shrink: 0; }
+
+.cupon-form {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borde);
+}
+.cupon-form h3 { font-size: .9rem; font-weight: 700; }
+.cupon-form-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.cupon-form label { display: flex; flex-direction: column; gap: 4px; font-size: .74rem; color: var(--texto-suave); min-width: 0; }
+.cupon-form input[type="text"],
+.cupon-form input[type="date"],
+.cupon-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  font-size: .9rem;
+  font-family: inherit;
+  outline: none;
+  color-scheme: dark;
+}
+.cupon-form input:focus, .cupon-form select:focus { border-color: var(--amarillo); }
+.cupon-valor-wrap { display: flex; gap: 6px; }
+.cupon-valor-wrap select { width: 62px; flex-shrink: 0; }
+.cupon-form label.cupon-check { flex-direction: row; align-items: center; gap: 8px; font-size: .84rem; color: var(--texto); padding-bottom: 9px; }
+.cupon-check input { width: 18px; height: 18px; accent-color: var(--amarillo); }
+.cupon-form .btn-primary { padding: 11px; font-size: .92rem; }
+
+/* ══════════════════════════════════════════
+   ESTADO DEL REFRESH AUTOMÁTICO (portada)
+══════════════════════════════════════════ */
+
+.estado-refresh {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--borde);
+  font-size: .82rem;
+  line-height: 1.45;
+  color: var(--texto-suave);
+}
+.estado-refresh > span { flex: 1 1 260px; }
+.estado-refresh.estado-ok        { border-color: rgba(63,185,80,.3); }
+.estado-refresh.estado-corriendo { border-color: rgba(121,192,255,.35); color: var(--azul); }
+.estado-refresh.estado-alerta    { border-color: rgba(248,81,73,.4); color: var(--texto); background: rgba(248,81,73,.07); }
+.estado-btn { flex-shrink: 0; white-space: nowrap; }
+.estado-btn:disabled { opacity: .5; }
+
+@media (max-width: 480px) {
+  .cupon-form-fila { grid-template-columns: 1fr; }
+  .cupon-form label.cupon-check { padding-bottom: 0; }
+  .estado-btn { width: 100%; }
+}

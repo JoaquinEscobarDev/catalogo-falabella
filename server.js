@@ -1,11 +1,12 @@
 const env = require('./src/config/env');
 const db = require('./src/config/database');
 const app = require('./src/app');
+const refreshWorker = require('./src/jobs/refreshWorker');
 
 process.on('uncaughtException',  e => console.error('UncaughtException:', e));
 process.on('unhandledRejection', e => console.error('UnhandledRejection:', e));
 
-// Railway arranca Node y Postgres casi en simultáneo; Postgres puede tardar
+// Node y Postgres arrancan casi en simultáneo; Postgres puede tardar
 // unos segundos más. Reintentamos con backoff antes de rendirse.
 async function conectarDB(intentosMax = 10, delayMs = 2000) {
   for (let i = 1; i <= intentosMax; i++) {
@@ -25,4 +26,6 @@ async function conectarDB(intentosMax = 10, delayMs = 2000) {
 
 conectarDB().then(() => {
   app.listen(env.port, () => console.log(`Servidor corriendo en http://localhost:${env.port}`));
+  // Refresh de precios/stock dentro del servidor: ya no hace falta una PC prendida.
+  refreshWorker.iniciar();
 });

@@ -20,35 +20,56 @@ function estadoActual() { return enCurso ? { ...enCurso } : null; }
 
 const ahora = () => new Date().toLocaleString('es-CL');
 
+// Cuántos productos se leen a la vez. El servidor va de a uno (su respaldo es
+// un único browser); el worker remoto, que solo usa curl, va de a varios.
+// REFRESH_CONCURRENCIA lo cambia.
+const CONCURRENCIA = Math.min(8, Math.max(1,
+  parseInt(process.env.REFRESH_CONCURRENCIA, 10) || (env.workerOrigen === 'remoto' ? 4 : 1)
+));
+
 async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk, onAvance, log = () => {} } = {}) {
   const r = { ok: 0, fail: 0, cambios: 0, viaDirecta: 0, bloqueado: false };
   let fallosSeguidos = 0;
+  let siguiente = 0;   // próximo índice a tomar
+  let hechos = 0;      // productos terminados (bien o mal)
+  let cortar = false;
+  let limpieza = null; // promesa de antesDelPrimerOk: corre una sola vez
 
-  for (let i = 0; i < skus.length; i++) {
-    const sku = skus[i];
-    try {
-      const res = await productService.refreshSku(sku, fetchFn);
-      if (!res.ok) throw new Error('sin datos');
-      if (r.ok === 0 && antesDelPrimerOk) await antesDelPrimerOk();
-      r.ok++;
-      fallosSeguidos = 0;
-      if (res.viaDirecta) r.viaDirecta++;
-      if (res.cambio) r.cambios++;
-      log(`  OK   ${sku} - ${res.producto.nombre} - $${res.producto.precio || res.producto.precioOferta || '?'}${res.cambio ? ' (precio cambió)' : ''}${res.producto.cupon ? ' (cupón)' : ''}`);
-      if (conStock) await stockService.refreshStock(sku).catch(() => {});
-    } catch (e) {
-      r.fail++;
-      fallosSeguidos++;
-      log(`  FAIL ${sku} - ${e.message}`);
+  async function carril() {
+    while (!cortar) {
+      const i = siguiente++;
+      if (i >= skus.length) return;
+      const sku = skus[i];
+      try {
+        const res = await productService.refreshSku(sku, fetchFn);
+        if (!res.ok) throw new Error('sin datos');
+        if (antesDelPrimerOk) await (limpieza ||= antesDelPrimerOk());
+        r.ok++;
+        fallosSeguidos = 0;
+        if (res.viaDirecta) r.viaDirecta++;
+        if (res.cambio) r.cambios++;
+        log(`  OK   ${sku} - ${res.producto.nombre} - $${res.producto.precio || res.producto.precioOferta || '?'}${res.cambio ? ' (precio cambió)' : ''}${res.producto.cupon ? ' (cupón)' : ''}`);
+        if (conStock) await stockService.refreshStock(sku).catch(() => {});
+      } catch (e) {
+        r.fail++;
+        fallosSeguidos++;
+        log(`  FAIL ${sku} - ${e.message}`);
+      }
+      hechos++;
+      if (onAvance) await onAvance(hechos, r);
+      if (fallosSeguidos >= FALLOS_SEGUIDOS_PARA_CORTAR && !cortar) {
+        cortar = true;
+        log(`  Cortado: ${fallosSeguidos} productos seguidos sin respuesta (bloqueo de Falabella).`);
+      }
+      if (!cortar && siguiente < skus.length) await new Promise(res => setTimeout(res, PAUSA_MS));
     }
-    if (onAvance) await onAvance(i + 1, r);
-    if (fallosSeguidos >= FALLOS_SEGUIDOS_PARA_CORTAR) {
-      r.bloqueado = true;
-      r.fail += skus.length - (i + 1); // los que quedaron sin intentar
-      log(`  Cortado: ${fallosSeguidos} productos seguidos sin respuesta (bloqueo de Falabella).`);
-      break;
-    }
-    if (i < skus.length - 1) await new Promise(res => setTimeout(res, PAUSA_MS));
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCIA, skus.length) }, carril));
+
+  if (cortar) {
+    r.bloqueado = true;
+    r.fail += skus.length - hechos; // los que quedaron sin intentar
   }
   // No se pudo leer ni un producto: para el usuario es lo mismo que un bloqueo.
   if (skus.length && r.ok === 0) r.bloqueado = true;

@@ -37,7 +37,7 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // residencial; la misma página por HTTP/1.1 llega bien. El curl de Windows
 // ya usaba HTTP/1.1 por defecto, por eso desde la PC funcionaba sin esto.
 // (Comprobado el 15-11-2026 con scripts/worker-telefono.js --diagnostico.)
-function curlFetch(url, useProxy = false) {
+function curlUnaVez(url, useProxy, comprimido) {
   const args = [
     '-sL', '--http1.1',
     '-H', `User-Agent: ${USER_AGENT}`,
@@ -45,6 +45,7 @@ function curlFetch(url, useProxy = false) {
     '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
     '--max-time', '20',
   ];
+  if (comprimido) args.push('--compressed');
   if (useProxy && env.proxyUrl) args.push('--proxy', env.proxyUrl);
   args.push(url);
 
@@ -55,6 +56,29 @@ function curlFetch(url, useProxy = false) {
       resolve(stdout);
     });
   });
+}
+
+// La página de un producto pesa ~1,3 MB sin comprimir; pedirla comprimida la
+// baja varias veces, que en un teléfono es casi todo el tiempo de descarga.
+// Pero cambiar las cabeceras puede hacer que Cloudflare rechace el pedido, así
+// que es adaptativo: se intenta comprimido y, si eso viene bloqueado pero sin
+// comprimir pasa, se deja de comprimir por el resto del proceso.
+let compresion = 'probando'; // 'probando' | 'si' | 'no'
+
+async function curlFetch(url, useProxy = false) {
+  if (compresion === 'no') return curlUnaVez(url, useProxy, false);
+  try {
+    const html = await curlUnaVez(url, useProxy, true);
+    compresion = 'si';
+    return html;
+  } catch (e) {
+    if (compresion === 'si' || e.message !== 'BLOCKED') throw e;
+    // Todavía no se sabe si la compresión es el problema: se prueba sin ella.
+    const html = await curlUnaVez(url, useProxy, false);
+    compresion = 'no';
+    console.log('La descarga comprimida viene bloqueada; se sigue sin comprimir.');
+    return html;
+  }
 }
 
 async function fetchDirectoConReintentos(url, intentos = 2) {
@@ -461,18 +485,52 @@ function pareceMarketplaceLargo(sku) {
 // `fetchFn(url)` es intercambiable: fetchDirectoConReintentos (PC/residencial)
 // o fetchConPlaywrightFallback (servidor). Devuelve viaDirecta=true cuando el
 // producto no salió en la búsqueda (típicamente porque no tiene stock).
-async function scrapeProducto(sku, fetchFn) {
-  try {
-    const html = await fetchFn(urlBusqueda(sku));
-    const producto = extraerDeHTML(html, sku);
-    if (producto) return { producto, viaDirecta: false };
-  } catch { /* sigue al fallback */ }
+//
+// Orden adaptativo: si la búsqueda falla varias veces seguidas mientras la
+// página directa sí responde (Cloudflare suele tratar distinto a /search), se
+// prueba primero la directa por un rato. No se pierde cobertura, solo cambia
+// el orden; así no se gastan dos intentos fallidos por cada producto.
+const BUSQUEDA_FALLOS_PARA_INVERTIR = 4;
+const BUSQUEDA_PAUSA_MS = 30 * 60 * 1000;
+let busquedaFallosSeguidos = 0;
+let directaPrimeroHasta = 0;
 
+async function intentarBusqueda(sku, fetchFn) {
   try {
-    const html = await fetchFn(urlDirecta(sku));
-    const producto = extraerDeHTML(html, sku);
-    if (producto) return { producto, viaDirecta: true };
-  } catch { /* sigue al siguiente fallback */ }
+    const producto = extraerDeHTML(await fetchFn(urlBusqueda(sku)), sku);
+    if (producto) { busquedaFallosSeguidos = 0; return producto; }
+  } catch { /* cuenta como fallo */ }
+  return null;
+}
+
+async function intentarDirecta(sku, fetchFn) {
+  try {
+    return extraerDeHTML(await fetchFn(urlDirecta(sku)), sku);
+  } catch {
+    return null;
+  }
+}
+
+async function scrapeProducto(sku, fetchFn) {
+  if (Date.now() < directaPrimeroHasta) {
+    const directa = await intentarDirecta(sku, fetchFn);
+    if (directa) return { producto: directa, viaDirecta: true };
+    const busqueda = await intentarBusqueda(sku, fetchFn);
+    if (busqueda) return { producto: busqueda, viaDirecta: false };
+  } else {
+    const busqueda = await intentarBusqueda(sku, fetchFn);
+    if (busqueda) return { producto: busqueda, viaDirecta: false };
+    const directa = await intentarDirecta(sku, fetchFn);
+    if (directa) {
+      // La búsqueda falló pero el producto existe: es la búsqueda la que no anda.
+      if (++busquedaFallosSeguidos >= BUSQUEDA_FALLOS_PARA_INVERTIR) {
+        directaPrimeroHasta = Date.now() + BUSQUEDA_PAUSA_MS;
+        busquedaFallosSeguidos = 0;
+        console.log('La búsqueda de Falabella no responde; se usa primero la página directa por 30 min.');
+      }
+      return { producto: directa, viaDirecta: true };
+    }
+  }
 
   if (pareceMarketplaceLargo(sku)) {
     try {

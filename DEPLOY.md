@@ -150,6 +150,22 @@ así que se llega por túnel SSH (`open-tunnel.bat` lo abre:
 DATABASE_URL=postgresql://catalogo:LA_MISMA_PASSWORD_DEL_.ENV@127.0.0.1:5433/catalogo_falabella
 ```
 
+## Alternativa: Railway
+
+La app también corre tal cual en Railway (es donde está hoy en producción):
+
+- **Origen:** servicio conectado a este repo, rama `main`, con *Auto deploys*
+  activado. Cada push a `main` se despliega solo; Railway detecta el
+  `Dockerfile`, que aplica las migraciones y levanta el server.
+- **Variables:** `DATABASE_URL` (obligatoria) y, opcionales, `REFRESH_HOURS`,
+  `AUTO_REFRESH` y `PROXY_URL` (ver la tabla de abajo).
+- **Serverless apagado:** el refresh automático corre dentro del server, así
+  que el servicio tiene que quedar siempre encendido (*Settings → Serverless*
+  desactivado).
+- **Comprobar que quedó la versión nueva:** abrir `/api/estado` en el dominio
+  del servicio. Si responde un JSON con `"auto": true`, el refresh automático
+  está andando; `Cannot GET /api/estado` significa que sigue la versión vieja.
+
 ## Variables de entorno — resumen
 
 | Variable | Dónde | Descripción |

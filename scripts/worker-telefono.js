@@ -16,7 +16,8 @@
 //
 // Uso:
 //   node scripts/worker-telefono.js            queda corriendo
-//   node scripts/worker-telefono.js --probar   prueba un producto y sale
+//   node scripts/worker-telefono.js --probar       prueba unos productos y sale
+//   node scripts/worker-telefono.js --diagnostico  muestra qué responde Falabella
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -50,7 +51,20 @@ async function probar() {
   }
   console.log(alguno
     ? '\nFunciona: este aparato puede leer Falabella. Ya se puede dejar corriendo.'
-    : '\nNo funcionó: Falabella tampoco respondió desde este aparato. Probá cambiando de red (wifi / datos móviles).');
+    : '\nNo funcionó: Falabella no respondió desde este aparato.');
+  if (!alguno) process.exitCode = 2;
+}
+
+// Muestra qué responde Falabella a cada variante de curl, usando el producto
+// actualizado más recientemente (el que con más seguridad sigue existiendo).
+async function diagnostico() {
+  const { rows } = await db.query(
+    'SELECT sku FROM products WHERE nombre IS NOT NULL ORDER BY price_updated_at DESC NULLS LAST LIMIT 1'
+  );
+  const sku = process.argv.find(a => /^\d{5,12}$/.test(a)) || rows[0]?.sku;
+  if (!sku) { console.log('No hay productos con datos para probar.'); return; }
+  console.log(`Diagnóstico con SKU ${sku}\n`);
+  for (const linea of await scraperService.diagnosticoCurl(sku)) console.log(linea);
 }
 
 async function main() {
@@ -58,8 +72,8 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  if (process.argv.includes('--probar')) {
-    await probar();
+  if (process.argv.includes('--probar') || process.argv.includes('--diagnostico')) {
+    await (process.argv.includes('--probar') ? probar() : diagnostico());
     await db.end();
     return;
   }

@@ -58,12 +58,16 @@ fi
 
 echo
 echo "== Probando =="
-node scripts/worker-telefono.js --probar
-
-cat <<'FIN'
+if node scripts/worker-telefono.js --probar; then
+  cat <<'FIN'
 
 Listo. Para dejarlo corriendo:
 
     bash ~/catalogo-falabella/scripts/termux/iniciar.sh
 
 FIN
+else
+  echo
+  echo "== Diagnóstico (mandá captura de esto) =="
+  node scripts/worker-telefono.js --diagnostico || true
+fi

@@ -512,24 +512,26 @@ async function fetchStockEnVivo(sku) {
 // distinguir "Cloudflare bloquea esta IP" de "el browser no arranca" sin
 // tener que leer los logs del servidor. Lo expone GET /api/diagnostico.
 
-function curlCrudo(url, { proxy = false, accept = 'text/html' } = {}) {
+function curlCrudo(url, { proxy = false, accept = 'text/html', extra = [], ua = USER_AGENT } = {}) {
   const args = [
-    '-sL', '-o', '-', '-D', '-',
-    '-H', `User-Agent: ${USER_AGENT}`,
+    '-sSL', '-o', '-', '-D', '-',
+    '-H', `User-Agent: ${ua}`,
     '-H', `Accept: ${accept}`,
     '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
     '--max-time', '20',
     '-w', '\n__CURL__ %{http_code} %{remote_ip} %{time_total}',
   ];
   if (proxy && env.proxyUrl) args.push('--proxy', env.proxyUrl);
-  args.push(url);
+  args.push(...extra, url);
   return new Promise(resolve => {
-    execFile('curl', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout = '') => {
+    execFile('curl', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout = '', stderr = '') => {
       const m = stdout.match(/\n__CURL__ (\d+) (\S*) (\S+)$/);
       const cuerpo = m ? stdout.slice(0, m.index) : stdout;
       const cabecera = n => (cuerpo.match(new RegExp(`^${n}:\\s*(.+)$`, 'im')) || [])[1]?.trim() || null;
       resolve({
-        error: err ? String(err.message).split('\n')[0].slice(0, 200) : null,
+        // Lo útil es el mensaje de curl (stderr) y su código de salida, no el comando.
+        error: err ? `curl ${err.code ?? '?'}: ${String(stderr).trim().split('\n').pop().slice(0, 160)}` : null,
+        cuerpo,
         http: m ? Number(m[1]) : null,
         segundos: m ? Number(m[3]) : null,
         bytes: cuerpo.length,
@@ -594,11 +596,57 @@ async function diagnostico(sku) {
   else if (!browser.arranco || (browser.error && browser.http == null)) conclusion = 'PROBLEMA DEL BROWSER: Chromium no arrancó o no pudo navegar (ver browser.error). No es necesariamente un bloqueo.';
   else conclusion = `BLOQUEADO: Falabella/Cloudflare rechaza a esta IP tanto por curl (HTTP ${curlDirecto.http}) como por browser (HTTP ${browser.http}).${env.proxyUrl ? ' El proxy configurado tampoco pasa.' : ' Hace falta un proxy residencial (PROXY_URL).'}`;
 
+  for (const r of [curlDirecto, curlBusqueda, curlConProxy, stock]) if (r) delete r.cuerpo;
   return { conclusion, sku, ipSalida, proxyConfigurado: !!env.proxyUrl, curlDirecto, curlBusqueda, curlConProxy, browser, stock };
+}
+
+// Diagnóstico solo-curl, para correr en el worker remoto (teléfono). Prueba la
+// misma página con distintas variantes de curl para ver si alguna pasa, y si
+// llegan datos comprueba que todavía se puedan interpretar. Devuelve líneas
+// cortas pensadas para leerse en la pantalla de un teléfono.
+const UA_MOVIL = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+
+async function diagnosticoCurl(sku) {
+  const pagina = urlDirecta(sku);
+  const pruebas = [
+    ['pagina (como el worker)', pagina, {}],
+    ['pagina --compressed',     pagina, { extra: ['--compressed'] }],
+    ['pagina --http1.1',        pagina, { extra: ['--http1.1'] }],
+    ['pagina UA movil',         pagina, { ua: UA_MOVIL, extra: ['--compressed'] }],
+    ['busqueda',                urlBusqueda(sku), {}],
+    ['stock (API)',             `${env.falabellaBaseUrl}/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`, { accept: 'application/json' }],
+    ['portada',                 `${env.falabellaBaseUrl}/falabella-cl`, { extra: ['--compressed'] }],
+  ];
+  const lineas = [];
+  for (const [nombre, url, opts] of pruebas) {
+    const r = await curlCrudo(url, opts);
+    let linea = `${nombre}: HTTP ${r.http ?? '-'} · ${r.bytes} bytes · datos=${r.conDatos ? 'SI' : 'no'}`;
+    if (r.cfMitigated) linea += ` · cf=${r.cfMitigated}`;
+    if (r.server) linea += ` · ${r.server}`;
+    if (r.error) linea += `\n   error: ${r.error}`;
+    if (r.titulo) linea += `\n   titulo: ${r.titulo}`;
+    if (r.conDatos) {
+      // Llegaron datos: ¿todavía se entienden?
+      const producto = extraerDeHTML(r.cuerpo, sku) || extraerDirectoSinValidarId(r.cuerpo, sku);
+      let claves = '?';
+      try {
+        const m = r.cuerpo.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+        claves = m ? Object.keys(JSON.parse(m[1])?.props?.pageProps || {}).slice(0, 8).join(',') : 'script con otro formato';
+      } catch (e) { claves = `JSON invalido (${e.message.slice(0, 40)})`; }
+      linea += producto
+        ? `\n   producto: ${producto.nombre} $${producto.precioOferta || producto.precio}`
+        : `\n   NO se pudo interpretar · pageProps: ${claves}`;
+    } else if (nombre.startsWith('stock')) {
+      linea += `\n   ${r.cuerpo.replace(/\s+/g, ' ').slice(-120)}`;
+    }
+    lineas.push(linea);
+  }
+  return lineas;
 }
 
 module.exports = {
   diagnostico,
+  diagnosticoCurl,
   fetchDirectoConReintentos,
   fetchConPlaywrightFallback,
   scrapeProducto,

@@ -44,7 +44,9 @@ async function diarioPendiente() {
   const cuando = ultimo ? enZona(new Date(ultimo.iniciadoEn)) : null;
   if (cuando && cuando.dia === hoy.dia && cuando.hora >= turno) return null;
   // Los cambios de precio de ayer se limpian solo en la primera corrida del día.
-  return { limpiar: !cuando || cuando.dia !== hoy.dia };
+  // En la primerísima corrida (recién desplegado, sin historial) no se limpia
+  // nada: la lista puede tener cambios de hoy detectados por el sistema anterior.
+  return { limpiar: !!cuando && cuando.dia !== hoy.dia };
 }
 
 function proximoRefresh() {

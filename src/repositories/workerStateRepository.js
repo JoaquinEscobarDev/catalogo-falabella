@@ -38,4 +38,17 @@ async function totalPendiente() {
   return r.rowCount > 0;
 }
 
-module.exports = { latido, remoto, pedirTotal, tomarTotal, totalPendiente };
+// Valores sueltos (por ejemplo el resumen de la última búsqueda de cupones).
+async function guardar(clave, valor) {
+  await db.query(`
+    INSERT INTO worker_state (clave, valor, actualizado_en) VALUES ($1, $2, NOW())
+    ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, actualizado_en = NOW()
+  `, [clave, valor]);
+}
+
+async function leer(clave) {
+  const { rows } = await db.query('SELECT valor FROM worker_state WHERE clave = $1', [clave]);
+  return rows.length ? rows[0].valor : null;
+}
+
+module.exports = { latido, remoto, pedirTotal, tomarTotal, totalPendiente, guardar, leer };

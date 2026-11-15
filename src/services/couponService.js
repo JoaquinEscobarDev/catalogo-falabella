@@ -7,6 +7,7 @@
 //     aplican a todo, una categoría, una marca o SKUs puntuales.
 
 const couponsRepository = require('../repositories/couponsRepository');
+const cuponesAutoService = require('./cuponesAutoService');
 
 function badRequest(msg) {
   const err = new Error(msg);
@@ -24,8 +25,15 @@ function normalizar(str) {
   return String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
 
+// Lista para la ventana de cupones: los automáticos (detectados en la página
+// de cupones de Falabella) y los cargados a mano, más el resultado de la
+// última búsqueda automática.
 async function listAll() {
-  return couponsRepository.findAll();
+  const [cupones, busqueda] = await Promise.all([
+    couponsRepository.findAll(),
+    cuponesAutoService.ultimoResumen(),
+  ]);
+  return { cupones, busqueda };
 }
 
 async function create(body) {
@@ -127,15 +135,19 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
       texto: auto.texto || null, vence: null,
     });
   }
-  for (const c of cuponesManuales) {
+  // Primero los automáticos y después los manuales: ante un mismo código,
+  // el último en entrar reemplaza al anterior, así manda el cargado a mano
+  // (el usuario lo puso con las condiciones exactas), después el de la página
+  // de cupones y al final el que se vio en la ficha del producto.
+  const ordenados = [...cuponesManuales].sort((a, b) => (a.origen === 'automatico' ? 0 : 1) - (b.origen === 'automatico' ? 0 : 1));
+  for (const c of ordenados) {
     if (!aplicaA(c, producto, sku, categoria)) continue;
-    // Si el mismo código ya vino detectado desde Falabella, manda el manual
-    // (es el que el usuario cargó con las condiciones exactas).
     const repetido = lista.findIndex(x => x.codigo && x.codigo === c.codigo);
     if (repetido >= 0) lista.splice(repetido, 1);
     lista.push({
-      origen: 'manual', id: c.id, codigo: c.codigo, tipo: c.tipo, valor: c.valor,
-      tope: c.tope, minimo: c.minimo, soloCMR: c.soloCMR, texto: null, vence: c.vence,
+      origen: c.origen === 'automatico' ? 'falabella' : 'manual',
+      id: c.id, codigo: c.codigo, tipo: c.tipo, valor: c.valor,
+      tope: c.tope, minimo: c.minimo, soloCMR: c.soloCMR, texto: c.texto || null, vence: c.vence,
     });
   }
 

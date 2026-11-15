@@ -44,8 +44,25 @@ async function query(...args) {
   }
 }
 
+// Varias consultas como una sola: o se aplican todas o ninguna.
+async function transaccion(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await fn((...args) => client.query(...args));
+    await client.query('COMMIT');
+    return r;
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   query,
+  transaccion,
   esErrorDeConexion,
   end: () => pool.end(),
 };

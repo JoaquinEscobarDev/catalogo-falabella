@@ -28,6 +28,7 @@ Corre 100% en la nube (PWA instalable + PostgreSQL): el propio servidor actualiz
 
 ### Cupones de descuento (`🎟️`)
 - **Detectados en Falabella**: al scrapear cada producto se busca si la ficha anuncia un cupón (código, % o monto, tope, compra mínima, exclusivo CMR)
+- **Página de cupones de Falabella**: en cada actualización completa se lee `falabella-cl/page/cupones-descuento` y cada cupón se aplica a los productos de la marca que menciona (los que dicen "todo el sitio", a todos). Reemplazan a los automáticos anteriores; si un cupón deja de aparecer, se deja de aplicar a los 3 días
 - **Cargados a mano**: desde el botón 🎟️ se registran los cupones de campaña (código, % o $, tope, compra mínima, solo CMR, vencimiento) que aplican a todos los productos, una categoría, una marca o SKUs puntuales
 - Cada tarjeta muestra el cupón y **en cuánto queda el precio final**: "Con cupón" (sobre el precio oferta/normal) y "Con cupón + CMR" (sobre el precio CMR)
 - Los cupones vencidos dejan de aplicarse solos
@@ -82,7 +83,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 - Actualización de precios manual por producto o refresh masivo de toda la categoría
 
 ### PWA instalable
-- Manifest y service worker incluidos (`catalogo-v9`)
+- Manifest y service worker incluidos (`catalogo-v10`)
 - Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
 - Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 

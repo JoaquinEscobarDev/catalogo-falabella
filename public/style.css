@@ -1359,3 +1359,8 @@ main {
   .cupon-form label.cupon-check { padding-bottom: 0; }
   .estado-btn { width: 100%; }
 }
+
+/* Cupones automáticos */
+.cupones-busqueda { font-size: .76rem; color: var(--texto-suave); line-height: 1.45; padding: 2px 2px 4px; list-style: none; }
+.cupon-item-auto  { font-size: .66rem; font-weight: 700; color: var(--azul); }
+.cupon-item-texto { font-size: .7rem; color: var(--texto-suave); margin-top: 3px; line-height: 1.35; overflow-wrap: anywhere; }

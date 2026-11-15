@@ -102,6 +102,28 @@ async function curlFetch(url, useProxy = false) {
   }
 }
 
+// Trae una página cualquiera (no de producto) y devuelve su código HTTP y el
+// HTML, sin exigir __NEXT_DATA__. La usa la búsqueda de cupones.
+function fetchPagina(url, { useProxy = false } = {}) {
+  const args = [
+    '-sL', '--http1.1', '--compressed',
+    '-H', `User-Agent: ${USER_AGENT}`,
+    '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
+    '--max-time', '30',
+    '-w', '\n__HTTP__%{http_code}',
+  ];
+  if (useProxy && env.proxyUrl) args.push('--proxy', env.proxyUrl);
+  args.push(url);
+  return new Promise((resolve, reject) => {
+    execFile('curl', args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout = '') => {
+      if (err) return reject(errorDeCurl(err));
+      const m = stdout.match(/\n__HTTP__(\d{3})$/);
+      resolve({ http: m ? Number(m[1]) : 0, html: m ? stdout.slice(0, m.index) : stdout });
+    });
+  });
+}
+
 async function fetchDirectoConReintentos(url, intentos = 2) {
   let ultimo = null;
   for (let i = 1; i <= intentos; i++) {
@@ -736,6 +758,7 @@ async function diagnosticoCurl(sku) {
 }
 
 module.exports = {
+  fetchPagina,
   hayInternet,
   diagnostico,
   diagnosticoCurl,

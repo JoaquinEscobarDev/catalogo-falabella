@@ -39,7 +39,7 @@ function esCodigoValido(token) {
 
 function extraerCodigo(texto) {
   const patrones = [
-    /c[oó]digo(?:\s+de\s+cup[oó]n)?[:\s]+["“'«]?([A-Z0-9][A-Z0-9_-]{3,24})(?![A-Za-z0-9])/,
+    /[Cc][OoÓó][Dd][Ii][Gg][Oo](?:\s+de\s+cup[oó]n)?[:\s]+["“'«]?([A-Z0-9][A-Z0-9_-]{3,24})(?![A-Za-z0-9])/,
     /[Cc][Uu][Pp][OoÓó][Nn](?:\s+de\s+descuento)?[:\s]+["“'«]?([A-Z0-9][A-Z0-9_-]{3,24})(?![A-Za-z0-9])/,
   ];
   // Un texto todo en mayúsculas ("CUPÓN EXTRA 10%") no deja distinguir un

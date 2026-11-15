@@ -1463,3 +1463,6 @@ main {
 .connect-chip { font-size: .72rem; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--borde); color: var(--texto-suave); }
 .connect-chip-total { color: var(--texto); font-weight: 700; border-color: var(--azul); }
 .connect-fecha { margin-top: 0; margin-left: auto; }
+
+.card-plan-tipo { font-size: .7rem; font-weight: 600; color: var(--texto-suave); }
+#connectOverlay .cupones-lista + .cupones-lista { margin-top: 6px; }

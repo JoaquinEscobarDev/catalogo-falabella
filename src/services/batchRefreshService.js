@@ -6,6 +6,7 @@ const env = require('../config/env');
 const productService = require('./productService');
 const scraperService = require('./scraperService');
 const cuponesAutoService = require('./cuponesAutoService');
+const connectColeccionService = require('./connectColeccionService');
 const stockService = require('./stockService');
 const productsRepository = require('../repositories/productsRepository');
 const refreshRequestsRepository = require('../repositories/refreshRequestsRepository');
@@ -137,6 +138,8 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
     // Cupones de campaña de la página de cupones: tarda unos segundos y, si
     // falla, el refresh de precios sigue igual.
     await cuponesAutoService.buscar({ log }).catch(e => log(`Cupones automáticos: error (${e.message}).`));
+    // Precio de los equipos con plan (colección Falabella Connect).
+    await connectColeccionService.buscar({ log }).catch(e => log(`Connect: error (${e.message}).`));
 
     r = await refrescarSkus(skus, {
       fetchFn, log,

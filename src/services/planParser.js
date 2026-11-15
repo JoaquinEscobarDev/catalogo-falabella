@@ -36,7 +36,7 @@ function aNumero(str) {
 function textosCortos(nodo, out = [], prof = 0, estado = { n: 0 }) {
   if (nodo == null || prof > 8 || estado.n++ > 20000) return out;
   if (typeof nodo === 'string') {
-    const t = nodo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const t = nodo.normalize('NFKC').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     if (t && t.length <= MAX_LARGO_TEXTO && !/^(https?:)?\/\//.test(t)) out.push(t);
     return out;
   }

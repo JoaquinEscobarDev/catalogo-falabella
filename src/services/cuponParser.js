@@ -59,7 +59,8 @@ function extraerCodigo(texto) {
 // Interpreta una frase tipo "Cupón TECNO10: 10% dcto extra pagando con CMR,
 // tope $50.000, en compras sobre $199.990".
 function parseTextoCupon(textoOriginal) {
-  const texto = String(textoOriginal || '').replace(/\s+/g, ' ').trim();
+  // NFKC: las letras "negritas" de Unicode (𝗖𝗬𝗕𝗘𝗥𝟭𝟬) pasan a letras comunes.
+  const texto = String(textoOriginal || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
   if (!texto) return null;
 
   const mTope = texto.match(/tope[^$\d]{0,40}\$?\s?(\d[\d.]*)/i);

@@ -14,6 +14,8 @@ function mapRowToProducto(row) {
     cuponDetectado: row.cupon || null,
     // Plan Connect detectado en la ficha (compañía, mensual, tipo...).
     plan: row.plan || null,
+    // Precio del equipo con plan (colección Falabella Connect), si aparece ahí.
+    conPlan: row.oferta_precio ? { precio: row.oferta_precio, tipoPrecio: row.oferta_tipo } : null,
   };
 }
 
@@ -45,7 +47,12 @@ async function remove(sku) {
 }
 
 async function getPriceData(sku) {
-  const r = await db.query('SELECT * FROM products WHERE sku = $1', [sku]);
+  const r = await db.query(`
+    SELECT p.*, o.precio_con_plan AS oferta_precio, o.tipo_precio AS oferta_tipo
+    FROM products p
+    LEFT JOIN connect_ofertas o ON o.id_falabella = p.sku AND o.detectado_en > NOW() - INTERVAL '3 days'
+    WHERE p.sku = $1
+  `, [sku]);
   return mapRowToProducto(r.rows[0]);
 }
 
@@ -135,10 +142,11 @@ async function setUpc(sku, upc) {
 
 async function findByCategoryName(nombreCategoria) {
   const { rows } = await db.query(`
-    SELECT p.*, st.stock, st.store_name
+    SELECT p.*, st.stock, st.store_name, o.precio_con_plan AS oferta_precio, o.tipo_precio AS oferta_tipo
     FROM products p
     JOIN categories c ON c.id = p.category_id
     LEFT JOIN stock_cache st ON st.sku = p.sku
+    LEFT JOIN connect_ofertas o ON o.id_falabella = p.sku AND o.detectado_en > NOW() - INTERVAL '3 days'
     WHERE c.nombre = $1
   `, [nombreCategoria]);
 
@@ -158,11 +166,12 @@ async function search(q) {
            p.precio_normal, p.precio_oferta, p.precio_cmr,
            p.url, p.price_updated_at,
            p.garantia_1a, p.garantia_2a, p.garantia_3a,
-           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h, p.upc, p.cupon, p.plan,
+           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h, p.upc, p.cupon, p.plan, o.precio_con_plan AS oferta_precio, o.tipo_precio AS oferta_tipo,
            s.stock
     FROM products p
     JOIN categories c ON c.id = p.category_id
     LEFT JOIN stock_cache s ON s.sku = p.sku
+    LEFT JOIN connect_ofertas o ON o.id_falabella = p.sku AND o.detectado_en > NOW() - INTERVAL '3 days'
     WHERE p.sku ILIKE $1 OR p.alias ILIKE $1
        OR p.nombre ILIKE $1 OR p.marca ILIKE $1
     ORDER BY p.nombre
@@ -177,6 +186,7 @@ async function search(q) {
     capacidad: r.capacidad, color: r.color,
     cuotasSinInteres: r.cuotas_sin_interes, despacho24h: r.despacho_24h,
     upc: r.upc, cuponDetectado: r.cupon || null, plan: r.plan || null,
+    conPlan: r.oferta_precio ? { precio: r.oferta_precio, tipoPrecio: r.oferta_tipo } : null,
     stock: r.stock,
   }));
 }

@@ -851,6 +851,7 @@ async function diagnosticoColeccionConnect() {
         visitar(v, Array.isArray(nodo) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k), prof + 1);
       }
     })(item, '', 0);
+    if (item.lowestPlan) lineas.push(`  lowestPlan completo: ${JSON.stringify(item.lowestPlan).slice(0, 400)}`);
     lineas.push(`  la app lee: ${JSON.stringify(detectarPlan(item))}`);
   }
   return lineas;

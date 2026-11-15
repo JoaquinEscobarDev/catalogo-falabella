@@ -56,11 +56,12 @@ function agruparDetectados(filas) {
 }
 
 async function listarPlanes() {
-  const [manuales, equipos] = await Promise.all([
+  const [manuales, equipos, ofertas] = await Promise.all([
     connectRepository.planesManuales(),
     connectRepository.equiposConPlan(),
+    connectRepository.ofertasResumen(),
   ]);
-  return { companias: COMPANIAS, manuales, detectados: agruparDetectados(equipos) };
+  return { companias: COMPANIAS, manuales, detectados: agruparDetectados(equipos), ofertas };
 }
 
 async function crearPlan(body) {

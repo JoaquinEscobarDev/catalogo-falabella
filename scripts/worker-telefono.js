@@ -129,7 +129,13 @@ async function main() {
       const { producto } = await scraperService.scrapeProducto(sku, scraperService.fetchDirectoConReintentos);
       console.log('', 'La app lee:', JSON.stringify(producto?.plan || null));
     };
-    const coleccion = async () => { for (const l of await scraperService.diagnosticoColeccionConnect()) console.log(l); };
+    const coleccion = async () => {
+      for (const l of await scraperService.diagnosticoColeccionConnect()) console.log(l);
+      const r = await require('../src/services/connectColeccionService').buscar({ log: console.log });
+      const fmt = n => `$${Number(n).toLocaleString('es-CL')}`;
+      console.log('\nEquipos con plan guardados (primeros 8):');
+      for (const o of r.ofertas.slice(0, 8)) console.log(`  ${o.nombre}: con plan ${fmt(o.precioConPlan)}${o.precioSinPlan ? ` · sin plan ${fmt(o.precioSinPlan)}` : ''} · ids ${o.ids.slice(0, 3).join(', ')}`);
+    };
     await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion })[modo]();
     await db.end();
     return;

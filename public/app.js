@@ -1475,19 +1475,27 @@ const TIPO_PLAN = { portabilidad: 'Portabilidad', linea_nueva: 'Línea nueva', a
 const COMPANIAS_CONNECT = ['Entel', 'Movistar', 'WOM', 'Claro'];
 
 // Bloque de la tarjeta para un equipo vendido con plan.
+const TIPO_PRECIO = { cmrPrice: 'CMR', internetPrice: 'oferta', normalPrice: 'normal' };
+
 function bloquePlan(prod, sku) {
-  const p = prod.plan;
-  if (!p || !p.compania) return '';
-  const equipo = prod.precioOferta || prod.precio;
-  const precios = [];
-  if (equipo) precios.push(`Equipo ${fmtPesos(equipo)}`);
-  if (p.mensual) precios.push(`plan ${fmtPesos(p.mensual)}/mes`);
-  const detalle = [p.nombre, p.gigas && !String(p.nombre || '').includes(String(p.gigas)) ? `${p.gigas} GB` : null].filter(Boolean).join(' · ');
+  const p = prod.plan && prod.plan.compania ? prod.plan : null;
+  const cp = prod.conPlan;
+  if (!p && !cp) return '';
+  const lineas = [];
+  if (cp) {
+    // Precio del equipo llevándolo con un plan (colección Falabella Connect).
+    lineas.push(`<div class="card-plan-precio">Equipo con plan desde ${fmtPesos(cp.precio)}${cp.tipoPrecio && TIPO_PRECIO[cp.tipoPrecio] ? ` <span class="card-plan-tipo">(${TIPO_PRECIO[cp.tipoPrecio]})</span>` : ''}</div>`);
+  }
+  if (p) {
+    const detalle = [p.nombre, p.gigas && !String(p.nombre || '').includes(String(p.gigas)) ? `${p.gigas} GB` : null].filter(Boolean).join(' · ');
+    if (detalle) lineas.push(`<div class="card-plan-nombre">${esc(detalle)}</div>`);
+    if (p.mensual) lineas.push(`<div class="card-plan-precio">Plan ${fmtPesos(p.mensual)}/mes</div>`);
+  }
+  const titulo = p ? `📶 Connect ${esc(p.compania)}${p.tipo ? ` · ${TIPO_PLAN[p.tipo]}` : ''}` : '📶 Connect · portabilidad o línea nueva';
   return `
     <div class="card-plan">
-      <div class="card-plan-titulo">📶 Connect ${esc(p.compania)}${p.tipo ? ` · ${TIPO_PLAN[p.tipo]}` : ''}</div>
-      ${detalle ? `<div class="card-plan-nombre">${esc(detalle)}</div>` : ''}
-      ${precios.length ? `<div class="card-plan-precio">${precios.join(' + ')}</div>` : ''}
+      <div class="card-plan-titulo">${titulo}</div>
+      ${lineas.join('')}
       <button class="btn-simular" data-sku="${esc(sku)}">🧮 Simular</button>
     </div>`;
 }
@@ -1572,11 +1580,30 @@ function renderPlanesConnect() {
   });
   const manItems = man.map(p => item({ ...p, key: `m${p.id}` }, 'manual', p.notas));
 
+  const ofertas = connectDatos.ofertas || [];
+  const ofertaItems = ofertas.map((o, i) => `
+    <li class="cupon-item">
+      <div class="cupon-item-cuerpo">
+        <div class="cupon-item-fila">
+          <span class="cupon-item-desc"><strong>${esc(o.nombre || 'Equipo')}</strong></span>
+          ${o.enCatalogo ? '<span class="cupon-item-fuente cupon-fuente-manual">En tu catálogo</span>' : ''}
+        </div>
+        <div class="cupon-item-desc">Con plan desde ${fmtPesos(o.precioConPlan)}${TIPO_PRECIO[o.tipoPrecio] ? ` (${TIPO_PRECIO[o.tipoPrecio]})` : ''}${o.precioSinPlan ? ` · sin plan ${fmtPesos(o.precioSinPlan)}` : ''}</div>
+      </div>
+      <div class="connect-item-acciones">
+        <button class="btn-secondary connect-btn-chico" data-simular-oferta="${i}">🧮 Simular</button>
+      </div>
+    </li>`);
+
   connectBody.innerHTML = `
-    <p class="cupones-ayuda">Los planes se leen solos de la ficha de cada equipo Connect en cada actualización de precios. Si falta alguno, agregalo abajo.</p>
+    <p class="cupones-ayuda">Los planes y los precios de los equipos con plan se leen solos de falabella.com en cada actualización de precios. Si falta un plan, agregalo abajo.</p>
     <ul class="cupones-lista">
       <li class="cupones-titulo">Planes (${det.length + man.length})</li>
-      ${det.length + man.length ? detItems.join('') + manItems.join('') : '<li class="cupones-vacio">Todavía no hay planes. Aparecen solos cuando se actualizan los precios de los equipos Connect, o podés agregarlos a mano.</li>'}
+      ${det.length + man.length ? detItems.join('') + manItems.join('') : '<li class="cupones-vacio">Falabella no publica el valor mensual de los planes junto a los equipos: agregá a mano los planes que ofrecen en la tienda.</li>'}
+    </ul>
+    <ul class="cupones-lista">
+      <li class="cupones-titulo">Equipos con plan en falabella.com (${ofertas.length})</li>
+      ${ofertas.length ? ofertaItems.join('') : '<li class="cupones-vacio">Todavía no se leyó la colección Falabella Connect. Se lee en cada actualización completa de precios.</li>'}
     </ul>
     <form id="formPlan" class="cupon-form" autocomplete="off">
       <h3>Agregar plan</h3>
@@ -1620,6 +1647,13 @@ function renderPlanesConnect() {
       ...simEstado, planKey: p.key, mensual: String(p.mensual || ''), compania: p.compania, plan: p.nombre || '',
       ...(equipo ? { equipo: equipo.nombre, sku: equipo.sku, precio: String(equipo.precio || '') } : {}),
     };
+    connectTab = 'simulador';
+    renderConnect();
+  }));
+  connectBody.querySelectorAll('[data-simular-oferta]').forEach(btn => btn.addEventListener('click', () => {
+    const o = ofertas[Number(btn.dataset.simularOferta)];
+    if (!o) return;
+    simEstado = { ...simEstado, equipo: o.nombre || '', sku: o.skuCatalogo || '', precio: String(o.precioConPlan || '') };
     connectTab = 'simulador';
     renderConnect();
   }));
@@ -1755,7 +1789,7 @@ function simularDesdeProducto(sku) {
   const p = prod.plan || {};
   simEstado = {
     ...simEstado,
-    equipo: prod.nombre || '', sku, precio: String(prod.precioOferta || prod.precio || ''),
+    equipo: prod.nombre || '', sku, precio: String(prod.conPlan?.precio || prod.precioOferta || prod.precio || ''),
     mensual: String(p.mensual || ''), compania: p.compania || '', plan: p.nombre || '', planKey: '',
   };
   abrirConnect('simulador');

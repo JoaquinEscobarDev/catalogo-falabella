@@ -38,6 +38,44 @@ async function equiposConPlan() {
   return rows;
 }
 
+// ── Equipos con plan (colección Falabella Connect) ──
+
+// Reemplaza todas las ofertas por las recién leídas, de una sola vez.
+async function reemplazarOfertas(ofertas) {
+  await db.transaccion(async q => {
+    await q('DELETE FROM connect_ofertas');
+    for (const o of ofertas) {
+      for (const id of o.ids) {
+        await q(`
+          INSERT INTO connect_ofertas (id_falabella, nombre, marca, precio_con_plan, tipo_precio, precio_sin_plan, url, plan)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          ON CONFLICT (id_falabella) DO UPDATE SET
+            precio_con_plan = LEAST(connect_ofertas.precio_con_plan, EXCLUDED.precio_con_plan)
+        `, [id, o.nombre, o.marca, o.precioConPlan, o.tipoPrecio, o.precioSinPlan, o.url, o.plan ? JSON.stringify(o.plan) : null]);
+      }
+    }
+  });
+}
+
+// Una fila por equipo (agrupando sus ids), indicando si está en el catálogo.
+async function ofertasResumen() {
+  const { rows } = await db.query(`
+    SELECT o.nombre, MIN(o.marca) AS marca, MIN(o.precio_con_plan) AS precio_con_plan,
+           MIN(o.tipo_precio) AS tipo_precio, MIN(o.precio_sin_plan) AS precio_sin_plan,
+           MIN(o.url) AS url, bool_or(p.sku IS NOT NULL) AS en_catalogo,
+           MIN(p.sku) AS sku_catalogo
+    FROM connect_ofertas o
+    LEFT JOIN products p ON p.sku = o.id_falabella
+    WHERE o.detectado_en > NOW() - INTERVAL '3 days'
+    GROUP BY o.nombre
+    ORDER BY bool_or(p.sku IS NOT NULL) DESC, MIN(o.precio_con_plan)
+  `);
+  return rows.map(r => ({
+    nombre: r.nombre, marca: r.marca, precioConPlan: r.precio_con_plan, tipoPrecio: r.tipo_precio,
+    precioSinPlan: r.precio_sin_plan, url: r.url, enCatalogo: r.en_catalogo, skuCatalogo: r.sku_catalogo,
+  }));
+}
+
 // ── Ventas ──
 
 function mapVenta(r) {
@@ -71,6 +109,6 @@ async function removeVenta(id) {
 }
 
 module.exports = {
-  planesManuales, insertPlan, removePlan, equiposConPlan,
+  planesManuales, insertPlan, removePlan, equiposConPlan, reemplazarOfertas, ofertasResumen,
   ventasDelMes, insertVenta, removeVenta,
 };

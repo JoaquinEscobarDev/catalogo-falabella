@@ -50,8 +50,10 @@ function normalizar(str) {
   return String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+// NFKC convierte las letras "negritas" de Unicode que Falabella usa en sus
+// títulos (𝗖𝗬𝗕𝗘𝗥𝟭𝟬) en letras comunes (CYBER10).
 function limpiarTexto(str) {
-  return String(str)
+  return String(str).normalize('NFKC')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#36;/g, '$')
     .replace(/\s+/g, ' ')

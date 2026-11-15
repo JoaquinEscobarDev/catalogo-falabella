@@ -15,7 +15,7 @@ const estado = asyncHandler(async (req, res) => {
 });
 
 const solicitarTotal = asyncHandler(async (req, res) => {
-  refreshService.solicitarTotal();
+  await refreshService.solicitarTotal();
   res.status(202).json({ ok: true });
 });
 

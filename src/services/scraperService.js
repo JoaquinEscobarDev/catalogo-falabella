@@ -15,9 +15,17 @@
 // que un curl que sí pasa. Por eso todo esto usa el binario curl real.
 
 const { execFile } = require('child_process');
-const { chromium } = require('playwright-extra');
-const stealth = require('puppeteer-extra-plugin-stealth');
-chromium.use(stealth());
+// Playwright se carga recién cuando hace falta un browser: el worker remoto
+// (teléfono con Termux, PC) solo usa curl y no necesita tenerlo instalado.
+let chromiumStealth = null;
+function getChromium() {
+  if (!chromiumStealth) {
+    const { chromium } = require('playwright-extra');
+    chromium.use(require('puppeteer-extra-plugin-stealth')());
+    chromiumStealth = chromium;
+  }
+  return chromiumStealth;
+}
 
 const env = require('../config/env');
 const { detectarCupon } = require('./cuponParser');
@@ -146,7 +154,7 @@ async function obtenerSesion() {
   const proxy = buildProxyConfig(env.proxyUrl);
   if (proxy) launchOpts.proxy = proxy;
 
-  const browser = await chromium.launch(launchOpts);
+  const browser = await getChromium().launch(launchOpts);
   const context = await browser.newContext({
     userAgent: USER_AGENT,
     viewport: { width: 1920, height: 1080 },

@@ -4,3 +4,4 @@ refresh-local.log
 refresh-full.log
 watch-refresh.log
 *.traineddata
+worker-telefono.log

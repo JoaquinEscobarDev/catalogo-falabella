@@ -14,7 +14,10 @@ REPO=https://github.com/JoaquinEscobarDev/catalogo-falabella.git
 DIR="$HOME/catalogo-falabella"
 
 echo "== 1/4 Instalando Node, git y curl =="
+# Hay que ACTUALIZAR todo antes de instalar: si git/curl nuevos quedan junto a
+# un openssl viejo, fallan con "CANNOT LINK EXECUTABLE ... libcurl.so".
 pkg update -y
+pkg upgrade -y -o Dpkg::Options::="--force-confnew"
 pkg install -y nodejs-lts git curl
 
 echo "== 2/4 Descargando el proyecto =="

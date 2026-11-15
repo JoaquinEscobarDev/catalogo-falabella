@@ -32,13 +32,20 @@ function normalizar(str) {
 async function listAll() {
   // Lo que ya no está vigente se borra antes de listar.
   await couponsRepository.eliminarNoVigentes().catch(() => {});
-  const [cupones, fichas, conteo, busqueda] = await Promise.all([
+  const [cupones, fichas, conteo, busqueda, filasOcultas] = await Promise.all([
     couponsRepository.findAll(),
     productsRepository.findCuponesEnFichas(),
     productsRepository.contarProductos(),
     cuponesAutoService.ultimoResumen(),
+    couponsRepository.findOcultos(),
   ]);
-  return { cupones, enFichas: agruparCuponesDeFichas(fichas), conteo, busqueda };
+  const ocultos = new Set(filasOcultas.map(o => o.clave));
+  return {
+    cupones: cupones.filter(c => c.origen !== 'automatico' || !estaOculto(ocultos, c)),
+    enFichas: agruparCuponesDeFichas(fichas.filter(f => !estaOculto(ocultos, f.cupon))),
+    ocultos: filasOcultas,
+    conteo, busqueda,
+  };
 }
 
 // Un mismo cupón suele aparecer en la ficha de varios productos: se agrupa
@@ -178,8 +185,9 @@ function textoLegible(texto, marca) {
 function cuponesDe(producto, sku, categoria, cuponesManuales) {
   const lista = [];
 
+  const ocultos = cuponesManuales.ocultos;
   const auto = producto.cuponDetectado;
-  if (auto) {
+  if (auto && !estaOculto(ocultos, auto)) {
     lista.push({
       origen: 'falabella', codigo: auto.codigo || null, tipo: auto.tipo || null, valor: auto.valor || null,
       tope: auto.tope || null, minimo: auto.minimo || null, soloCMR: !!auto.soloCMR,
@@ -196,6 +204,7 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
   const ordenados = [...cuponesManuales].sort((a, b) => (a.origen === 'automatico' ? 0 : 1) - (b.origen === 'automatico' ? 0 : 1));
   for (const c of ordenados) {
     if (!aplicaA(c, producto, sku, categoria)) continue;
+    if (c.origen === 'automatico' && estaOculto(ocultos, c)) continue;
     const repetido = lista.findIndex(x => x.codigo && x.codigo === c.codigo);
     if (repetido >= 0) lista.splice(repetido, 1);
     lista.push({
@@ -231,8 +240,24 @@ function decorar(producto, sku, categoria, cuponesManuales) {
   return { ...resto, cupones: cuponesDe(producto, sku, categoria, cuponesManuales) };
 }
 
+// ¿El usuario ocultó este cupón? Se compara por código, por la clave del
+// cupón de ficha y por su texto (para avisos sin código como "cupontel10").
+function estaOculto(ocultos, c) {
+  if (!ocultos || !ocultos.size || !c) return false;
+  return (c.codigo && ocultos.has(String(c.codigo).toUpperCase()))
+    || ocultos.has(claveFicha(c))
+    || (c.texto && ocultos.has(`txt:${normalizar(c.texto)}`));
+}
+
 async function vigentes() {
-  return couponsRepository.findVigentes();
+  const [cupones, filasOcultas] = await Promise.all([
+    couponsRepository.findVigentes(),
+    couponsRepository.findOcultos().catch(() => []),
+  ]);
+  // Las claves ocultas viajan junto a la lista hasta cuponesDe(), que es
+  // donde se arma lo que muestra cada tarjeta.
+  cupones.ocultos = new Set(filasOcultas.map(o => o.clave));
+  return cupones;
 }
 
 // Productos a los que aplica un cupón, con sus precios y el precio final.
@@ -282,4 +307,26 @@ async function productosDeCupon({ id, clave }) {
   };
 }
 
-module.exports = { listAll, create, remove, vigentes, decorar, cuponesDe, calcular, productosDeCupon };
+async function ocultar(body) {
+  const clave = String(body.clave || '').trim();
+  if (!clave || clave.length > 300) throw badRequest('Falta el cupón a ocultar');
+  const etiqueta = String(body.etiqueta || clave).trim().slice(0, 120);
+  await couponsRepository.ocultar(clave, etiqueta);
+  // Si es un aviso sin código, también por su texto: así se oculta aunque
+  // cambie su tipo o monto detectado.
+  if (clave.startsWith('|') || /^[^|]*\|[^|]*\|/.test(clave)) {
+    const texto = clave.split('|').slice(2).join('|');
+    if (texto) await couponsRepository.ocultar(`txt:${texto}`, etiqueta);
+  }
+}
+
+async function mostrar(clave) {
+  // Se quitan todas las claves que ocultaban ese mismo cupón.
+  const filas = await couponsRepository.findOcultos();
+  const etiqueta = filas.find(f => f.clave === clave)?.etiqueta;
+  for (const f of filas) {
+    if (f.clave === clave || (etiqueta && f.etiqueta === etiqueta)) await couponsRepository.mostrar(f.clave);
+  }
+}
+
+module.exports = { listAll, create, remove, vigentes, decorar, cuponesDe, calcular, productosDeCupon, ocultar, mostrar };

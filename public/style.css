@@ -1497,3 +1497,8 @@ main {
 .cupon-prod-ids { font-size: .72rem; color: var(--texto-suave); font-family: monospace; overflow-wrap: anywhere; }
 .cupon-prod-precios { font-size: .76rem; color: var(--texto); }
 .cupon-prod-precios strong { color: var(--amarillo); }
+
+/* Cupones ocultos por el usuario */
+.cupones-titulo-ocultos { color: var(--texto-suave); padding-top: 8px; }
+.cupon-item-oculto { opacity: .6; }
+.cupon-item-ocultar, .cupon-item-mostrar { flex-shrink: 0; }

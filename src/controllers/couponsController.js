@@ -24,4 +24,16 @@ const productos = asyncHandler(async (req, res) => {
   res.json(await couponService.productosDeCupon({ id, clave }));
 });
 
-module.exports = { list, create, remove, productos };
+const ocultar = asyncHandler(async (req, res) => {
+  await couponService.ocultar(req.body || {});
+  res.json({ ok: true });
+});
+
+const mostrar = asyncHandler(async (req, res) => {
+  const clave = String(req.query.clave || '');
+  if (!clave) return res.status(400).json({ error: 'Falta el cupón' });
+  await couponService.mostrar(clave);
+  res.json({ ok: true });
+});
+
+module.exports = { list, create, remove, productos, ocultar, mostrar };

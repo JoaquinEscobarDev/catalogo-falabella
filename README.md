@@ -82,7 +82,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 - Actualización de precios manual por producto o refresh masivo de toda la categoría
 
 ### PWA instalable
-- Manifest y service worker incluidos (`catalogo-v8`)
+- Manifest y service worker incluidos (`catalogo-v9`)
 - Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
 - Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 

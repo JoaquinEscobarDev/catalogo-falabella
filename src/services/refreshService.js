@@ -1,13 +1,27 @@
 const env = require('../config/env');
 const refreshRequestsRepository = require('../repositories/refreshRequestsRepository');
 const refreshRunsRepository = require('../repositories/refreshRunsRepository');
+const workerStateRepository = require('../repositories/workerStateRepository');
 const categoriesRepository = require('../repositories/categoriesRepository');
 const batch = require('./batchRefreshService');
 const worker = require('../jobs/refreshWorker');
 
-// "Actualizar precios" deja la solicitud en la base y despierta al worker del
-// servidor (src/jobs/refreshWorker.js), que la procesa en segundo plano. La
-// web consulta el estado hasta que termina.
+// Lo que se está refrescando ahora. Si lo hace este mismo proceso se sabe en
+// memoria (al producto); si lo hace el worker remoto, se lee de la base.
+async function enCurso() {
+  const local = batch.estadoActual();
+  if (local) return local;
+  const run = await refreshRunsRepository.findEnCurso();
+  if (!run) return null;
+  return {
+    tipo: run.tipo, detalle: run.detalle, solicitudId: null,
+    total: run.total, hechos: run.ok + run.fail, ok: run.ok, fail: run.fail,
+  };
+}
+
+// "Actualizar precios" deja la solicitud en la base y despierta al worker
+// (src/jobs/refreshWorker.js), que la procesa en segundo plano. La web
+// consulta el estado hasta que termina.
 async function solicitar(categoria) {
   const categoryId = await categoriesRepository.findOrCreateIdByName(categoria);
   const id = await refreshRequestsRepository.create(categoryId);
@@ -22,8 +36,9 @@ async function estado(id) {
     err.status = 404;
     throw err;
   }
-  const actual = batch.estadoActual();
-  const esEsta = actual && String(actual.solicitudId) === String(id);
+  const actual = s.terminada ? null : await enCurso();
+  // Tomada y sin terminar: lo que esté corriendo de tipo categoría es esta.
+  const esEsta = actual && s.tomada && actual.tipo === 'categoria';
   return {
     procesado: s.terminada,
     enCola: !s.tomada,
@@ -34,26 +49,32 @@ async function estado(id) {
   };
 }
 
-function solicitarTotal() {
-  worker.pedirTotal();
+async function solicitarTotal() {
+  await worker.pedirTotal();
 }
 
-// Resumen para la portada: si el refresh automático está andando, cuándo fue
-// el último, cómo le fue y cuándo es el próximo.
+// Resumen para la portada: quién está refrescando, cuándo fue el último,
+// cómo le fue y cuándo es el próximo.
 async function resumen() {
-  const [ultimo, ultimoCompleto] = await Promise.all([
+  const [ultimo, ultimoCompleto, actual, totalEnCola, remoto] = await Promise.all([
     refreshRunsRepository.findLast(),
     refreshRunsRepository.findLastFull(),
+    enCurso(),
+    workerStateRepository.totalPendiente(),
+    workerStateRepository.remoto(),
   ]);
+  const auto = worker.estaActivo() || remoto.activo;
   return {
-    auto: worker.estaActivo(),
+    auto,
     horas: env.refreshHours,
     proxy: !!env.proxyUrl,
-    enCurso: batch.estadoActual(),
-    totalEnCola: worker.totalEnCola(),
+    // Worker remoto (teléfono / PC): si está vivo, es él quien refresca.
+    remoto,
+    enCurso: actual,
+    totalEnCola,
     ultimo,
     ultimoCompleto,
-    proximo: worker.proximoRefresh(),
+    proximo: auto ? worker.proximoRefresh() : null,
   };
 }
 

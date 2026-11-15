@@ -21,6 +21,10 @@ module.exports = {
   refreshHours: lista(process.env.REFRESH_HOURS, '7'),
   refreshTimezone: process.env.REFRESH_TZ || 'America/Santiago',
 
+  // Quién es este proceso para la bitácora de refresh: 'servidor' (la web) o
+  // 'remoto' (scripts/worker-telefono.js corriendo en un teléfono o una PC).
+  workerOrigen: process.env.WORKER_ORIGEN === 'remoto' ? 'remoto' : 'servidor',
+
   // Solo para pruebas/entornos especiales.
   falabellaBaseUrl: (process.env.FALABELLA_BASE_URL || 'https://www.falabella.com').replace(/\/$/, ''),
   chromiumPath: process.env.CHROMIUM_PATH || null,

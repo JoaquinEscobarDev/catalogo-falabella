@@ -42,8 +42,12 @@ async function markFinished(id, ok, fail) {
 
 // Solicitudes tomadas por un proceso que murió antes de terminar (redeploy,
 // reinicio): se cierran para que la web no se quede esperándolas.
+// (Solo las viejas: una recién tomada puede estar en manos del otro worker.)
 async function closeOrphans() {
-  await db.query('UPDATE refresh_requests SET terminado_en = NOW() WHERE procesado = TRUE AND terminado_en IS NULL');
+  await db.query(`
+    UPDATE refresh_requests SET terminado_en = NOW()
+    WHERE procesado = TRUE AND terminado_en IS NULL AND creado_en < NOW() - INTERVAL '45 minutes'
+  `);
 }
 
 module.exports = { create, getStatus, findPending, markProcessed, markFinished, closeOrphans };

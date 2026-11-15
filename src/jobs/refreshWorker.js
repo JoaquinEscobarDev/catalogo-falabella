@@ -1,24 +1,39 @@
-// Worker de refresh que vive dentro del servidor. Reemplaza a los dos .bat
-// que antes corría la PC con el Programador de tareas de Windows:
+// Worker de refresh. Reemplaza a los dos .bat que antes corría la PC con el
+// Programador de tareas de Windows:
 //
 //   - refresh-diario.bat  → refresh completo en las horas de REFRESH_HOURS
 //   - watch-refresh.bat   → atender el botón "Actualizar precios" de la web
 //
-// Todo el scraping pasa por una sola cola (de a un producto a la vez), así el
-// refresh diario y los pedidos de la web nunca se pisan.
+// Corre en dos lugares posibles, coordinados a través de la base de datos:
+//
+//   - 'servidor': dentro del proceso web (server.js). Scrapea con curl y, si
+//     Cloudflare bloquea, con un browser real.
+//   - 'remoto':   scripts/worker-telefono.js en un teléfono (Termux) o una PC
+//     con IP residencial. Scrapea solo con curl.
+//
+// Mientras haya un worker remoto dando señales de vida, el servidor le cede
+// todo el trabajo. Si el remoto desaparece, el servidor vuelve a intentarlo solo.
+//
+// Dentro de cada proceso todo el scraping pasa por una sola cola (de a un
+// producto a la vez), así el refresh diario y los pedidos de la web no se pisan.
 
 const env = require('../config/env');
 const batch = require('../services/batchRefreshService');
 const refreshRequestsRepository = require('../repositories/refreshRequestsRepository');
 const refreshRunsRepository = require('../repositories/refreshRunsRepository');
+const workerStateRepository = require('../repositories/workerStateRepository');
 
-const INTERVALO_MS = 30 * 1000;
-const log = msg => console.log(msg);
+const origen = env.workerOrigen;
+const esRemoto = origen === 'remoto';
+const INTERVALO_MS = esRemoto ? 15 * 1000 : 30 * 1000;
+const LATIDO_MS = 45 * 1000;
 
+let log = msg => console.log(msg);
+let fetchFn; // undefined = el default de productService (curl + browser)
 let activo = false;
 let ocupado = false;
-let totalPedido = false;
 let timer = null;
+let timerLatido = null;
 
 // Fecha (AAAA-MM-DD) y hora (0-23) en la zona horaria del negocio.
 function enZona(fecha) {
@@ -31,16 +46,17 @@ function enZona(fecha) {
 }
 
 // ¿Toca el refresh programado? Sí, si ya pasó alguna de las horas
-// configuradas de hoy y todavía no se corrió nada desde esa hora. Cubre
-// también el caso de que el servidor estuviera apagado a la hora exacta.
-// Un refresh que terminó bloqueado no se reintenta hasta la hora siguiente.
+// configuradas de hoy y todavía no se corrió nada que cuente desde esa hora.
+// Cubre también el caso de que este proceso estuviera apagado a la hora
+// exacta. Un intento propio que terminó bloqueado no se repite hasta la hora
+// siguiente (ver findLastFullQueCuenta).
 async function diarioPendiente() {
   if (!env.refreshHours.length) return null;
   const hoy = enZona(new Date());
   const turno = [...env.refreshHours].reverse().find(h => h <= hoy.hora);
   if (turno === undefined) return null;
 
-  const ultimo = await refreshRunsRepository.findLastFull();
+  const ultimo = await refreshRunsRepository.findLastFullQueCuenta(origen);
   const cuando = ultimo ? enZona(new Date(ultimo.iniciadoEn)) : null;
   if (cuando && cuando.dia === hoy.dia && cuando.hora >= turno) return null;
   // Los cambios de precio de ayer se limpian solo en la primera corrida del día.
@@ -50,7 +66,7 @@ async function diarioPendiente() {
 }
 
 function proximoRefresh() {
-  if (!activo || !env.refreshHours.length) return null;
+  if (!env.refreshHours.length) return null;
   const { hora } = enZona(new Date());
   const hoy = env.refreshHours.find(h => h > hora);
   return hoy !== undefined ? { hora: hoy, dia: 'hoy' } : { hora: env.refreshHours[0], dia: 'mañana' };
@@ -60,20 +76,22 @@ async function tick() {
   if (!activo || ocupado) return;
   ocupado = true;
   try {
-    await batch.procesarSolicitudesPendientes({ log });
+    // El servidor se hace a un lado mientras el worker remoto esté vivo.
+    if (!esRemoto && (await workerStateRepository.remoto()).activo) return;
 
-    if (totalPedido) {
-      totalPedido = false;
-      await batch.refreshTotal({ tipo: 'manual', log });
+    await batch.procesarSolicitudesPendientes({ fetchFn, log });
+
+    if (await workerStateRepository.tomarTotal()) {
+      await batch.refreshTotal({ tipo: 'manual', fetchFn, log });
     } else {
       const diario = await diarioPendiente();
-      if (diario) await batch.refreshTotal({ tipo: 'diario', limpiar: diario.limpiar, log });
+      if (diario) await batch.refreshTotal({ tipo: 'diario', limpiar: diario.limpiar, fetchFn, log });
     }
 
     // Lo que haya entrado mientras corría el refresh completo.
-    await batch.procesarSolicitudesPendientes({ log });
+    await batch.procesarSolicitudesPendientes({ fetchFn, log });
   } catch (e) {
-    console.error('Worker de refresh:', e.message);
+    console.error(`Worker de refresh: ${e.message}`);
   } finally {
     ocupado = false;
   }
@@ -84,45 +102,59 @@ function despertar() {
   if (activo) setImmediate(tick);
 }
 
-function pedirTotal() {
-  if (!activo) {
+// "Actualizar todo ahora". Queda anotado en la base y lo toma el worker que
+// esté a cargo: el remoto si está vivo, si no este servidor.
+async function pedirTotal() {
+  const remoto = await workerStateRepository.remoto();
+  if (!activo && !remoto.activo) {
     const err = new Error('El refresh automático está desactivado en este servidor (AUTO_REFRESH=0)');
     err.status = 409;
     throw err;
   }
-  const actual = batch.estadoActual();
-  if (totalPedido || (actual && actual.tipo !== 'categoria')) {
+  const enCurso = await refreshRunsRepository.findEnCurso();
+  const nuevo = !(enCurso && enCurso.tipo !== 'categoria') && await workerStateRepository.pedirTotal();
+  if (!nuevo) {
     const err = new Error('Ya hay una actualización completa en curso');
     err.status = 409;
     throw err;
   }
-  totalPedido = true;
   despertar();
 }
 
-async function iniciar() {
-  if (!env.autoRefresh) {
+// opciones.fetchFn: cómo traer el HTML (ver productService.refreshSku).
+async function iniciar(opciones = {}) {
+  if (!esRemoto && !env.autoRefresh) {
     console.log('Refresh automático desactivado (AUTO_REFRESH=0).');
     return;
   }
+  fetchFn = opciones.fetchFn;
+  if (opciones.log) log = opciones.log;
+
   // Lo que quedó a medias de un proceso anterior (redeploy / reinicio).
-  await refreshRunsRepository.closeOrphans().catch(() => {});
+  await refreshRunsRepository.closeOrphans(origen).catch(() => {});
   await refreshRequestsRepository.closeOrphans().catch(() => {});
 
   activo = true;
+  if (esRemoto) {
+    // El latido va en su propio timer: tiene que seguir saliendo durante un
+    // refresh largo, cuando tick() está ocupado.
+    const latir = () => workerStateRepository.latido(opciones.detalle).catch(e => console.error(`Sin conexión a la base: ${e.message}`));
+    await latir();
+    timerLatido = setInterval(latir, LATIDO_MS);
+  }
   timer = setInterval(tick, INTERVALO_MS);
-  // Primera pasada apenas el servidor termina de levantar.
-  setTimeout(tick, 5000).unref?.();
-  console.log(`Refresh automático activo — refresh completo a las ${env.refreshHours.map(h => `${h}:00`).join(', ') || '(sin horario)'} (${env.refreshTimezone}).`);
+  // Primera pasada apenas termina de levantar.
+  setTimeout(tick, esRemoto ? 1000 : 5000);
+  console.log(`Refresh automático activo (${origen}) — refresh completo a las ${env.refreshHours.map(h => `${h}:00`).join(', ') || '(sin horario)'} (${env.refreshTimezone}).`);
 }
 
 function detener() {
   activo = false;
   clearInterval(timer);
+  clearInterval(timerLatido);
 }
 
 module.exports = {
   iniciar, detener, despertar, pedirTotal, proximoRefresh,
   estaActivo: () => activo,
-  totalEnCola: () => totalPedido,
 };

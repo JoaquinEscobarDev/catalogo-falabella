@@ -6,6 +6,8 @@
 //
 // Uso: node scripts/refresh-local.js
 
+process.env.WORKER_ORIGEN = 'remoto'; // para la bitácora: no lo corrió el servidor
+
 const db = require('../src/config/database');
 const batch = require('../src/services/batchRefreshService');
 const scraperService = require('../src/services/scraperService');

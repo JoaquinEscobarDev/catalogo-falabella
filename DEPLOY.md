@@ -138,6 +138,38 @@ reiniciá:
 docker compose up -d
 ```
 
+### Alternativa gratis al proxy: refrescar desde el teléfono (Termux)
+
+Un teléfono Android sale a internet con una IP de hogar o de red móvil, que
+Falabella sí deja pasar. `scripts/worker-telefono.js` lee Falabella desde el
+teléfono y guarda precios, stock y cupones directo en la base de producción.
+Mientras esté corriendo, el servidor le cede todo el trabajo: el refresh
+programado, el botón **Actualizar precios** y **Actualizar todo ahora**. Si el
+teléfono se desconecta más de 3 minutos, el servidor vuelve a intentarlo solo.
+
+1. Instalar **Termux** (desde F-Droid o GitHub; la versión de Play Store suele
+   estar desactualizada).
+2. Tener a mano la dirección **pública** de la base de datos: en Railway, la
+   variable `DATABASE_PUBLIC_URL` del servicio Postgres (o `DATABASE_URL` si
+   apunta a un host externo como Neon). La que termina en `railway.internal`
+   no sirve desde afuera.
+3. En Termux:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/JoaquinEscobarDev/catalogo-falabella/main/scripts/termux/instalar.sh -o instalar.sh
+   bash instalar.sh
+   ```
+   Instala Node, descarga el proyecto, pide la dirección de la base y hace una
+   prueba leyendo tres productos.
+4. Dejarlo corriendo:
+   ```bash
+   bash ~/catalogo-falabella/scripts/termux/iniciar.sh
+   ```
+5. En los ajustes de Android, sacarle a Termux la restricción de batería
+   ("Sin restricciones"), o Android lo cierra con la pantalla apagada.
+
+La portada de la app muestra **📱 Teléfono conectado** cuando el worker está
+vivo. Para actualizar el código del teléfono, volver a correr `bash instalar.sh`.
+
 ### Plan B: refrescar desde una PC
 
 `scripts/refresh-local.js` y `scripts/watch-refresh.js` siguen funcionando

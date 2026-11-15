@@ -2,6 +2,7 @@
 // (src/jobs/refreshWorker.js) y también los scripts manuales de scripts/.
 
 const db = require('../config/database');
+const env = require('../config/env');
 const productService = require('./productService');
 const stockService = require('./stockService');
 const productsRepository = require('../repositories/productsRepository');
@@ -63,7 +64,7 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
 async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = () => {} } = {}) {
   const skus = await productsRepository.findAllSkus();
   log(`[${ahora()}] Refrescando ${skus.length} SKUs (${tipo})...`);
-  const runId = await refreshRunsRepository.start(tipo, null, skus.length);
+  const runId = await refreshRunsRepository.start(tipo, null, skus.length, env.workerOrigen);
   enCurso = { tipo, detalle: null, solicitudId: null, total: skus.length, hechos: 0, ok: 0, fail: 0 };
 
   let r = { ok: 0, fail: 0, cambios: 0, viaDirecta: 0, bloqueado: false };
@@ -77,7 +78,7 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
       } : null,
       onAvance: async (hechos, parcial) => {
         Object.assign(enCurso, { hechos, ok: parcial.ok, fail: parcial.fail });
-        if (hechos % 10 === 0) await refreshRunsRepository.progress(runId, parcial).catch(() => {});
+        if (hechos % 5 === 0) await refreshRunsRepository.progress(runId, parcial).catch(() => {});
       },
     });
     estado = r.bloqueado ? 'bloqueado' : 'ok';
@@ -99,7 +100,7 @@ async function procesarSolicitudesPendientes({ fetchFn, log = () => {} } = {}) {
     await refreshRequestsRepository.markProcessed(id);
 
     const skus = await productsRepository.findSkusByCategoryName(categoria);
-    const runId = await refreshRunsRepository.start('categoria', categoria, skus.length);
+    const runId = await refreshRunsRepository.start('categoria', categoria, skus.length, env.workerOrigen);
     enCurso = { tipo: 'categoria', detalle: categoria, solicitudId: id, total: skus.length, hechos: 0, ok: 0, fail: 0 };
 
     let r = { ok: 0, fail: 0, cambios: 0, bloqueado: false };
@@ -107,7 +108,12 @@ async function procesarSolicitudesPendientes({ fetchFn, log = () => {} } = {}) {
     try {
       r = await refrescarSkus(skus, {
         fetchFn, log,
-        onAvance: (hechos, parcial) => { Object.assign(enCurso, { hechos, ok: parcial.ok, fail: parcial.fail }); },
+        onAvance: async (hechos, parcial) => {
+          Object.assign(enCurso, { hechos, ok: parcial.ok, fail: parcial.fail });
+          // Se guarda seguido: la web lee el avance desde la base cuando el
+          // trabajo lo hace otro proceso (worker remoto).
+          if (hechos % 3 === 0) await refreshRunsRepository.progress(runId, parcial).catch(() => {});
+        },
       });
       estado = r.bloqueado ? 'bloqueado' : 'ok';
     } finally {

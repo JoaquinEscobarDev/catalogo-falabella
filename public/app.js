@@ -1236,8 +1236,9 @@ function renderEstadoRefresh(e) {
       const cuando = formatRelativo(new Date(u.terminadoEn || u.iniciadoEn));
       if (u.estado === 'bloqueado') {
         clase = 'estado-alerta';
-        texto = `⚠️ ${cuando} Falabella bloqueó al servidor${u.ok ? ` (alcanzó a leer ${u.ok} de ${u.total})` : ''}. Los precios mostrados son los últimos guardados.`
-          + (e.proxy ? '' : ' Hace falta configurar un proxy (PROXY_URL).');
+        const quien = u.origen === 'remoto' ? 'al teléfono' : 'al servidor';
+        texto = `⚠️ ${cuando} Falabella bloqueó ${quien}${u.ok ? ` (alcanzó a leer ${u.ok} de ${u.total})` : ''}. Los precios mostrados son los últimos guardados.`
+          + (e.proxy || e.remoto?.activo || u.origen === 'remoto' ? '' : ' Hace falta un proxy (PROXY_URL) o dejar corriendo el worker del teléfono.');
       } else if (u.estado === 'interrumpido' || u.estado === 'error') {
         clase = 'estado-alerta';
         texto = `⚠️ La última actualización (${cuando}) quedó a medias: ${u.ok} de ${u.total} productos.`;
@@ -1248,6 +1249,9 @@ function renderEstadoRefresh(e) {
       }
     }
     if (e.proximo) texto += ` Próxima automática: ${e.proximo.dia} ${hora(e.proximo.hora)}.`;
+    // Quién está a cargo de leer Falabella.
+    if (e.remoto?.activo) texto += ' 📱 Teléfono conectado.';
+    else if (e.remoto?.ultimoLatido) texto += ` 📵 Teléfono desconectado (${formatRelativo(new Date(e.remoto.ultimoLatido))}).`;
     if (e.auto) boton = '<button class="btn-secondary estado-btn" id="btnRefreshTotal">↻ Actualizar todo ahora</button>';
   }
 

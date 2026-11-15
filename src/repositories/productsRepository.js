@@ -76,6 +76,18 @@ async function findCuponesEnFichas() {
   return rows;
 }
 
+// Todos los productos con lo necesario para saber a cuáles aplica un cupón
+// y cuánto quedan con él (ventana "productos del cupón").
+async function findParaCupones() {
+  const { rows } = await db.query(`
+    SELECT p.sku, p.nombre, p.marca, p.upc, p.precio_normal, p.precio_oferta, p.precio_cmr, p.cupon,
+           (p.price_updated_at > NOW() - INTERVAL '3 days') AS fresco, c.nombre AS categoria
+    FROM products p JOIN categories c ON c.id = p.category_id
+    ORDER BY p.nombre NULLS LAST, p.sku
+  `);
+  return rows;
+}
+
 // Cuántos productos hay por marca y por categoría, para decir a cuántos
 // productos aplica cada cupón.
 async function contarProductos() {
@@ -193,5 +205,5 @@ async function search(q) {
 
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getCategoryName, findAllSkus, findMarcas, findCuponesEnFichas, contarProductos, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
+  getPriceData, getCategoryName, findAllSkus, findMarcas, findCuponesEnFichas, findParaCupones, contarProductos, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
 };

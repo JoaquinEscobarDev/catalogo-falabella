@@ -32,6 +32,7 @@ Corre 100% en la nube (PWA instalable + PostgreSQL): el propio servidor actualiz
 - **Cargados a mano**: desde el botón 🎟️ se registran los cupones de campaña (código, % o $, tope, compra mínima, solo CMR, vencimiento) que aplican a todos los productos, una categoría, una marca o SKUs puntuales
 - Cada tarjeta muestra el cupón y **en cuánto queda el precio final**: "Con cupón" (sobre el precio oferta/normal) y "Con cupón + CMR" (sobre el precio CMR)
 - Los cupones vencidos dejan de aplicarse solos
+- **Tocar un cupón** (en la tarjeta o en la ventana 🎟️) abre la lista de productos a los que aplica, con su precio, el precio con cupón, SKU y UPC, y un filtro
 
 ### Planes Connect (`📶`)
 - **Plan en la tarjeta**: al actualizar precios se lee la ficha de cada equipo; si se vende con plan (Entel, Movistar, WOM o Claro), la tarjeta muestra compañía, portabilidad o línea nueva, el valor mensual y el precio del equipo
@@ -90,7 +91,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 - Actualización de precios manual por producto o refresh masivo de toda la categoría
 
 ### PWA instalable
-- Manifest y service worker incluidos (`catalogo-v13`)
+- Manifest y service worker incluidos (`catalogo-v14`)
 - Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
 - Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 

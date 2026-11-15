@@ -19,6 +19,7 @@
 //   node scripts/worker-telefono.js --probar       prueba unos productos y sale
 //   node scripts/worker-telefono.js --diagnostico  muestra qué responde Falabella
 //   node scripts/worker-telefono.js --cupones      busca cupones de campaña ahora y muestra cuáles encontró
+//   node scripts/worker-telefono.js --cupon-producto SKU   muestra qué dice la ficha de ese producto sobre su cupón
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -107,9 +108,14 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto'].find(m => process.argv.includes(m));
   if (modo) {
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones })[modo]();
+    const cuponProducto = async () => {
+      const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
+      if (!sku) { console.log('Falta el SKU, por ejemplo: --cupon-producto 80659213'); return; }
+      for (const l of await scraperService.contextoCupon(sku)) console.log(l);
+    };
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto })[modo]();
     await db.end();
     return;
   }

@@ -757,7 +757,52 @@ async function diagnosticoCurl(sku) {
   return lineas;
 }
 
+// Diagnóstico: muestra dónde aparece la palabra "cupón" en la ficha de un
+// producto y qué otros datos hay al lado, para saber si Falabella publica el
+// monto o el código en algún campo que todavía no se lee.
+async function contextoCupon(sku, fetchFn = fetchDirectoConReintentos) {
+  const html = await fetchFn(urlDirecta(sku));
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return ['La página no trae datos internos.'];
+  const pd = JSON.parse(m[1])?.props?.pageProps?.productData;
+  if (!pd) return ['La página no trae los datos del producto.'];
+
+  const corto = v => {
+    if (v == null) return String(v);
+    if (typeof v === 'object') return Array.isArray(v) ? `[lista de ${v.length}]` : `{${Object.keys(v).slice(0, 6).join(', ')}}`;
+    return String(v).replace(/\s+/g, ' ').slice(0, 90);
+  };
+  const hallazgos = [];
+  (function visitar(nodo, ruta, padre, rutaPadre, prof) {
+    if (nodo == null || prof > 14 || hallazgos.length >= 4) return;
+    if (typeof nodo === 'string') {
+      if (/cup[oó]n|coupon/i.test(nodo) && nodo.length < 400) hallazgos.push({ ruta, padre, rutaPadre });
+      return;
+    }
+    if (typeof nodo !== 'object') return;
+    for (const [k, v] of Object.entries(nodo)) {
+      const r = Array.isArray(nodo) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k);
+      if (/coupon|cup[oó]n/i.test(k) && v != null && v !== '' && hallazgos.length < 4) hallazgos.push({ ruta: r, padre: nodo, rutaPadre: ruta, porClave: true });
+      visitar(v, r, nodo, ruta, prof + 1);
+    }
+  })(pd, '', null, '', 0);
+
+  if (!hallazgos.length) return [`${pd.name}: la ficha no menciona cupones.`];
+  const lineas = [`${pd.name}`];
+  const vistos = new Set();
+  for (const h of hallazgos) {
+    // Dos menciones en el mismo objeto (p. ej. label y type) se muestran una vez.
+    if (vistos.has(h.padre)) continue;
+    vistos.add(h.padre);
+    lineas.push('', `en: ${h.ruta}`);
+    const obj = h.padre && typeof h.padre === 'object' && !Array.isArray(h.padre) ? h.padre : null;
+    if (obj) for (const [k, v] of Object.entries(obj).slice(0, 14)) lineas.push(`  ${k}: ${corto(v)}`);
+  }
+  return lineas;
+}
+
 module.exports = {
+  contextoCupon,
   fetchPagina,
   hayInternet,
   diagnostico,

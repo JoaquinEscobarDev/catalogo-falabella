@@ -124,6 +124,21 @@ function etiqueta(cupon) {
 
 // Devuelve los cupones que aplican a un producto con su precio final ya
 // calculado, del más conveniente al menos.
+// Falabella marca en la ficha los productos que participan de una campaña de
+// cupón con un identificador interno, p. ej. "F14-CP-CUPON-PHILIPS-1P", sin el
+// monto ni el código. En vez de mostrar ese identificador, se dice qué es.
+const RE_ID_INTERNO = /^[A-Z0-9]+(?:[-_][A-Z0-9]+){2,}$/;
+
+function textoLegible(texto, marca) {
+  const t = String(texto || '').trim();
+  if (!t) return 'Cupón disponible';
+  if (!RE_ID_INTERNO.test(t)) return t;
+  const m = t.match(/CUPON[-_]([A-Z0-9]+)/);
+  const nombre = (m && m[1].length > 2 ? m[1] : marca) || '';
+  const lindo = nombre ? nombre.charAt(0) + nombre.slice(1).toLowerCase() : '';
+  return `Participa de una campaña de cupón${lindo ? ` ${lindo}` : ''}. La ficha no dice el monto ni el código: revisalos en la página de cupones de Falabella.`;
+}
+
 function cuponesDe(producto, sku, categoria, cuponesManuales) {
   const lista = [];
 
@@ -132,7 +147,7 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
     lista.push({
       origen: 'falabella', codigo: auto.codigo || null, tipo: auto.tipo || null, valor: auto.valor || null,
       tope: auto.tope || null, minimo: auto.minimo || null, soloCMR: !!auto.soloCMR,
-      texto: auto.texto || null, vence: null,
+      texto: textoLegible(auto.texto, producto.marca), vence: null, aviso: !auto.tipo,
     });
   }
   // Primero los automáticos y después los manuales: ante un mismo código,
@@ -151,7 +166,12 @@ function cuponesDe(producto, sku, categoria, cuponesManuales) {
     });
   }
 
-  return lista.map(c => {
+  // Un aviso de la ficha sin monto ("este producto participa de una campaña de
+  // cupón") sobra si ya hay un cupón concreto, con su descuento, que aplica.
+  const hayConcreto = lista.some(c => c.tipo);
+  const finales = hayConcreto ? lista.filter(c => c.tipo) : lista;
+
+  return finales.map(c => {
     const calc = c.tipo ? calcular(c, producto) : { precioFinal: null, descuento: null, precioFinalCMR: null, descuentoCMR: null, mejorPrecio: null };
     // noAplica: el cupón existe pero el precio no alcanza la compra mínima.
     const noAplica = !!c.tipo && calc.mejorPrecio == null;

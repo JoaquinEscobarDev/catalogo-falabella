@@ -29,6 +29,7 @@ function getChromium() {
 
 const env = require('../config/env');
 const { detectarCupon } = require('./cuponParser');
+const { detectarPlan } = require('./planParser');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -404,6 +405,16 @@ function extraerCupon(pd, variante) {
   }
 }
 
+// Plan Connect (equipo vendido con plan de una compañía), si la ficha lo trae.
+function extraerPlan(pd, variante) {
+  try {
+    const { variants, ...productoSinVariantes } = pd || {};
+    return detectarPlan(variante, productoSinVariantes);
+  } catch {
+    return null;
+  }
+}
+
 function extraerDeProductData(pd, skuBuscado) {
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};
   const precios  = variante.prices || [];
@@ -430,6 +441,7 @@ function extraerDeProductData(pd, skuBuscado) {
     cuotasSinInteres: extraerCuotasSinInteres(pd),
     despacho24h: extraerDespacho24h(variante.meatStickers),
     cupon: extraerCupon(pd, variante),
+    plan: extraerPlan(pd, variante),
     ...extraerGarantias(pd),
   };
 }
@@ -457,6 +469,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     color: extraerColorDeNombre(nombre),
     despacho24h: extraerDespacho24h(item.meatStickers),
     cupon: extraerCupon(item, null),
+    plan: (() => { try { return detectarPlan(item); } catch { return null; } })(),
     // Los listados de búsqueda no traen warrantyOptions ni installmentsWithoutInterest.
     cuotasSinInteres: null,
     garantia1a: null, garantia2a: null, garantia3a: null,
@@ -757,10 +770,11 @@ async function diagnosticoCurl(sku) {
   return lineas;
 }
 
-// Diagnóstico: muestra dónde aparece la palabra "cupón" en la ficha de un
-// producto y qué otros datos hay al lado, para saber si Falabella publica el
-// monto o el código en algún campo que todavía no se lee.
-async function contextoCupon(sku, fetchFn = fetchDirectoConReintentos) {
+// Diagnóstico: muestra dónde aparecen ciertas palabras en la ficha de un
+// producto y qué otros datos hay al lado, para saber en qué campos publica
+// Falabella cosas que todavía no se leen (monto de un cupón, datos del plan).
+//   reTexto: qué buscar en los valores; reClave: qué buscar en los nombres de campo.
+async function contextoFicha(sku, { reTexto, reClave, nada }, fetchFn = fetchDirectoConReintentos) {
   const html = await fetchFn(urlDirecta(sku));
   const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
   if (!m) return ['La página no trae datos internos.'];
@@ -774,20 +788,20 @@ async function contextoCupon(sku, fetchFn = fetchDirectoConReintentos) {
   };
   const hallazgos = [];
   (function visitar(nodo, ruta, padre, rutaPadre, prof) {
-    if (nodo == null || prof > 14 || hallazgos.length >= 4) return;
+    if (nodo == null || prof > 14 || hallazgos.length >= 6) return;
     if (typeof nodo === 'string') {
-      if (/cup[oó]n|coupon/i.test(nodo) && nodo.length < 400) hallazgos.push({ ruta, padre, rutaPadre });
+      if (reTexto.test(nodo) && nodo.length < 400) hallazgos.push({ ruta, padre, rutaPadre });
       return;
     }
     if (typeof nodo !== 'object') return;
     for (const [k, v] of Object.entries(nodo)) {
       const r = Array.isArray(nodo) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k);
-      if (/coupon|cup[oó]n/i.test(k) && v != null && v !== '' && hallazgos.length < 4) hallazgos.push({ ruta: r, padre: nodo, rutaPadre: ruta, porClave: true });
+      if (reClave.test(k) && v != null && v !== '' && hallazgos.length < 6) hallazgos.push({ ruta: r, padre: nodo, rutaPadre: ruta, porClave: true });
       visitar(v, r, nodo, ruta, prof + 1);
     }
   })(pd, '', null, '', 0);
 
-  if (!hallazgos.length) return [`${pd.name}: la ficha no menciona cupones.`];
+  if (!hallazgos.length) return [`${pd.name}: ${nada}`];
   const lineas = [`${pd.name}`];
   const vistos = new Set();
   for (const h of hallazgos) {
@@ -801,8 +815,21 @@ async function contextoCupon(sku, fetchFn = fetchDirectoConReintentos) {
   return lineas;
 }
 
+function contextoCupon(sku, fetchFn) {
+  return contextoFicha(sku, { reTexto: /cup[oó]n|coupon/i, reClave: /coupon|cup[oó]n/i, nada: 'la ficha no menciona cupones.' }, fetchFn);
+}
+
+function contextoPlan(sku, fetchFn) {
+  return contextoFicha(sku, {
+    reTexto: /\b(entel|movistar|wom|claro)\b|portabilidad|l[ií]nea nueva|\/mes|mensual|\bplan\b/i,
+    reClave: /plan|carrier|operador|operator|telco|portab/i,
+    nada: 'la ficha no menciona planes ni compañías.',
+  }, fetchFn);
+}
+
 module.exports = {
   contextoCupon,
+  contextoPlan,
   fetchPagina,
   hayInternet,
   diagnostico,

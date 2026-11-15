@@ -1391,3 +1391,75 @@ main {
 .cupon-fuente-ficha  { color: var(--naranja); border-color: rgba(240,136,62,.35); }
 .cupon-fuente-manual { color: var(--verde); border-color: rgba(63,185,80,.35); }
 .cupon-item-alcance { display: block; font-size: .72rem; color: var(--texto-suave); margin-top: 2px; overflow-wrap: anywhere; }
+
+/* ══════════════════════════════════════════
+   PLANES CONNECT
+══════════════════════════════════════════ */
+
+.card-plan {
+  margin-top: 6px; padding: 6px 8px; border-radius: 8px;
+  background: rgba(121,192,255,.07); border: 1px solid rgba(121,192,255,.3);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.card-plan-titulo { font-size: .76rem; font-weight: 700; color: var(--azul); }
+.card-plan-nombre { font-size: .72rem; color: var(--texto); }
+.card-plan-precio { font-size: .8rem; font-weight: 700; color: var(--texto); }
+.btn-simular {
+  align-self: flex-start; margin-top: 3px; font-size: .7rem; padding: 2px 8px; border-radius: 6px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--borde); color: var(--texto-suave);
+}
+.btn-simular:hover { color: var(--texto); border-color: var(--azul); }
+
+/* Ventana centrada, igual que la de cupones */
+#connectOverlay { align-items: center; padding: 16px; }
+#connectOverlay .cuotas-sheet {
+  border-radius: var(--radius); border-bottom: 1px solid var(--borde);
+  max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+  animation: fadeInUp .22s var(--ease);
+}
+#connectOverlay .cuotas-sheet-header { justify-content: center; text-align: center; padding: 14px 48px; }
+#connectOverlay .cuotas-close { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
+#connectOverlay .cupones-ayuda, #connectOverlay .cupon-form h3 { text-align: center; }
+
+.connect-tabs {
+  display: flex; gap: 6px; padding: 10px 16px 0; justify-content: center;
+  position: sticky; top: 49px; background: var(--surface); z-index: 1;
+}
+.connect-tabs button {
+  flex: 1; max-width: 160px; padding: 8px 6px; border-radius: 8px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--borde); color: var(--texto-suave);
+  font-size: .82rem; font-weight: 600; font-family: inherit;
+}
+.connect-tabs button.active { background: rgba(121,192,255,.15); border-color: var(--azul); color: var(--azul); }
+
+.connect-item-acciones { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+.connect-btn-chico { padding: 4px 9px; font-size: .74rem; text-decoration: none; display: inline-block; }
+.connect-btn-ancho { width: 100%; padding: 11px; font-size: .9rem; }
+
+.connect-resultado {
+  background: var(--surface-2); border: 1px solid var(--borde); border-radius: 10px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 2px;
+}
+.connect-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 4px; }
+.connect-fila-titulo { font-size: .8rem; color: var(--texto-suave); }
+.connect-fila-valor  { font-size: 1.05rem; font-weight: 800; color: var(--texto); white-space: nowrap; }
+.connect-fila-detalle { font-size: .7rem; color: var(--texto-suave); text-align: right; }
+
+.connect-tipo { display: flex; gap: 8px; justify-content: center; }
+.connect-tipo label {
+  flex: 1; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px; border-radius: 8px; border: 1.5px solid var(--borde); background: var(--surface-2);
+  font-size: .85rem; color: var(--texto); cursor: pointer;
+}
+.connect-tipo label:has(input:checked) { border-color: var(--azul); background: rgba(121,192,255,.12); }
+.connect-tipo input { accent-color: var(--azul); }
+
+.connect-ventas-cabecera { display: flex; gap: 8px; align-items: center; justify-content: center; padding-top: 14px; border-top: 1px solid var(--borde); }
+.connect-ventas-cabecera input[type="month"] {
+  padding: 7px 10px; background: var(--surface-2); border: 1.5px solid var(--borde); border-radius: 8px;
+  color: var(--texto); font-family: inherit; font-size: .85rem; color-scheme: dark;
+}
+.connect-resumen { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.connect-chip { font-size: .72rem; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--borde); color: var(--texto-suave); }
+.connect-chip-total { color: var(--texto); font-weight: 700; border-color: var(--azul); }
+.connect-fecha { margin-top: 0; margin-left: auto; }

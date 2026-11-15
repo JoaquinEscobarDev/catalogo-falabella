@@ -12,6 +12,8 @@ function mapRowToProducto(row) {
     // Cupón crudo detectado al scrapear; couponService lo convierte en
     // `cupones` (con precio final) antes de responder al cliente.
     cuponDetectado: row.cupon || null,
+    // Plan Connect detectado en la ficha (compañía, mensual, tipo...).
+    plan: row.plan || null,
   };
 }
 
@@ -115,13 +117,15 @@ async function setPriceData(sku, producto) {
       capacidad = $12, color = $13,
       cuotas_sin_interes = $14, despacho_24h = $15,
       cupon = $16,
+      plan = $17,
       price_updated_at = NOW()
     WHERE sku = $1
   `, [sku, producto.nombre, producto.marca,
       producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
       producto.garantia1a, producto.garantia2a, producto.garantia3a,
       producto.capacidad, producto.color, producto.cuotasSinInteres, producto.despacho24h,
-      producto.cupon ? JSON.stringify(producto.cupon) : null]);
+      producto.cupon ? JSON.stringify(producto.cupon) : null,
+      producto.plan ? JSON.stringify(producto.plan) : null]);
 }
 
 // Trae precio + stock cacheados de toda una categoría en una sola consulta.
@@ -154,7 +158,7 @@ async function search(q) {
            p.precio_normal, p.precio_oferta, p.precio_cmr,
            p.url, p.price_updated_at,
            p.garantia_1a, p.garantia_2a, p.garantia_3a,
-           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h, p.upc, p.cupon,
+           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h, p.upc, p.cupon, p.plan,
            s.stock
     FROM products p
     JOIN categories c ON c.id = p.category_id
@@ -172,7 +176,7 @@ async function search(q) {
     garantia1a: r.garantia_1a, garantia2a: r.garantia_2a, garantia3a: r.garantia_3a,
     capacidad: r.capacidad, color: r.color,
     cuotasSinInteres: r.cuotas_sin_interes, despacho24h: r.despacho_24h,
-    upc: r.upc, cuponDetectado: r.cupon || null,
+    upc: r.upc, cuponDetectado: r.cupon || null, plan: r.plan || null,
     stock: r.stock,
   }));
 }

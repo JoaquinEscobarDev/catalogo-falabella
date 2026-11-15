@@ -11,6 +11,7 @@ function mapRow(r) {
     origen: r.origen || 'manual',
     texto: r.texto || null,
     detectadoEn: r.detectado_en || null,
+    general: r.general === true,
   };
 }
 
@@ -64,9 +65,9 @@ async function reemplazarAutomaticos(cupones) {
     await q(`DELETE FROM coupons WHERE origen = 'automatico'`);
     for (const c of cupones) {
       await q(`
-        INSERT INTO coupons (codigo, tipo, valor, tope, minimo, solo_cmr, alcance, alcance_valor, vence, origen, texto, detectado_en)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'automatico',$10,NOW())
-      `, [c.codigo, c.tipo, c.valor, c.tope, c.minimo, !!c.soloCMR, c.alcance, c.alcanceValor, c.vence, c.texto]);
+        INSERT INTO coupons (codigo, tipo, valor, tope, minimo, solo_cmr, alcance, alcance_valor, vence, origen, texto, general, detectado_en)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'automatico',$10,$11,NOW())
+      `, [c.codigo, c.tipo, c.valor, c.tope, c.minimo, !!c.soloCMR, c.alcance, c.alcanceValor, c.vence, c.texto, !!c.general]);
     }
   });
 }

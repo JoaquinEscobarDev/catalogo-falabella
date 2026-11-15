@@ -444,6 +444,7 @@ function bloqueCupones(prod) {
       const [, m, d] = c.vence.split('-');
       condiciones.push(`hasta ${d}/${m}`);
     }
+    if (c.general) condiciones.push('cupón general del sitio: puede tener exclusiones');
     const titulo = `🎟️ ${c.codigo ? `Cupón <strong>${esc(c.codigo)}</strong>` : 'Cupón'}${c.etiqueta ? ` −${esc(c.etiqueta)}` : ''}`;
 
     let cuerpo;
@@ -1346,7 +1347,7 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
       return `${c.productos} producto${c.productos === 1 ? '' : 's'}: ${nombres}${resto > 0 ? ` y ${resto} más` : ''}`;
     }
     switch (c.alcance) {
-      case 'todos':     return `Todos los productos${n(conteo?.total)}`;
+      case 'todos':     return `${c.general ? 'Todo el sitio (cupón general: puede tener exclusiones)' : 'Todos los productos'}${n(conteo?.total)}`;
       case 'marca':     return `Marca ${c.alcanceValor}${n(conteo?.porMarca?.[String(c.alcanceValor).toUpperCase()])}`;
       case 'categoria': return `Categoría ${c.alcanceValor}${n(conteo?.porCategoria?.[c.alcanceValor])}`;
       case 'sku':       return `SKU ${c.alcanceValor}`;

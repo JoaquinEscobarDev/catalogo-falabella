@@ -19,6 +19,32 @@ const MESES = {
 };
 
 const RE_TODO_EL_SITIO = /todo el sitio|toda la tienda|todos los productos|cualquier producto|todo falabella/;
+// Campaña general (Cyber, Black...): nombra departamentos en vez de marcas.
+const RE_GENERAL = /todo el sitio|toda la tienda|todos los productos|cualquier producto|todo falabella|electronica|tecnologia|electrohogar|y mas\b/;
+
+// Código escrito suelto, sin "código:" delante ("Cupón Extra Cyber ⚡ CYBER10"):
+// mayúsculas con al menos un dígito, 5 a 20 caracteres.
+function codigoSuelto(texto) {
+  if (!/cup[oó]n/i.test(texto)) return null;
+  for (const m of texto.matchAll(/(?<![A-Za-z0-9])([A-Z][A-Z0-9]{4,19})(?![A-Za-z0-9])/g)) {
+    const t = m[1];
+    if (/\d/.test(t) && (t.match(/[A-Z]/g) || []).length >= 3) return t;
+  }
+  return null;
+}
+
+function leerTope(texto) {
+  const m = texto.match(/tope[^$\d]{0,40}\$?\s?(\d{1,3}(?:\.\d{3})+|\d{4,})/i);
+  return m ? parseInt(m[1].replace(/\./g, ''), 10) : null;
+}
+
+// Descuento sin "%": "Cupón 10 extra", "10 de descuento adicional".
+function porcentajeSinSimbolo(texto) {
+  const m = texto.match(/cup[oó]n[^.$\d]{0,30}?(\d{1,2})\s*(?:%\s*)?(?:extra|adicional|de descuento|dcto|off)\b/i)
+    || texto.match(/(\d{1,2})\s*(?:%\s*)?(?:extra|adicional)\b/i);
+  const n = m ? parseInt(m[1], 10) : null;
+  return n > 0 && n < 100 ? n : null;
+}
 
 function normalizar(str) {
   return String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -188,11 +214,15 @@ function extraerCuponesDePagina(html, marcas = [], hoy = new Date()) {
   // Interpretar cada bloque; un bloque sirve si tiene código y descuento.
   const interpretados = [];
   const candidatos = new Set();
+  const codigosVistos = new Set();   // todos los códigos de la página, con o sin monto
+  const textosCupon = new Set();     // todos los textos que hablan de un cupón
   for (const b of bloques) {
     const c = parseTextoCupon(b.texto);
-    const codigo = b.codigoCampo || c?.codigo;
+    const codigo = b.codigoCampo || c?.codigo || codigoSuelto(b.texto);
+    if (codigo) codigosVistos.add(codigo);
+    if (/cup[oó]n/i.test(b.texto)) textosCupon.add(b.texto);
     if (c && codigo && c.tipo) interpretados.push({ ...c, codigo, textoBloque: b.texto });
-    else if (/cup[oó]n/i.test(b.texto) && b.texto.length >= 20) candidatos.add(b.texto.slice(0, 200));
+    else if (/cup[oó]n/i.test(b.texto) && b.texto.length >= 20) candidatos.add(b.texto.slice(0, 300));
   }
 
   // Un mismo cupón aparece en varios bloques anidados: se agrupa por código y
@@ -248,10 +278,39 @@ function extraerCuponesDePagina(html, marcas = [], hoy = new Date()) {
     }
   }
 
+  // Página de una sola campaña (p. ej. "Cupón Extra Cyber ⚡ CYBER10"): el
+  // código, el monto y a qué aplica vienen repartidos en textos distintos
+  // (título, texto enriquecido, descripción). Si hay un único código en toda
+  // la página, se leen todos esos textos juntos.
+  const sinMonto = [];
+  for (const codigo of codigosVistos) {
+    if (porCodigo.has(codigo)) continue;
+    if (codigosVistos.size !== 1) { sinMonto.push(codigo); continue; }
+    const junto = [...textosCupon].sort((a, b) => a.length - b.length).join(' · ').slice(0, 5000);
+    const c = parseTextoCupon(junto) || {};
+    let tipo = c.tipo, valor = c.valor;
+    const pct = porcentajeSinSimbolo(junto);
+    if (!tipo && pct) { tipo = 'porcentaje'; valor = pct; }
+    if (!tipo) { sinMonto.push(codigo); continue; }
+    const datos = {
+      codigo, tipo, valor,
+      // El tope se lee aparte: parseTextoCupon solo lo da cuando ve un "%".
+      tope: tipo === 'porcentaje' ? (c.tope ?? leerTope(junto)) : null,
+      minimo: c.minimo, soloCMR: !!c.soloCMR,
+      vence: parseVence(junto, hoy),
+      texto: [...textosCupon].filter(t => t.includes(codigo) || /\d/.test(t)).sort((a, b) => a.length - b.length).join(' · ').slice(0, 300),
+    };
+    // No se buscan marcas en el texto de toda la página: los banners nombran
+    // muchas y se le asignaría una al azar.
+    if (RE_GENERAL.test(normalizar(junto))) cupones.push({ ...datos, alcance: 'todos', alcanceValor: null, general: true });
+    else sinAlcance.push(datos);
+  }
+
   return {
     tieneNextData: !!nextData,
     cupones,
     sinAlcance,
+    sinMonto,
     // Sin los que mencionan un cupón ya interpretado: esos no aportan nada.
     candidatos: [...candidatos]
       .filter(t => !todosLosCodigos.some(c => t.includes(c)))

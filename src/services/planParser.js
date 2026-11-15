@@ -96,12 +96,28 @@ function leerGigas(texto) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+// Falabella marca la compañía del equipo en attributes.connectOperator de la
+// variante: "Liberado" para los equipos sin plan, o el nombre de la compañía
+// para los que se venden con plan. (Visto en una ficha real el 15-11-2026.)
+function operadorDeAtributos(fuentes) {
+  for (const f of fuentes) {
+    const op = f?.attributes?.connectOperator ?? f?.connectOperator;
+    if (typeof op === 'string' && op.trim()) return op.trim();
+  }
+  return null;
+}
+
 // fuentes: la variante elegida y el producto sin sus otras variantes (o un
 // item de resultados de búsqueda). Devuelve null si no parece un equipo con plan.
 function detectarPlan(...fuentes) {
+  const operador = operadorDeAtributos(fuentes);
+  const companiaOperador = operador ? (COMPANIAS.find(([, re]) => re.test(operador)) || [null])[0] : null;
+  // Equipo liberado: no viene con plan, aunque algún texto nombre compañías.
+  if (operador && !companiaOperador && /liberado/i.test(operador)) return null;
+
   const textos = [];
   for (const f of fuentes) textosCortos(f, textos);
-  if (!textos.length) return null;
+  if (!textos.length && !companiaOperador) return null;
 
   // Solo cuenta si algún texto menciona una compañía junto con "plan",
   // "portabilidad", "línea nueva" o un valor mensual: así un "Claro" suelto
@@ -109,9 +125,10 @@ function detectarPlan(...fuentes) {
   const relevantes = textos.filter(t =>
     COMPANIAS.some(([, re]) => re.test(t)) && (/plan|portabilidad|l[ií]nea nueva|mensual|\/mes|al mes/i.test(t))
   );
-  if (!relevantes.length) return null;
+  // El campo connectOperator con una compañía alcanza para saber que es Connect.
+  if (!relevantes.length && !companiaOperador) return null;
 
-  const compania = (COMPANIAS.find(([, re]) => re.test(relevantes.join(' '))) || [null])[0];
+  const compania = companiaOperador || (COMPANIAS.find(([, re]) => re.test(relevantes.join(' '))) || [null])[0];
 
   // Ya se sabe que es un equipo con plan: los datos del plan pueden venir en
   // otros textos que no repiten la compañía ("Plan Libre 300GB $24.990 mensual").
@@ -134,7 +151,7 @@ function detectarPlan(...fuentes) {
     tipo: leerTipo(todo),
     nombre,
     gigas,
-    texto: todo.slice(0, 240),
+    texto: (todo || `connectOperator: ${operador}`).slice(0, 240),
   };
 }
 

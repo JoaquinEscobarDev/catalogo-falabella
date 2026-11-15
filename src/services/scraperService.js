@@ -37,6 +37,17 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // residencial; la misma página por HTTP/1.1 llega bien. El curl de Windows
 // ya usaba HTTP/1.1 por defecto, por eso desde la PC funcionaba sin esto.
 // (Comprobado el 15-11-2026 con scripts/worker-telefono.js --diagnostico.)
+// Códigos de salida de curl que significan "no hubo conexión" (sin DNS, no
+// conecta, tiempo agotado, TLS o conexión cortada), a diferencia de una
+// respuesta de Falabella sin datos (BLOCKED).
+const CURL_SIN_RED = { 5: 'no resuelve el proxy', 6: 'no resuelve el dominio', 7: 'no conecta', 28: 'tiempo agotado', 35: 'falla TLS', 52: 'respuesta vacía', 55: 'error al enviar', 56: 'conexión cortada' };
+
+function errorDeCurl(err) {
+  const e = new Error(`curl ${err.code}${CURL_SIN_RED[err.code] ? `: ${CURL_SIN_RED[err.code]}` : ''}`);
+  e.sinRed = err.code in CURL_SIN_RED;
+  return e;
+}
+
 function curlUnaVez(url, useProxy, comprimido) {
   const args = [
     '-sL', '--http1.1',
@@ -51,10 +62,20 @@ function curlUnaVez(url, useProxy, comprimido) {
 
   return new Promise((resolve, reject) => {
     execFile('curl', args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-      if (err) return reject(new Error(err.message));
+      if (err) return reject(errorDeCurl(err));
       if (!stdout || !stdout.includes('__NEXT_DATA__')) return reject(new Error('BLOCKED'));
       resolve(stdout);
     });
+  });
+}
+
+// ¿Hay internet en este aparato? Se consulta una dirección neutra (no
+// Falabella): cualquier respuesta HTTP sirve. INTERNET_PROBE_URL la cambia.
+const PROBE_URL = process.env.INTERNET_PROBE_URL || 'https://www.gstatic.com/generate_204';
+function hayInternet() {
+  return new Promise(resolve => {
+    execFile('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '8', PROBE_URL],
+      (err, stdout) => resolve(!!stdout && stdout.trim() !== '000'));
   });
 }
 
@@ -82,12 +103,15 @@ async function curlFetch(url, useProxy = false) {
 }
 
 async function fetchDirectoConReintentos(url, intentos = 2) {
+  let ultimo = null;
   for (let i = 1; i <= intentos; i++) {
     try {
       return await curlFetch(url);
-    } catch { /* reintenta */ }
+    } catch (e) { ultimo = e; /* reintenta */ }
     if (i < intentos) await new Promise(res => setTimeout(res, 1500));
   }
+  // Sin conexión no es lo mismo que "Falabella no dio datos": se informa tal cual.
+  if (ultimo?.sinRed) throw ultimo;
   throw new Error('BLOCKED');
 }
 
@@ -499,14 +523,17 @@ async function intentarBusqueda(sku, fetchFn) {
   try {
     const producto = extraerDeHTML(await fetchFn(urlBusqueda(sku)), sku);
     if (producto) { busquedaFallosSeguidos = 0; return producto; }
-  } catch { /* cuenta como fallo */ }
+  } catch (e) {
+    if (e.sinRed) throw e; // sin internet: que decida quien llama
+  }
   return null;
 }
 
 async function intentarDirecta(sku, fetchFn) {
   try {
     return extraerDeHTML(await fetchFn(urlDirecta(sku)), sku);
-  } catch {
+  } catch (e) {
+    if (e.sinRed) throw e;
     return null;
   }
 }
@@ -537,7 +564,9 @@ async function scrapeProducto(sku, fetchFn) {
       const html = await fetchFn(urlDirectaOffset(sku));
       const producto = extraerDirectoSinValidarId(html, sku);
       if (producto) return { producto, viaDirecta: true };
-    } catch { /* no hay más intentos */ }
+    } catch (e) {
+      if (e.sinRed) throw e;
+    }
   }
 
   return { producto: null, viaDirecta: false };
@@ -707,6 +736,7 @@ async function diagnosticoCurl(sku) {
 }
 
 module.exports = {
+  hayInternet,
   diagnostico,
   diagnosticoCurl,
   fetchDirectoConReintentos,

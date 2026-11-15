@@ -32,9 +32,14 @@ const { detectarCupon } = require('./cuponParser');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+// --http1.1 es imprescindible: con HTTP/2 (lo que un curl de Linux/Android
+// negocia por defecto) Cloudflare responde 403 "challenge" aunque la IP sea
+// residencial; la misma página por HTTP/1.1 llega bien. El curl de Windows
+// ya usaba HTTP/1.1 por defecto, por eso desde la PC funcionaba sin esto.
+// (Comprobado el 15-11-2026 con scripts/worker-telefono.js --diagnostico.)
 function curlFetch(url, useProxy = false) {
   const args = [
-    '-sL',
+    '-sL', '--http1.1',
     '-H', `User-Agent: ${USER_AGENT}`,
     '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     '-H', 'Accept-Language: es-CL,es;q=0.9,en;q=0.8',
@@ -582,11 +587,11 @@ async function diagnostico(sku) {
   const pagina = urlDirecta(sku);
   const [ipSalida, curlDirecto, curlBusqueda, stock] = await Promise.all([
     curlCrudo('https://api.ipify.org').then(x => (x.http === 200 ? x.muestra?.trim().split(' ').pop() : null) || x.error),
-    curlCrudo(pagina),
-    curlCrudo(urlBusqueda(sku)),
+    curlCrudo(pagina, { extra: ['--http1.1'] }),
+    curlCrudo(urlBusqueda(sku), { extra: ['--http1.1'] }),
     curlCrudo(`${env.falabellaBaseUrl}/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`, { accept: 'application/json' }),
   ]);
-  const curlConProxy = env.proxyUrl ? await curlCrudo(pagina, { proxy: true }) : null;
+  const curlConProxy = env.proxyUrl ? await curlCrudo(pagina, { proxy: true, extra: ['--http1.1'] }) : null;
   const browser = await diagnosticoBrowser(pagina);
 
   let conclusion;
@@ -609,11 +614,10 @@ const UA_MOVIL = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (K
 async function diagnosticoCurl(sku) {
   const pagina = urlDirecta(sku);
   const pruebas = [
-    ['pagina (como el worker)', pagina, {}],
-    ['pagina --compressed',     pagina, { extra: ['--compressed'] }],
-    ['pagina --http1.1',        pagina, { extra: ['--http1.1'] }],
-    ['pagina UA movil',         pagina, { ua: UA_MOVIL, extra: ['--compressed'] }],
-    ['busqueda',                urlBusqueda(sku), {}],
+    ['pagina http1.1 (como el worker)', pagina, { extra: ['--http1.1'] }],
+    ['busqueda http1.1',        urlBusqueda(sku), { extra: ['--http1.1'] }],
+    ['pagina http2',            pagina, { extra: ['--http2'] }],
+    ['pagina http2 UA movil',   pagina, { ua: UA_MOVIL, extra: ['--http2', '--compressed'] }],
     ['stock (API)',             `${env.falabellaBaseUrl}/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`, { accept: 'application/json' }],
     ['portada',                 `${env.falabellaBaseUrl}/falabella-cl`, { extra: ['--compressed'] }],
   ];

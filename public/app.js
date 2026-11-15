@@ -10,6 +10,12 @@ function formatRelativo(fecha) {
   return `hace ${dias}d`;
 }
 
+// Escapa texto que viene de afuera (Falabella, cupones) antes de meterlo en HTML.
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+const fmtPesos = n => `$${Number(n).toLocaleString('es-CL')}`;
+
 // ── Categorías ──
 const CATEGORIAS = [
   { nombre: 'Computadores',       icono: '💻' },
@@ -77,6 +83,7 @@ async function init() {
   const r = await fetch('/api/skus');
   skusGuardados = await r.json();
   renderCategorias();
+  cargarEstadoRefresh();
   await cargarTodo();
   // Refresca el ToDo cada 20s para que los cambios de otros dispositivos
   // (agregar, quitar, limpiar) se vean sin tener que recargar la página.
@@ -205,6 +212,7 @@ function mostrarVistaCategorias() {
   headerTitle.textContent      = '🛒 Catálogo Falabella';
   todoFab.style.display        = 'none';
   renderCategorias();
+  cargarEstadoRefresh();
 }
 
 btnBack.addEventListener('click', () => history.back());
@@ -264,13 +272,30 @@ async function cargarProducto(sku, force = false) {
   renderTodo();
 }
 
-// El refresco real lo hace tu PC (ver watch-refresh.js) cada ~5 min — Railway
-// no puede scrapear Falabella de forma confiable. El botón solo deja la
-// solicitud y espera a que se procese para volver a cargar los precios.
+// Vuelve a pedir precio + stock de toda la categoría en un solo request.
+async function recargarCategoria(nombre) {
+  let datos;
+  try {
+    const r = await fetch(`/api/categoria/${encodeURIComponent(nombre)}`);
+    datos = await r.json();
+  } catch { return; }
+  if (!Array.isArray(datos)) return;
+  for (const d of datos) {
+    if (d.producto) productosCache[d.sku] = d.producto;
+    if (d.stock) stockCache[d.sku] = d.stock;
+  }
+  renderGrid();
+  renderTodo();
+}
+
+// El refresco lo hace el propio servidor en segundo plano (ya no depende de
+// una PC prendida). El botón deja la solicitud y va mostrando el avance hasta
+// que termina, y recién ahí recarga los precios.
 btnRefreshAll.addEventListener('click', async () => {
   if (!categoriaActiva || btnRefreshAll.disabled) return;
   btnRefreshAll.disabled = true;
   btnRefreshAll.textContent = '↻ Solicitando…';
+  const restaurar = ms => setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, ms);
 
   let solicitudId;
   try {
@@ -284,35 +309,36 @@ btnRefreshAll.addEventListener('click', async () => {
     solicitudId = data.id;
   } catch (e) {
     btnRefreshAll.textContent = '❌ ' + e.message;
-    setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 3000);
+    restaurar(3000);
     return;
   }
 
-  btnRefreshAll.textContent = '↻ Esperando tu PC…';
+  btnRefreshAll.textContent = '↻ Actualizando…';
   const categoriaAlSolicitar = categoriaActiva;
 
-  // Tu PC revisa solicitudes pendientes cada ~5 min — esperamos hasta 12 min en total.
-  for (let intento = 0; intento < 24; intento++) {
-    await new Promise(res => setTimeout(res, 30000));
-    let procesado = false;
+  // Hasta 30 min: una categoría grande con el browser de respaldo puede tardar.
+  for (let intento = 0; intento < 450; intento++) {
+    await new Promise(res => setTimeout(res, 4000));
+    let estado = null;
     try {
       const r = await fetch(`/api/solicitar-refresh/${solicitudId}`);
-      procesado = (await r.json()).procesado;
-    } catch { /* probar de nuevo en el próximo intento */ }
-    if (procesado) {
-      if (categoriaActiva === categoriaAlSolicitar) {
-        const skusCat = skusGuardados.filter(s => s.categoria === categoriaAlSolicitar);
-        skusCat.forEach(s => { delete productosCache[s.sku]; delete stockCache[s.sku]; });
-        renderGrid();
-        await Promise.all(skusCat.map(s => Promise.all([cargarProducto(s.sku), cargarStock(s.sku)])));
-      }
-      btnRefreshAll.textContent = '✓ Precios actualizados';
-      setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 3000);
+      estado = await r.json();
+    } catch { continue; /* probar de nuevo en el próximo intento */ }
+
+    if (estado.procesado) {
+      if (categoriaActiva === categoriaAlSolicitar) await recargarCategoria(categoriaAlSolicitar);
+      const total = (estado.ok || 0) + (estado.fail || 0);
+      if (total && !estado.ok) btnRefreshAll.textContent = '⚠️ Falabella no respondió';
+      else if (estado.fail)    btnRefreshAll.textContent = `✓ Actualizados ${estado.ok} de ${total}`;
+      else                     btnRefreshAll.textContent = '✓ Precios actualizados';
+      restaurar(4000);
       return;
     }
+    if (estado.avance)          btnRefreshAll.textContent = `↻ Actualizando ${estado.avance.hechos}/${estado.avance.total}…`;
+    else if (estado.esperandoA) btnRefreshAll.textContent = '↻ En cola…';
   }
   btnRefreshAll.textContent = '⏱ Tardó más de lo esperado';
-  setTimeout(() => { btnRefreshAll.textContent = '↻ Actualizar precios'; btnRefreshAll.disabled = false; }, 4000);
+  restaurar(4000);
 });
 
 async function cargarStock(sku) {
@@ -337,7 +363,8 @@ function normalizarTexto(str) {
 // lo que sea menor; si no hay ninguno, el precio normal.
 function precioOrden(prod) {
   if (!prod) return Infinity;
-  const candidatos = [prod.precioCMR, prod.precioOferta, prod.precio].filter(p => p != null);
+  const conCupon = (prod.cupones || []).map(c => c.mejorPrecio);
+  const candidatos = [prod.precioCMR, prod.precioOferta, prod.precio, ...conCupon].filter(p => p != null);
   return candidatos.length ? Math.min(...candidatos) : Infinity;
 }
 
@@ -396,6 +423,52 @@ function badgeStock(sku) {
   if (n === null || n === undefined) return '<span class="stock-badge stock-unknown">Sin info</span>';
   if (n <= 2) return `<span class="stock-badge stock-low">Revisar</span>`;
   return `<span class="stock-badge stock-ok">Stock: ${n}</span>`;
+}
+
+// Cupones que aplican al producto, con el precio final ya calculado por el
+// servidor (ver src/services/couponService.js).
+function bloqueCupones(prod) {
+  const cupones = prod.cupones || [];
+  if (!cupones.length) return '';
+  const MAX = 2;
+
+  const items = cupones.slice(0, MAX).map(c => {
+    const condiciones = [];
+    if (c.tope)    condiciones.push(`tope ${fmtPesos(c.tope)}`);
+    if (c.minimo)  condiciones.push(`compra mínima ${fmtPesos(c.minimo)}`);
+    if (c.soloCMR) condiciones.push('solo con CMR');
+    if (c.vence) {
+      const [, m, d] = c.vence.split('-');
+      condiciones.push(`hasta ${d}/${m}`);
+    }
+    const titulo = `🎟️ ${c.codigo ? `Cupón <strong>${esc(c.codigo)}</strong>` : 'Cupón'}${c.etiqueta ? ` −${esc(c.etiqueta)}` : ''}`;
+
+    let cuerpo;
+    if (!c.tipo) {
+      // Falabella anuncia un cupón pero no se pudo leer de cuánto es.
+      cuerpo = `<div class="cupon-nota">${esc(c.texto || 'Cupón disponible')}</div>`;
+    } else if (c.noAplica) {
+      cuerpo = `<div class="cupon-nota">No alcanza la compra mínima de ${fmtPesos(c.minimo)}</div>`;
+    } else {
+      const filas = [];
+      if (c.precioFinal != null) {
+        filas.push(`<div class="precio-fila"><span class="precio-label">Con cupón</span><span class="precio-cupon">${fmtPesos(c.precioFinal)}</span></div>`);
+      }
+      if (c.precioFinalCMR != null) {
+        filas.push(`<div class="precio-fila"><span class="precio-label">Con cupón + CMR</span><span class="precio-cupon${c.precioFinal != null ? ' precio-cupon-cmr' : ''}">${fmtPesos(c.precioFinalCMR)}</span></div>`);
+      }
+      cuerpo = filas.join('');
+    }
+    return `
+      <div class="card-cupon${c.noAplica ? ' card-cupon-off' : ''}" title="${esc(c.texto || '')}">
+        <div class="cupon-titulo">${titulo}</div>
+        ${cuerpo}
+        ${condiciones.length ? `<div class="cupon-cond">${condiciones.join(' · ')}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const extra = cupones.length > MAX ? `<div class="cupon-cond">+${cupones.length - MAX} cupón(es) más</div>` : '';
+  return items + extra;
 }
 
 function tarjeta({ sku, alias }, idx = -1) {
@@ -481,6 +554,8 @@ function tarjeta({ sku, alias }, idx = -1) {
     ? `<div class="card-despacho">🚚 Despacho 24 horas</div>`
     : '';
 
+  const bloqueCupon = bloqueCupones(prod);
+
   const btnLabel = enLista ? '✓ En lista' : '🔖 Cambiar';
   const btnClass = enLista ? 'btn-cambiar en-lista' : 'btn-cambiar';
 
@@ -515,6 +590,7 @@ function tarjeta({ sku, alias }, idx = -1) {
             </button>
           </div>
           <div class="card-precios">${bloquePrecio}</div>
+          ${bloqueCupon}
           ${bloqueDespacho}
           ${bloqueCuotas}
           ${bloqueGarantia}
@@ -1113,3 +1189,206 @@ cuotasOverlay.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') cuotasOverlay.classList.remove('open');
 });
+
+
+// ══════════════════════════════════════════
+// ESTADO DEL REFRESH AUTOMÁTICO (portada)
+// ══════════════════════════════════════════
+
+const estadoRefreshEl = document.getElementById('estadoRefresh');
+let estadoRefreshTimer = null;
+
+async function cargarEstadoRefresh() {
+  if (!estadoRefreshEl) return;
+  clearTimeout(estadoRefreshTimer);
+  let e;
+  try {
+    const r = await fetch('/api/estado');
+    if (!r.ok) throw new Error();
+    e = await r.json();
+  } catch {
+    estadoRefreshTimer = setTimeout(cargarEstadoRefresh, 60000);
+    return;
+  }
+  renderEstadoRefresh(e);
+  // Mientras hay algo corriendo se consulta seguido para mostrar el avance.
+  const corriendo = e.enCurso || e.totalEnCola;
+  estadoRefreshTimer = setTimeout(cargarEstadoRefresh, corriendo ? 5000 : 60000);
+}
+
+function renderEstadoRefresh(e) {
+  const hora = h => `${String(h).padStart(2, '0')}:00`;
+  let clase = '', texto = '', boton = '';
+
+  if (e.enCurso || e.totalEnCola) {
+    const c = e.enCurso;
+    clase = 'estado-corriendo';
+    texto = c
+      ? `⏳ Actualizando ${c.tipo === 'categoria' ? esc(c.detalle) : 'todos los productos'}: ${c.hechos} de ${c.total}…`
+      : '⏳ Actualización completa en cola…';
+  } else {
+    const u = e.ultimoCompleto;
+    if (!u) {
+      texto = e.auto
+        ? '🤖 Actualización automática activa. Todavía no corre la primera.'
+        : 'ℹ️ La actualización automática está desactivada en el servidor.';
+    } else {
+      const cuando = formatRelativo(new Date(u.terminadoEn || u.iniciadoEn));
+      if (u.estado === 'bloqueado') {
+        clase = 'estado-alerta';
+        texto = `⚠️ ${cuando} Falabella bloqueó al servidor${u.ok ? ` (alcanzó a leer ${u.ok} de ${u.total})` : ''}. Los precios mostrados son los últimos guardados.`
+          + (e.proxy ? '' : ' Hace falta configurar un proxy (PROXY_URL).');
+      } else if (u.estado === 'interrumpido' || u.estado === 'error') {
+        clase = 'estado-alerta';
+        texto = `⚠️ La última actualización (${cuando}) quedó a medias: ${u.ok} de ${u.total} productos.`;
+      } else {
+        clase = 'estado-ok';
+        texto = `✅ Precios y stock actualizados ${cuando}: ${u.ok} de ${u.total} productos`
+          + (u.cambios ? ` · ${u.cambios} con cambio de precio` : '') + '.';
+      }
+    }
+    if (e.proximo) texto += ` Próxima automática: ${e.proximo.dia} ${hora(e.proximo.hora)}.`;
+    if (e.auto) boton = '<button class="btn-secondary estado-btn" id="btnRefreshTotal">↻ Actualizar todo ahora</button>';
+  }
+
+  estadoRefreshEl.className = `estado-refresh ${clase}`;
+  estadoRefreshEl.innerHTML = `<span>${texto}</span>${boton}`;
+  estadoRefreshEl.style.display = 'flex';
+
+  const btn = document.getElementById('btnRefreshTotal');
+  if (btn) btn.addEventListener('click', async () => {
+    if (!confirm('¿Actualizar ahora los precios y el stock de todos los productos? Puede tardar varios minutos.')) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/refresh-total', { method: 'POST' });
+      if (!r.ok) alert((await r.json()).error || 'No se pudo iniciar');
+    } catch { alert('Error de red'); }
+    cargarEstadoRefresh();
+  });
+}
+
+// ══════════════════════════════════════════
+// CUPONES DE DESCUENTO
+// ══════════════════════════════════════════
+
+const btnCupones      = document.getElementById('btnCupones');
+const cuponesOverlay  = document.getElementById('cuponesOverlay');
+const cuponesLista    = document.getElementById('cuponesLista');
+const formCupon       = document.getElementById('formCupon');
+
+// Mismo resguardo que la búsqueda: si el HTML cacheado es viejo, no inicializar.
+if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
+  const $ = id => document.getElementById(id);
+  const msgCupon = $('msgCupon');
+
+  $('cuponAlcanceCategoria').innerHTML = CATEGORIAS.map(c => `<option value="${c.nombre}">${c.icono} ${c.nombre}</option>`).join('');
+
+  function actualizarCamposCupon() {
+    const alcance = $('cuponAlcance').value;
+    $('cuponAlcanceValorLabel').style.display = alcance === 'todos' ? 'none' : '';
+    $('cuponAlcanceCategoria').style.display  = alcance === 'categoria' ? '' : 'none';
+    $('cuponAlcanceTexto').style.display      = alcance === 'marca' || alcance === 'sku' ? '' : 'none';
+    $('cuponAlcanceValorTitulo').textContent  = { categoria: 'Categoría', marca: 'Marca', sku: 'SKUs (separados por coma)' }[alcance] || '';
+    $('cuponAlcanceTexto').placeholder        = alcance === 'marca' ? 'Ej: Samsung' : 'Ej: 17461845, 16957308';
+    $('cuponTopeLabel').style.visibility      = $('cuponTipo').value === 'porcentaje' ? '' : 'hidden';
+    $('cuponValor').placeholder               = $('cuponTipo').value === 'porcentaje' ? '10' : '20.000';
+  }
+  $('cuponAlcance').addEventListener('change', actualizarCamposCupon);
+  $('cuponTipo').addEventListener('change', actualizarCamposCupon);
+
+  function descripcionCupon(c) {
+    const partes = [c.tipo === 'porcentaje' ? `${c.valor}% de descuento` : `${fmtPesos(c.valor)} de descuento`];
+    if (c.tope)    partes.push(`tope ${fmtPesos(c.tope)}`);
+    if (c.minimo)  partes.push(`compra mínima ${fmtPesos(c.minimo)}`);
+    if (c.soloCMR) partes.push('solo con CMR');
+    const alcance = { todos: 'Todos los productos', categoria: `Categoría ${c.alcanceValor}`, marca: `Marca ${c.alcanceValor}`, sku: `SKU ${c.alcanceValor}` }[c.alcance];
+    let vence = '';
+    if (c.vence) {
+      const [a, m, d] = c.vence.split('-');
+      vence = c.vencido ? ` · venció el ${d}/${m}/${a}` : ` · vence el ${d}/${m}/${a}`;
+    }
+    return `${esc(partes.join(' · '))}<br><span class="cupon-item-alcance">${esc(alcance)}${vence}</span>`;
+  }
+
+  async function cargarCupones() {
+    let cupones;
+    try {
+      const r = await fetch('/api/cupones');
+      cupones = await r.json();
+    } catch {
+      cuponesLista.innerHTML = '<li class="cupones-vacio">Error al cargar los cupones</li>';
+      return;
+    }
+    if (!Array.isArray(cupones) || !cupones.length) {
+      cuponesLista.innerHTML = '<li class="cupones-vacio">No hay cupones cargados.</li>';
+      return;
+    }
+    cuponesLista.innerHTML = cupones.map(c => `
+      <li class="cupon-item${c.vencido ? ' cupon-item-vencido' : ''}">
+        <div>
+          <span class="cupon-item-codigo">${esc(c.codigo)}</span>${c.vencido ? ' <span class="cupon-item-tag">Vencido</span>' : ''}
+          <div class="cupon-item-desc">${descripcionCupon(c)}</div>
+        </div>
+        <button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>
+      </li>`).join('');
+    cuponesLista.querySelectorAll('.cupon-item-borrar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar este cupón?')) return;
+        await fetch(`/api/cupones/${btn.dataset.id}`, { method: 'DELETE' });
+        await cargarCupones();
+        refrescarPreciosConCupon();
+      });
+    });
+  }
+
+  // Los precios finales los calcula el servidor: tras cambiar un cupón hay
+  // que volver a pedir lo que está en pantalla.
+  function refrescarPreciosConCupon() {
+    if (categoriaActiva) recargarCategoria(categoriaActiva);
+  }
+
+  formCupon.addEventListener('submit', async e => {
+    e.preventDefault();
+    const alcance = $('cuponAlcance').value;
+    const body = {
+      codigo: $('cuponCodigo').value,
+      tipo: $('cuponTipo').value,
+      valor: $('cuponValor').value,
+      tope: $('cuponTope').value,
+      minimo: $('cuponMinimo').value,
+      soloCMR: $('cuponSoloCMR').checked,
+      alcance,
+      alcanceValor: alcance === 'categoria' ? $('cuponAlcanceCategoria').value : $('cuponAlcanceTexto').value,
+      vence: $('cuponVence').value || null,
+    };
+    msgCupon.className = 'msg';
+    msgCupon.textContent = 'Guardando…';
+    try {
+      const r = await fetch('/api/cupones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'No se pudo guardar');
+    } catch (err) {
+      msgCupon.className = 'msg err';
+      msgCupon.textContent = err.message;
+      return;
+    }
+    msgCupon.className = 'msg ok';
+    msgCupon.textContent = 'Cupón guardado ✓';
+    setTimeout(() => { msgCupon.textContent = ''; }, 3000);
+    formCupon.reset();
+    actualizarCamposCupon();
+    await cargarCupones();
+    refrescarPreciosConCupon();
+  });
+
+  const cerrarCupones = () => cuponesOverlay.classList.remove('open');
+  btnCupones.addEventListener('click', () => {
+    actualizarCamposCupon();
+    cuponesLista.innerHTML = '<li class="cupones-vacio">Cargando…</li>';
+    cuponesOverlay.classList.add('open');
+    cargarCupones();
+  });
+  $('cuponesClose').addEventListener('click', cerrarCupones);
+  cuponesOverlay.addEventListener('click', e => { if (e.target === cuponesOverlay) cerrarCupones(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarCupones(); });
+}

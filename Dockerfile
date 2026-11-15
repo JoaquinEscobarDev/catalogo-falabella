@@ -16,4 +16,6 @@ RUN npx playwright install chromium
 
 COPY . .
 EXPOSE 3000
-CMD ["node", "server.js"]
+# Aplica las migraciones pendientes y levanta el server (que además corre el
+# refresh automático de precios/stock, ver src/jobs/refreshWorker.js).
+CMD ["sh", "-c", "node migrations/run.js && node server.js"]

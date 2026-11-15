@@ -8,9 +8,14 @@ async function create(categoryId) {
   return rows[0].id;
 }
 
+// procesado = el worker ya la tomó; terminado_en = terminó de refrescar.
 async function getStatus(id) {
-  const { rows } = await db.query('SELECT procesado FROM refresh_requests WHERE id = $1', [id]);
-  return rows.length ? rows[0].procesado : null;
+  const { rows } = await db.query(
+    'SELECT procesado, terminado_en, ok, fail FROM refresh_requests WHERE id = $1', [id]
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return { tomada: r.procesado, terminada: r.terminado_en != null, ok: r.ok, fail: r.fail };
 }
 
 async function findPending() {
@@ -28,4 +33,17 @@ async function markProcessed(id) {
   await db.query('UPDATE refresh_requests SET procesado = TRUE WHERE id = $1', [id]);
 }
 
-module.exports = { create, getStatus, findPending, markProcessed };
+async function markFinished(id, ok, fail) {
+  await db.query(
+    'UPDATE refresh_requests SET procesado = TRUE, terminado_en = NOW(), ok = $2, fail = $3 WHERE id = $1',
+    [id, ok, fail]
+  );
+}
+
+// Solicitudes tomadas por un proceso que murió antes de terminar (redeploy,
+// reinicio): se cierran para que la web no se quede esperándolas.
+async function closeOrphans() {
+  await db.query('UPDATE refresh_requests SET terminado_en = NOW() WHERE procesado = TRUE AND terminado_en IS NULL');
+}
+
+module.exports = { create, getStatus, findPending, markProcessed, markFinished, closeOrphans };

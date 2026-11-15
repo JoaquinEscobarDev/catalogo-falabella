@@ -21,6 +21,7 @@
         <h1 id="headerTitle">🛒 Catálogo Falabella</h1>
       </div>
       <button class="btn-search-global" id="btnSearchGlobal" title="Buscar producto">🔍</button>
+      <button class="btn-search-global btn-cupones-global" id="btnCupones" title="Cupones de descuento">🎟️</button>
       <div class="header-actions" id="headerActions" style="display:none">
         <button id="btnRefreshAll" class="btn-secondary">↻ Actualizar precios</button>
       </div>
@@ -32,6 +33,7 @@
     <!-- ── Vista: Selección de categoría ── -->
     <section id="viewCategorias">
       <p class="subtitle">Seleccioná una zona para revisar sus precios</p>
+      <div class="estado-refresh" id="estadoRefresh" style="display:none"></div>
       <div class="categorias-grid" id="categoriasGrid"></div>
     </section>
 
@@ -151,6 +153,76 @@
         <button class="cuotas-close" id="cuotasClose">✕</button>
       </div>
       <div id="cuotasBody"></div>
+    </div>
+  </div>
+
+  <!-- Modal cupones de descuento -->
+  <div class="cuotas-overlay" id="cuponesOverlay">
+    <div class="cuotas-sheet">
+      <div class="cuotas-sheet-header">
+        <span>🎟️ Cupones de descuento</span>
+        <button class="cuotas-close" id="cuponesClose">✕</button>
+      </div>
+      <div class="cupones-body">
+        <p class="cupones-ayuda">
+          Los cupones que Falabella muestra en la ficha del producto se detectan solos.
+          Acá podés cargar los cupones de campaña (los de
+          <a href="https://www.falabella.com/falabella-cl/page/cupones-descuento" target="_blank" rel="noopener">falabella.com/cupones</a>)
+          y la app calcula el precio final en cada producto donde aplican.
+        </p>
+        <ul class="cupones-lista" id="cuponesLista"></ul>
+
+        <form id="formCupon" class="cupon-form" autocomplete="off">
+          <h3>Agregar cupón</h3>
+          <div class="cupon-form-fila">
+            <label>Código
+              <input type="text" id="cuponCodigo" placeholder="Ej: TECNO10" required maxlength="40" />
+            </label>
+            <label>Descuento
+              <span class="cupon-valor-wrap">
+                <input type="text" id="cuponValor" inputmode="numeric" placeholder="10" required />
+                <select id="cuponTipo">
+                  <option value="porcentaje">%</option>
+                  <option value="monto">$</option>
+                </select>
+              </span>
+            </label>
+          </div>
+          <div class="cupon-form-fila">
+            <label id="cuponTopeLabel">Tope de descuento (opcional)
+              <input type="text" id="cuponTope" inputmode="numeric" placeholder="$ 50.000" />
+            </label>
+            <label>Compra mínima (opcional)
+              <input type="text" id="cuponMinimo" inputmode="numeric" placeholder="$ 199.990" />
+            </label>
+          </div>
+          <div class="cupon-form-fila">
+            <label>Aplica a
+              <select id="cuponAlcance">
+                <option value="todos">Todos los productos</option>
+                <option value="categoria">Una categoría</option>
+                <option value="marca">Una marca</option>
+                <option value="sku">SKUs específicos</option>
+              </select>
+            </label>
+            <label id="cuponAlcanceValorLabel" style="display:none">
+              <span id="cuponAlcanceValorTitulo">Cuál</span>
+              <select id="cuponAlcanceCategoria" style="display:none"></select>
+              <input type="text" id="cuponAlcanceTexto" style="display:none" />
+            </label>
+          </div>
+          <div class="cupon-form-fila">
+            <label>Vence (opcional)
+              <input type="date" id="cuponVence" />
+            </label>
+            <label class="cupon-check">
+              <input type="checkbox" id="cuponSoloCMR" /> Solo pagando con CMR
+            </label>
+          </div>
+          <button type="submit" class="btn-primary">Guardar cupón</button>
+          <p id="msgCupon" class="msg"></p>
+        </form>
+      </div>
     </div>
   </div>
 

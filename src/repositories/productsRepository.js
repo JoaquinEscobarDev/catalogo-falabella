@@ -9,6 +9,9 @@ function mapRowToProducto(row) {
     garantia1a: row.garantia_1a, garantia2a: row.garantia_2a, garantia3a: row.garantia_3a,
     capacidad: row.capacidad, color: row.color, cuotasSinInteres: row.cuotas_sin_interes,
     despacho24h: row.despacho_24h, upc: row.upc,
+    // Cupón crudo detectado al scrapear; couponService lo convierte en
+    // `cupones` (con precio final) antes de responder al cliente.
+    cuponDetectado: row.cupon || null,
   };
 }
 
@@ -44,6 +47,26 @@ async function getPriceData(sku) {
   return mapRowToProducto(r.rows[0]);
 }
 
+async function getCategoryName(sku) {
+  const r = await db.query(
+    'SELECT c.nombre FROM products p JOIN categories c ON c.id = p.category_id WHERE p.sku = $1', [sku]
+  );
+  return r.rows[0]?.nombre || null;
+}
+
+async function findAllSkus() {
+  const { rows } = await db.query('SELECT sku FROM products ORDER BY sku');
+  return rows.map(r => r.sku);
+}
+
+async function findSkusByCategoryName(nombreCategoria) {
+  const { rows } = await db.query(
+    'SELECT p.sku FROM products p JOIN categories c ON c.id = p.category_id WHERE c.nombre = $1 ORDER BY p.sku',
+    [nombreCategoria]
+  );
+  return rows.map(r => r.sku);
+}
+
 // Snapshot de precios actuales, usado para diffear contra un scrape nuevo.
 async function getPreviousPrices(sku) {
   const r = await db.query(
@@ -61,12 +84,14 @@ async function setPriceData(sku, producto) {
       garantia_1a = $9, garantia_2a = $10, garantia_3a = $11,
       capacidad = $12, color = $13,
       cuotas_sin_interes = $14, despacho_24h = $15,
+      cupon = $16,
       price_updated_at = NOW()
     WHERE sku = $1
   `, [sku, producto.nombre, producto.marca,
       producto.precio, producto.precioOferta, producto.precioCMR, producto.imagen, producto.url,
       producto.garantia1a, producto.garantia2a, producto.garantia3a,
-      producto.capacidad, producto.color, producto.cuotasSinInteres, producto.despacho24h]);
+      producto.capacidad, producto.color, producto.cuotasSinInteres, producto.despacho24h,
+      producto.cupon ? JSON.stringify(producto.cupon) : null]);
 }
 
 // Trae precio + stock cacheados de toda una categoría en una sola consulta.
@@ -99,7 +124,7 @@ async function search(q) {
            p.precio_normal, p.precio_oferta, p.precio_cmr,
            p.url, p.price_updated_at,
            p.garantia_1a, p.garantia_2a, p.garantia_3a,
-           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h,
+           p.capacidad, p.color, p.cuotas_sin_interes, p.despacho_24h, p.upc, p.cupon,
            s.stock
     FROM products p
     JOIN categories c ON c.id = p.category_id
@@ -117,11 +142,12 @@ async function search(q) {
     garantia1a: r.garantia_1a, garantia2a: r.garantia_2a, garantia3a: r.garantia_3a,
     capacidad: r.capacidad, color: r.color,
     cuotasSinInteres: r.cuotas_sin_interes, despacho24h: r.despacho_24h,
+    upc: r.upc, cuponDetectado: r.cupon || null,
     stock: r.stock,
   }));
 }
 
 module.exports = {
   findAll, existsBySku, insert, remove,
-  getPriceData, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
+  getPriceData, getCategoryName, findAllSkus, findSkusByCategoryName, getPreviousPrices, setPriceData, findByCategoryName, search, setUpc,
 };

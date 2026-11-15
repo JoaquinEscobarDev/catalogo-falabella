@@ -9,8 +9,16 @@ const solicitar = asyncHandler(async (req, res) => {
 });
 
 const estado = asyncHandler(async (req, res) => {
-  const procesado = await refreshService.estado(req.params.id);
-  res.json({ procesado });
+  res.json(await refreshService.estado(req.params.id));
 });
 
-module.exports = { solicitar, estado };
+const solicitarTotal = asyncHandler(async (req, res) => {
+  refreshService.solicitarTotal();
+  res.status(202).json({ ok: true });
+});
+
+const resumen = asyncHandler(async (req, res) => {
+  res.json(await refreshService.resumen());
+});
+
+module.exports = { solicitar, estado, solicitarTotal, resumen };

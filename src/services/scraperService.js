@@ -6,8 +6,9 @@
 //     desde una IP residencial (scripts/refresh-local.js, scripts/watch-refresh.js)
 //     donde casi siempre alcanza.
 //   - fetchConPlaywrightFallback: curl primero, y si Cloudflare bloquea, cae a
-//     un browser real con stealth (+ proxy opcional). Pensado para el endpoint
-//     on-demand del servidor, que puede correr en una IP de datacenter.
+//     un browser real con stealth (+ proxy opcional). Es lo que usa el
+//     servidor (endpoint on-demand y refresh automático, ver
+//     src/jobs/refreshWorker.js), que corre en una IP de datacenter.
 //
 // OJO: el fetch nativo de Node tiene un fingerprint TLS distinto al de curl,
 // y Cloudflare lo bloquea (403) aunque sea la misma IP y los mismos headers
@@ -19,6 +20,7 @@ const stealth = require('puppeteer-extra-plugin-stealth');
 chromium.use(stealth());
 
 const env = require('../config/env');
+const { detectarCupon } = require('./cuponParser');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -52,7 +54,24 @@ async function fetchDirectoConReintentos(url, intentos = 2) {
   throw new Error('BLOCKED');
 }
 
-// ── Playwright (solo para el endpoint on-demand del servidor) ──
+// Si curl viene bloqueado varias veces seguidas (IP de datacenter marcada por
+// Cloudflare), no tiene sentido seguir probándolo antes de cada producto
+// durante un refresh de cientos de SKUs: se salta directo al browser por un rato.
+const CURL_FAIL_THRESHOLD = 3;
+const CURL_PAUSA_MS = 15 * 60 * 1000;
+let curlFallosSeguidos = 0;
+let curlPausadoHasta = 0;
+function curlEnPausa() { return Date.now() < curlPausadoHasta; }
+function curlMarcarFallo() {
+  if (++curlFallosSeguidos >= CURL_FAIL_THRESHOLD) {
+    curlPausadoHasta = Date.now() + CURL_PAUSA_MS;
+    curlFallosSeguidos = 0;
+    console.log('curl bloqueado varias veces seguidas: usando solo el browser por 15 min');
+  }
+}
+function curlMarcarExito() { curlFallosSeguidos = 0; }
+
+// ── Playwright (servidor) ──
 
 // Limita Playwright a un browser a la vez para no explotar RAM.
 let playwrightBusy = false;
@@ -103,8 +122,18 @@ function buildProxyConfig(proxyUrlStr) {
   };
 }
 
-async function playwrightFetch(url) {
-  await playwrightSlot();
+// Un solo browser compartido: durante un refresh masivo se reusa el mismo
+// contexto (y sus cookies, incluida la que deja Cloudflare al pasar el
+// challenge), en vez de lanzar un Chromium nuevo por producto. Se cierra solo
+// tras un rato sin uso para no dejar RAM ocupada en el VPS.
+const BROWSER_IDLE_MS = 90 * 1000;
+let sesion = null; // { browser, context }
+let sesionTimer = null;
+
+async function obtenerSesion() {
+  clearTimeout(sesionTimer);
+  if (sesion && sesion.browser.isConnected()) return sesion;
+
   const launchOpts = {
     headless: true,
     args: [
@@ -113,28 +142,65 @@ async function playwrightFetch(url) {
       '--window-size=1920,1080',
     ],
   };
+  if (env.chromiumPath) launchOpts.executablePath = env.chromiumPath;
   const proxy = buildProxyConfig(env.proxyUrl);
   if (proxy) launchOpts.proxy = proxy;
 
   const browser = await chromium.launch(launchOpts);
+  const context = await browser.newContext({
+    userAgent: USER_AGENT,
+    viewport: { width: 1920, height: 1080 },
+    locale: 'es-CL',
+    extraHTTPHeaders: { 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8' },
+  });
+  sesion = { browser, context };
+  return sesion;
+}
+
+async function cerrarSesion() {
+  clearTimeout(sesionTimer);
+  const s = sesion;
+  sesion = null;
+  if (s) await s.browser.close().catch(() => {});
+}
+
+function programarCierreSesion() {
+  clearTimeout(sesionTimer);
+  sesionTimer = setTimeout(() => { cerrarSesion(); }, BROWSER_IDLE_MS);
+  sesionTimer.unref?.();
+}
+
+async function playwrightFetch(url) {
+  await playwrightSlot();
+  let page = null;
   try {
-    const context = await browser.newContext({
-      userAgent: USER_AGENT,
-      viewport: { width: 1920, height: 1080 },
-      locale: 'es-CL',
-      extraHTTPHeaders: { 'Accept-Language': 'es-CL,es;q=0.9,en;q=0.8' },
-    });
-    const page = await context.newPage();
+    const { context } = await obtenerSesion();
+    page = await context.newPage();
     // Probado bloquear imagenes/fuentes para ahorrar proxy: rompe el challenge de
     // Cloudflare (vuelve a servir 403 "Un momento..."). No tocar resourceType.
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+    // No se espera a "networkidle": con analytics/chat la red de Falabella casi
+    // nunca queda quieta y se perdían 25 s por página. Lo único que importa es
+    // que aparezca __NEXT_DATA__ con el documento ya parseado, sea en la
+    // primera carga o después de que el challenge de Cloudflare recargue sola.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(e => {
+      if (!/timeout/i.test(e.message)) throw e;
+    });
     await page.waitForFunction(
-      () => document.getElementById('__NEXT_DATA__') !== null,
-      { timeout: 10000 }
+      () => document.readyState !== 'loading' && document.getElementById('__NEXT_DATA__') !== null,
+      undefined, // arg de la función; las opciones van en el tercer parámetro
+      { timeout: 15000 }
     ).catch(() => {});
-    return await page.content();
+    const html = await page.content();
+    if (!html.includes('__NEXT_DATA__')) throw new Error('BLOCKED');
+    await page.close().catch(() => {});
+    programarCierreSesion();
+    return html;
+  } catch (e) {
+    // Sesión fallida = se descarta entera: el próximo intento parte con un
+    // browser limpio (y, si hay proxy rotativo, con otra IP).
+    await cerrarSesion();
+    throw e;
   } finally {
-    await browser.close();
     playwrightRelease();
   }
 }
@@ -145,9 +211,13 @@ const PLAYWRIGHT_RETRIES = env.proxyUrl ? 5 : 1;
 
 async function fetchConPlaywrightFallback(url) {
   try {
-    return await curlFetch(url, true);
+    if (curlEnPausa()) throw new Error('BLOCKED');
+    const html = await curlFetch(url, true);
+    curlMarcarExito();
+    return html;
   } catch (e) {
     if (e.message !== 'BLOCKED' && !e.message.includes('403')) throw e;
+    if (!curlEnPausa()) curlMarcarFallo();
     if (playwrightIsBlocked()) throw new Error('BLOCKED');
 
     for (let attempt = 1; attempt <= PLAYWRIGHT_RETRIES; attempt++) {
@@ -237,6 +307,17 @@ function extraerGarantias(pd) {
   return resultado;
 }
 
+// Cupón de descuento anunciado en la ficha. Se busca en la variante elegida y
+// en el producto sin sus otras variantes (para no tomar el cupón de otro color).
+function extraerCupon(pd, variante) {
+  try {
+    const { variants, ...productoSinVariantes } = pd || {};
+    return detectarCupon(variante, productoSinVariantes);
+  } catch {
+    return null;
+  }
+}
+
 function extraerDeProductData(pd, skuBuscado) {
   const variante = pd.variants?.find(v => v.id === skuBuscado) || pd.variants?.[0] || {};
   const precios  = variante.prices || [];
@@ -262,6 +343,7 @@ function extraerDeProductData(pd, skuBuscado) {
     color: variante.attributes?.colorName || extraerColorDeNombre(variante.name),
     cuotasSinInteres: extraerCuotasSinInteres(pd),
     despacho24h: extraerDespacho24h(variante.meatStickers),
+    cupon: extraerCupon(pd, variante),
     ...extraerGarantias(pd),
   };
 }
@@ -288,6 +370,7 @@ function extraerDeSearchResult(item, skuBuscado) {
     capacidad: extraerCapacidad(nombre, null),
     color: extraerColorDeNombre(nombre),
     despacho24h: extraerDespacho24h(item.meatStickers),
+    cupon: extraerCupon(item, null),
     // Los listados de búsqueda no traen warrantyOptions ni installmentsWithoutInterest.
     cuotasSinInteres: null,
     garantia1a: null, garantia2a: null, garantia3a: null,
@@ -338,14 +421,14 @@ function extraerDirectoSinValidarId(html, skuBuscado) {
 // directa del producto los sigue mostrando. El slug no importa, Falabella
 // resuelve por el ID — por eso "x" funciona como slug cualquiera.
 function urlBusqueda(sku) {
-  return `https://www.falabella.com/falabella-cl/search?Ntt=${sku}`;
+  return `${env.falabellaBaseUrl}/falabella-cl/search?Ntt=${sku}`;
 }
 function urlDirecta(sku) {
-  return `https://www.falabella.com/falabella-cl/product/${sku}/x/${sku}`;
+  return `${env.falabellaBaseUrl}/falabella-cl/product/${sku}/x/${sku}`;
 }
 function urlDirectaOffset(sku) {
   const productId = String(Number(sku) - 1);
-  return `https://www.falabella.com/falabella-cl/product/${productId}/x/${sku}`;
+  return `${env.falabellaBaseUrl}/falabella-cl/product/${productId}/x/${sku}`;
 }
 
 // Algunos productos marketplace (ej. DDESIGN) no quedan indexados en el
@@ -393,7 +476,7 @@ const STORE_LAT = '-33.394';
 const STORE_LON = '-70.551';
 
 async function fetchStockEnVivo(sku) {
-  const url = `https://www.falabella.com/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`;
+  const url = `${env.falabellaBaseUrl}/s/geo/v1/stores/cl?offeringId=${sku}&sellerId=FALABELLA_CHILE&latitude=${STORE_LAT}&longitude=${STORE_LON}`;
   const stdout = await new Promise((resolve, reject) => {
     execFile('curl', [
       '-s', url,
@@ -419,4 +502,6 @@ module.exports = {
   scrapeProducto,
   fetchStockEnVivo,
   parsePrecio,
+  playwrightIsBlocked,
+  cerrarSesion,
 };

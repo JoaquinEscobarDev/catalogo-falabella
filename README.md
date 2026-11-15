@@ -2,7 +2,7 @@
 
 Herramienta interna para vendedores de tienda. Permite consultar precios en tiempo real de falabella.com, simular cuotas con distintos bancos, registrar cambios de precio pendientes y gestionar el catálogo por categorías.
 
-Desplegada como PWA instalable en Railway con PostgreSQL.
+Corre 100% en la nube (PWA instalable + PostgreSQL): el propio servidor actualiza precios, stock y cupones, sin depender de una PC. Ver [DEPLOY.md](DEPLOY.md).
 
 ---
 
@@ -19,6 +19,18 @@ Desplegada como PWA instalable en Railway con PostgreSQL.
 - Muestra precio CMR, precio oferta y precio normal en la misma tarjeta
 - Historial de precios guardado en base de datos para detectar variaciones
 - Indicador visual de cambio de precio (subida / bajada) respecto al registro anterior
+
+### Actualización automática (sin PC)
+- El servidor refresca precios, stock y cupones de todos los SKUs una vez al día (`REFRESH_HOURS`, por defecto 07:00 hora de Chile)
+- **↻ Actualizar precios** dentro de una categoría la refresca al instante, mostrando el avance
+- **↻ Actualizar todo ahora** en la portada lanza un refresh completo a pedido
+- La portada muestra cuándo fue la última actualización y avisa si Falabella bloqueó al servidor (en ese caso se conservan los últimos precios guardados y hay que configurar `PROXY_URL`)
+
+### Cupones de descuento (`🎟️`)
+- **Detectados en Falabella**: al scrapear cada producto se busca si la ficha anuncia un cupón (código, % o monto, tope, compra mínima, exclusivo CMR)
+- **Cargados a mano**: desde el botón 🎟️ se registran los cupones de campaña (código, % o $, tope, compra mínima, solo CMR, vencimiento) que aplican a todos los productos, una categoría, una marca o SKUs puntuales
+- Cada tarjeta muestra el cupón y **en cuánto queda el precio final**: "Con cupón" (sobre el precio oferta/normal) y "Con cupón + CMR" (sobre el precio CMR)
+- Los cupones vencidos dejan de aplicarse solos
 
 ### Código UPC por producto
 - Campo UPC editable inline en cada tarjeta
@@ -70,7 +82,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 - Actualización de precios manual por producto o refresh masivo de toda la categoría
 
 ### PWA instalable
-- Manifest y service worker incluidos (`catalogo-v7`)
+- Manifest y service worker incluidos (`catalogo-v8`)
 - Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
 - Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 
@@ -84,7 +96,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 | Base de datos | PostgreSQL (Railway) |
 | Scraping | curl (headers reales) + Playwright stealth (fallback) |
 | Frontend | HTML/CSS/JS vanilla (sin frameworks) |
-| Deploy | Railway (auto-deploy desde `main`) |
+| Deploy | Docker Compose en VPS (ver `DEPLOY.md`); también corre en Railway con `npm start` |
 | PWA | Service Worker + Web App Manifest |
 
 ---
@@ -105,8 +117,13 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 | `POST` | `/api/todo` | Agrega/actualiza un item pendiente |
 | `DELETE` | `/api/todo/:sku` | Elimina un item pendiente |
 | `POST` | `/api/todo/clear` | Limpia toda la lista |
-| `POST` | `/api/solicitar-refresh` | Solicita refresh de precios en segundo plano |
-| `GET` | `/api/solicitar-refresh/:id` | Consulta el estado de un refresh |
+| `POST` | `/api/solicitar-refresh` | Solicita refresh de precios de una categoría (lo procesa el servidor) |
+| `GET` | `/api/solicitar-refresh/:id` | Consulta el estado/avance de un refresh |
+| `POST` | `/api/refresh-total` | Lanza un refresh completo de todos los SKUs |
+| `GET` | `/api/estado` | Estado del refresh automático (último, en curso, próximo) |
+| `GET` | `/api/cupones` | Lista los cupones cargados a mano |
+| `POST` | `/api/cupones` | Agrega un cupón |
+| `DELETE` | `/api/cupones/:id` | Elimina un cupón |
 | `POST` | `/api/reservas-iphone` | Crea una reserva iPhone 18 |
 | `GET` | `/api/reservas-iphone` | Lista todas las reservas iPhone 18 |
 | `GET` | `/api/reservas-iphone/qr` | QR SVG del formulario de reserva |
@@ -116,11 +133,11 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 ## Scripts
 
 ```bash
-npm start                # Inicia el servidor en producción
+npm start                # Migra e inicia el servidor (incluye el refresh automático)
 npm run dev              # Inicia con nodemon (desarrollo)
 npm run migrate          # Ejecuta las migraciones de base de datos
-npm run refresh          # Refresh masivo de precios desde IP local
-npm run watch-refresh    # Refresh continuo (modo watch)
+npm run refresh          # Opcional: refresh masivo a mano desde otra máquina
+npm run watch-refresh    # Opcional: atender solicitudes desde otra máquina (AUTO_REFRESH=0)
 ```
 
 ---
@@ -129,8 +146,11 @@ npm run watch-refresh    # Refresh continuo (modo watch)
 
 ```env
 DATABASE_URL=postgresql://...   # URL de conexión a PostgreSQL
-PROXY_URL=                      # Proxy opcional para scraping en datacenter
-CACHE_TTL_MS=300000             # TTL de caché de precios (default: 5 min)
+PROXY_URL=                      # Proxy residencial, si Cloudflare bloquea la IP del servidor
+REFRESH_HOURS=7                 # Horas (hora de Chile) del refresh completo automático, ej: 7,15
+AUTO_REFRESH=1                  # 0 = apagar el refresh automático del servidor
+CACHE_TTL_HOURS=30              # Antigüedad máxima del precio guardado antes de re-scrapear on-demand
+STOCK_TTL_HOURS=2               # Ídem para el stock
 PORT=3000
 ```
 
@@ -148,6 +168,7 @@ PORT=3000
 ├── src/
 │   ├── config/          # Configuración de BD y entorno
 │   ├── controllers/     # Handlers HTTP
+│   ├── jobs/            # Worker de refresh automático (corre dentro del server)
 │   ├── repositories/    # Acceso a base de datos
 │   ├── routes/          # Definición de rutas
 │   └── services/        # Lógica de negocio y scraping

@@ -1381,7 +1381,9 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
           ${c.fuente === 'pagina' && c.texto ? `<div class="cupon-item-texto">“${esc(c.texto.slice(0, 160))}”</div>` : ''}
           <div class="cupon-item-ver">Ver productos ›</div>
         </div>
-        ${c.fuente === 'manual' ? `<button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>` : ''}
+        ${c.fuente === 'manual'
+          ? `<button class="todo-clear cupon-item-borrar" data-id="${c.id}" title="Eliminar cupón">Eliminar</button>`
+          : `<button class="todo-clear cupon-item-ocultar" data-clave="${esc(c.fuente === 'ficha' ? (c.clave || '') : (c.codigo || ''))}" data-etiqueta="${esc(c.codigo || c.texto || 'cupón')}" title="Si este cupón no sirve, ocultarlo de las tarjetas y de la lista">Ocultar</button>`}
       </li>`;
   }
 
@@ -1406,9 +1408,40 @@ if (btnCupones && cuponesOverlay && cuponesLista && formCupon) {
 
     const estadoBusqueda = Array.isArray(datos) ? '' : `<li class="cupones-busqueda">${esc(textoBusqueda(datos?.busqueda))}</li>`;
     const titulo = `<li class="cupones-titulo">Cupones vigentes (${todos.length})</li>`;
+    const ocultos = Array.isArray(datos) ? [] : (datos?.ocultos || []);
+    // Varias claves pueden ocultar el mismo cupón: se lista una vez por nombre.
+    const ocultosUnicos = [...new Map(ocultos.map(o => [o.etiqueta || o.clave, o])).values()];
+    const seccionOcultos = ocultosUnicos.length ? `
+      <li class="cupones-titulo cupones-titulo-ocultos">Ocultos (${ocultosUnicos.length})</li>
+      ${ocultosUnicos.map(o => `
+        <li class="cupon-item cupon-item-oculto">
+          <div class="cupon-item-cuerpo"><span class="cupon-item-codigo">${esc(o.etiqueta || o.clave)}</span>
+            <div class="cupon-item-alcance">No se muestra en las tarjetas</div></div>
+          <button class="todo-clear cupon-item-mostrar" data-clave="${esc(o.clave)}">Mostrar</button>
+        </li>`).join('')}` : '';
     cuponesLista.innerHTML = titulo + estadoBusqueda + (todos.length
       ? todos.map(c => itemCupon(c, conteo)).join('')
-      : '<li class="cupones-vacio">No hay cupones vigentes por ahora.</li>');
+      : '<li class="cupones-vacio">No hay cupones vigentes por ahora.</li>') + seccionOcultos;
+
+    cuponesLista.querySelectorAll('.cupon-item-ocultar').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm(`¿Ocultar ${btn.dataset.etiqueta}? Deja de mostrarse en las tarjetas aunque Falabella lo siga publicando. Se puede volver a mostrar.`)) return;
+        await fetch('/api/cupones/ocultos', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clave: btn.dataset.clave, etiqueta: btn.dataset.etiqueta }),
+        });
+        await cargarCupones();
+        refrescarPreciosConCupon();
+      });
+    });
+    cuponesLista.querySelectorAll('.cupon-item-mostrar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await fetch(`/api/cupones/ocultos?clave=${encodeURIComponent(btn.dataset.clave)}`, { method: 'DELETE' });
+        await cargarCupones();
+        refrescarPreciosConCupon();
+      });
+    });
 
     enlazarCuponesClickeables(cuponesLista);
     cuponesLista.querySelectorAll('.cupon-item-borrar').forEach(btn => {
@@ -1974,7 +2007,7 @@ function enlazarCuponesClickeables(raiz) {
   raiz.querySelectorAll('[data-cupon-id], [data-cupon-clave]').forEach(el => {
     el.addEventListener('click', e => {
       // El botón Eliminar de un cupón manual tiene su propia acción.
-      if (e.target.closest('.cupon-item-borrar')) return;
+      if (e.target.closest('.cupon-item-borrar, .cupon-item-ocultar')) return;
       e.stopPropagation();
       abrirProductosCupon(el.dataset.cuponId ? { id: el.dataset.cuponId } : { clave: el.dataset.cuponClave });
     });

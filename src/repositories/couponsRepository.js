@@ -76,4 +76,25 @@ async function remove(id) {
   await db.query('DELETE FROM coupons WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findVigentes, insert, reemplazarAutomaticos, eliminarNoVigentes, remove };
+// ── Cupones ocultos por el usuario ──
+
+async function findOcultos() {
+  const { rows } = await db.query('SELECT clave, etiqueta FROM coupons_ocultos ORDER BY created_at DESC');
+  return rows;
+}
+
+async function ocultar(clave, etiqueta) {
+  await db.query(`
+    INSERT INTO coupons_ocultos (clave, etiqueta) VALUES ($1, $2)
+    ON CONFLICT (clave) DO UPDATE SET etiqueta = EXCLUDED.etiqueta
+  `, [clave, etiqueta]);
+}
+
+async function mostrar(clave) {
+  await db.query('DELETE FROM coupons_ocultos WHERE clave = $1', [clave]);
+}
+
+module.exports = {
+  findAll, findVigentes, insert, reemplazarAutomaticos, eliminarNoVigentes, remove,
+  findOcultos, ocultar, mostrar,
+};

@@ -4,12 +4,35 @@
 const db = require('../config/database');
 const env = require('../config/env');
 const productService = require('./productService');
+const scraperService = require('./scraperService');
 const stockService = require('./stockService');
 const productsRepository = require('../repositories/productsRepository');
 const refreshRequestsRepository = require('../repositories/refreshRequestsRepository');
 const refreshRunsRepository = require('../repositories/refreshRunsRepository');
 
 const PAUSA_MS = parseInt(process.env.REFRESH_PAUSA_MS, 10) || 400; // ritmo prudente, no hay apuro
+const ESPERA_SIN_INTERNET_MS = 30 * 1000;
+
+// Si se fue internet (el teléfono perdió el wifi, el móvil quedó sin señal),
+// el refresh se pone en pausa hasta que vuelva, en vez de marcar cientos de
+// productos como fallidos y terminar como "bloqueado". Los carriles en
+// paralelo comparten una sola espera. Devuelve true si hubo que esperar.
+let esperaInternet = null;
+function esperarInternet(log) {
+  if (!esperaInternet) {
+    esperaInternet = (async () => {
+      if (await scraperService.hayInternet()) return false;
+      const desde = Date.now();
+      log('  ...  sin internet: refresh en pausa hasta que vuelva la conexión');
+      while (!(await scraperService.hayInternet())) {
+        await new Promise(res => setTimeout(res, ESPERA_SIN_INTERNET_MS));
+      }
+      log(`  ...  volvió internet (${Math.max(1, Math.round((Date.now() - desde) / 60000))} min sin conexión); sigue el refresh`);
+      return true;
+    })().finally(() => { esperaInternet = null; });
+  }
+  return esperaInternet;
+}
 // Tantos productos seguidos sin poder leerse = Falabella está bloqueando a
 // este servidor. Se corta la corrida en vez de insistir con cientos de SKUs.
 const FALLOS_SEGUIDOS_PARA_CORTAR = 12;
@@ -50,7 +73,13 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
             res = await productService.refreshSku(sku, fetchFn);
             break;
           } catch (e) {
-            if (!db.esErrorDeConexion(e) || intento >= 4) throw e;
+            const esBase = db.esErrorDeConexion(e);
+            if (!esBase && !e.sinRed) throw e;
+            // Sin internet: se espera lo que haga falta y se reintenta.
+            if (await esperarInternet(log)) continue;
+            // Hay internet: si falló Falabella, es un fallo normal (y cuenta
+            // para el corte por bloqueo); si falló la base, unos reintentos.
+            if (!esBase || intento >= 4) throw e;
             log(`  ...  sin conexión a la base, reintentando ${sku} en 20 s`);
             await new Promise(res2 => setTimeout(res2, 20000));
           }

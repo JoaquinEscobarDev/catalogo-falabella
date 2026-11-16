@@ -139,7 +139,7 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
     // falla, el refresh de precios sigue igual.
     await cuponesAutoService.buscar({ log }).catch(e => log(`Cupones automáticos: error (${e.message}).`));
     // Precio de los equipos con plan (colección Falabella Connect).
-    await connectColeccionService.buscar({ log }).catch(e => log(`Connect: error (${e.message}).`));
+    await connectColeccionService.buscar({ log, ...(fetchFn ? { fetchFn } : {}) }).catch(e => log(`Connect: error (${e.message}).`));
 
     r = await refrescarSkus(skus, {
       fetchFn, log,

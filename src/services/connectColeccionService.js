@@ -11,6 +11,7 @@ const env = require('../config/env');
 const scraperService = require('./scraperService');
 const connectRepository = require('../repositories/connectRepository');
 const workerStateRepository = require('../repositories/workerStateRepository');
+const { extraerPlanesConnect, urlPlanes } = require('./connectPlanesParser');
 
 const PATH = '/falabella-cl/collection/falabella-connect';
 const MAX_PAGINAS = 6;
@@ -121,12 +122,38 @@ function extraerOfertasConnect(html) {
       imagen: imagenDe(item),
       specs: specsDe(item),
       operadores: operadoresDe(item),
+      urlPlanes: urlPlanes(url, env.falabellaBaseUrl, item.productId, item.skuId),
     });
   }
   return { ofertas, total: pp.pagination?.count ?? null, hayDatos: true };
 }
 
-async function buscar({ log = () => {} } = {}) {
+// Abre la página de planes de cada equipo y guarda, por compañía, el plan
+// más barato (pie, mensual, gigas...) y la lista de planes. De a varios a la
+// vez; si fallan muchos seguidos (bloqueo), deja de intentar.
+const PLANES_CONCURRENCIA = 4;
+async function leerPlanesPorEquipo(ofertas, fetchFn, log) {
+  const pendientes = ofertas.filter(o => o.urlPlanes);
+  let i = 0, hechos = 0, conPlanes = 0, fallosSeguidos = 0, cortar = false;
+  async function carril() {
+    while (!cortar) {
+      const o = pendientes[i++];
+      if (!o) return;
+      try {
+        const r = extraerPlanesConnect(await fetchFn(o.urlPlanes));
+        if (r.porCompania) { o.operadores = r.porCompania; conPlanes++; }
+        fallosSeguidos = 0;
+      } catch {
+        if (++fallosSeguidos >= 8) cortar = true;
+      }
+      if (++hechos % 15 === 0) log(`Connect: planes leídos de ${hechos}/${pendientes.length} equipos...`);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(PLANES_CONCURRENCIA, pendientes.length) }, carril));
+  return { conPlanes, revisados: hechos, cortado: cortar };
+}
+
+async function buscar({ log = () => {}, fetchFn = scraperService.fetchDirectoConReintentos } = {}) {
   const ofertas = [];
   const resumen = { en: new Date().toISOString(), ok: false, paginas: 0, equipos: 0, error: null };
   let total = null;
@@ -149,6 +176,11 @@ async function buscar({ log = () => {} } = {}) {
   }
 
   resumen.equipos = ofertas.length;
+  if (ofertas.length) {
+    const p = await leerPlanesPorEquipo(ofertas, fetchFn, log);
+    resumen.conPlanes = p.conPlanes;
+    log(`Connect: planes por compañía de ${p.conPlanes} de ${ofertas.length} equipos${p.cortado ? ' (cortado: demasiados fallos seguidos)' : ''}.`);
+  }
   // Solo se reemplaza si se leyó algo: un bloqueo no borra lo anterior
   // (y lo anterior deja de mostrarse solo a los 3 días).
   if (ofertas.length) await connectRepository.reemplazarOfertas(ofertas);

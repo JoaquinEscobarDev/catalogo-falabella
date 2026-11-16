@@ -916,6 +916,28 @@ async function diagnosticoPlanesConnect(sku) {
       for (const [k, x] of Object.entries(v)) textos(x, Array.isArray(v) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k), prof + 1);
     })(pp, '', 0);
   }
+  // Lo que entiende la app de los planes de esta página.
+  try {
+    const { extraerPlanesConnect } = require('./connectPlanesParser');
+    const r = extraerPlanesConnect(html);
+    lineas.push('', `connectData: ${(r.camposConnectData || []).join(', ').slice(0, 400)}`);
+    lineas.push(`campos de un plan: ${(r.camposPlan || []).join(', ')}`);
+    lineas.push('', `La app lee ${r.planes.length} planes:`);
+    for (const p of r.planes) {
+      lineas.push(`  ${p.compania} · ${p.nombre} · $${p.mensual}/mes · equipo ${p.pie != null ? `$${p.pie}` : 'NO ENCONTRADO'} · ${p.gigas ?? '?'} GB · ${p.meses ?? '?'} meses · ${p.tipos.join('/')}`);
+    }
+    const plan0 = JSON.parse(m[1])?.props?.pageProps?.connectData?.plans?.[0];
+    if (plan0) {
+      const despuesDeColor = Object.keys(plan0).slice(Object.keys(plan0).indexOf('color') + 1);
+      if (despuesDeColor.length) {
+        lineas.push('', 'campos del primer plan después de color:');
+        for (const k of despuesDeColor) lineas.push(`  ${k}: ${JSON.stringify(plan0[k]).slice(0, 150)}`);
+      }
+    }
+  } catch (e) {
+    lineas.push(`error leyendo planes: ${e.message}`);
+  }
+
   // Las listas más internas primero (son los planes en sí, no sus contenedores).
   listas.sort((a, b) => b.ruta.length - a.ruta.length);
   for (const { ruta, v } of listas.slice(0, 3)) {

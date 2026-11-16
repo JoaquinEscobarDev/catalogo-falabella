@@ -95,7 +95,8 @@ function planesDeLista(lista) {
       mensual: aNumero(p.monthlyCost),
       pie: pieDe(p),
       meses: aNumero(p.contractPeriod),
-      gigas: gigasDe(p.internet),
+      // Sin gigas informados pero con "Libre" en el nombre (Movistar "5G Libre"): gigas libres.
+      gigas: gigasDe(p.internet) ?? (/\blibres?\b/i.test(p.planDisplayName || p.name || '') ? 'Libres' : null),
       minutos: minutos ? (minutos >= 99999 ? 'Ilimitados' : minutos) : null,
       tipos: tiposDe(p.saleTypes),
       id: p.planId || p.connectItemId || null,

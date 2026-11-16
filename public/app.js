@@ -2010,8 +2010,10 @@ async function cargarVentas() {
   }));
 }
 
-if (connectOverlay && connectBody && connectTabs && btnConnect) {
-  btnConnect.addEventListener('click', () => abrirConnect(connectTab));
+// Ya no hay botón 📶 en la barra superior (pedido del usuario): la ventana
+// se abre desde el botón Simular de las tarjetas de equipos con plan.
+if (connectOverlay && connectBody && connectTabs) {
+  if (btnConnect) btnConnect.addEventListener('click', () => abrirConnect(connectTab));
   connectTabs.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { connectTab = b.dataset.tab; renderConnect(); }));
   document.getElementById('connectClose').addEventListener('click', () => connectOverlay.classList.remove('open'));
   connectOverlay.addEventListener('click', e => { if (e.target === connectOverlay) connectOverlay.classList.remove('open'); });

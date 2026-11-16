@@ -860,6 +860,48 @@ async function diagnosticoColeccionConnect() {
 // Diagnóstico: en la ficha de un equipo de la colección Connect, muestra todo
 // lo que tenga que ver con planes y compañías (en toda la página, no solo en
 // los datos del producto), para encontrar los valores por compañía.
+// Diagnóstico: la ficha no trae los planes; la página los pide después a un
+// servicio de Falabella Connect (fconnect.falabellatienda.com). Para saber a
+// qué dirección, se revisan los archivos JavaScript que carga la página y se
+// muestran las direcciones y rutas que hablan de planes u operadores.
+async function diagnosticoApiConnect(sku) {
+  const html = await fetchDirectoConReintentos(urlDirecta(sku));
+  const base = env.falabellaBaseUrl;
+  const scripts = [...new Set([...html.matchAll(/<script[^>]+src="([^"]+\.js[^"]*)"/g)].map(m => m[1]))]
+    .map(src => (src.startsWith('http') ? src : src.startsWith('//') ? `https:${src}` : `${base}${src.startsWith('/') ? '' : '/'}${src}`));
+  const lineas = [`Archivos JavaScript en la página: ${scripts.length}`];
+
+  // Lo que interesa: direcciones de fconnect / appspot y rutas con plan, operador, oferta.
+  const RE_URL = /https?:\/\/[a-z0-9.-]*(?:fconnect|falabellatienda|appspot|txd)[a-z0-9.-]*[^"'`\s)<>]*/gi;
+  const RE_RUTA = /["'`](\/[a-zA-Z0-9_\-./]*(?:plan|operador|operator|carrier|offer|oferta|connect)[a-zA-Z0-9_\-./]*)["'`]/gi;
+  const RE_CONTEXTO = /.{0,60}(?:getPlans|fetchPlans|plansUrl|PLANS_URL|planes\?|\/plans\b|\/planes\b).{0,80}/gi;
+  const vistos = new Set();
+  let revisados = 0;
+  for (const url of scripts.slice(0, 80)) {
+    let js;
+    try {
+      const r = await fetchPagina(url);
+      if (r.http !== 200) continue;
+      js = r.html;
+    } catch { continue; }
+    revisados++;
+    const nombre = url.split('/').pop().split('?')[0].slice(0, 40);
+    const hallados = [
+      ...(js.match(RE_URL) || []),
+      ...[...js.matchAll(RE_RUTA)].map(m => m[1]),
+      ...(js.match(RE_CONTEXTO) || []).map(t => `…${t.replace(/\s+/g, ' ')}…`),
+    ];
+    for (const h of hallados) {
+      const t = h.slice(0, 160);
+      if (vistos.has(t) || /\.(png|jpe?g|svg|css|woff2?)\b/i.test(t)) continue;
+      vistos.add(t);
+      if (vistos.size <= 50) lineas.push(`  [${nombre}] ${t}`);
+    }
+  }
+  lineas.splice(1, 0, `revisados: ${revisados} · hallazgos: ${vistos.size}${vistos.size > 50 ? ' (se muestran 50)' : ''}`);
+  return lineas;
+}
+
 async function diagnosticoEquipoConnect(sku) {
   const html = await fetchDirectoConReintentos(urlDirecta(sku));
   const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -911,6 +953,7 @@ module.exports = {
   contextoPlan,
   diagnosticoColeccionConnect,
   diagnosticoEquipoConnect,
+  diagnosticoApiConnect,
   fetchPagina,
   hayInternet,
   diagnostico,

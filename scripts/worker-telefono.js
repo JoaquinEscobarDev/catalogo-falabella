@@ -24,6 +24,7 @@
 //   node scripts/worker-telefono.js --connect-coleccion    muestra cómo vienen los equipos de la colección Falabella Connect
 //   node scripts/worker-telefono.js --connect-equipo SKU   muestra dónde publica la ficha de un equipo con plan los valores por compañía
 //   node scripts/worker-telefono.js --connect-api SKU      busca en el JavaScript de la página el servicio que entrega los planes
+//   node scripts/worker-telefono.js --connect-planes SKU   abre la página de planes del equipo y muestra cómo vienen
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -116,7 +117,7 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
@@ -138,6 +139,10 @@ async function main() {
       console.log('\nEquipos con plan guardados (primeros 8):');
       for (const o of r.ofertas.slice(0, 8)) console.log(`  ${o.nombre}: con plan ${fmt(o.precioConPlan)}${o.precioSinPlan ? ` · sin plan ${fmt(o.precioSinPlan)}` : ''} · ids ${o.ids.slice(0, 3).join(', ')}`);
     };
+    const planesEquipo = async () => {
+      const sku = process.argv.find(a => /^\d{5,12}$/.test(a)) || '17765908';
+      for (const l of await scraperService.diagnosticoPlanesConnect(sku)) console.log(l);
+    };
     const api = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a)) || '17765908';
       for (const l of await scraperService.diagnosticoApiConnect(sku)) console.log(l);
@@ -146,7 +151,7 @@ async function main() {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a)) || '17765908';
       for (const l of await scraperService.diagnosticoEquipoConnect(sku)) console.log(l);
     };
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api })[modo]();
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo })[modo]();
     await db.end();
     return;
   }

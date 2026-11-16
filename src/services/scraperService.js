@@ -864,6 +864,72 @@ async function diagnosticoColeccionConnect() {
 // servicio de Falabella Connect (fconnect.falabellatienda.com). Para saber a
 // qué dirección, se revisan los archivos JavaScript que carga la página y se
 // muestran las direcciones y rutas que hablan de planes u operadores.
+// Diagnóstico: abre la página de planes de un equipo
+// (/falabella-cl/plans/{productId}/{slug}/{variantId}, visto en el JavaScript
+// de la ficha) y muestra cómo vienen los planes de cada compañía.
+async function diagnosticoPlanesConnect(sku) {
+  const base = env.falabellaBaseUrl;
+  const ficha = await fetchDirectoConReintentos(urlDirecta(sku));
+  const mf = ficha.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  const pd = mf ? JSON.parse(mf[1])?.props?.pageProps?.productData : null;
+  if (!pd) return ['No se pudo leer la ficha del equipo.'];
+  const url = `${base}/falabella-cl/plans/${pd.id}/${pd.slug || 'x'}/${sku}`;
+  const lineas = [`${pd.name} · productId ${pd.id}`, `página de planes: ${url}`];
+
+  let html = null;
+  try {
+    const r = await fetchPagina(url);
+    lineas.push(`HTTP ${r.http} · ${Math.round(r.html.length / 1024)} KB · título: ${((r.html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || '').trim().slice(0, 80)}`);
+    html = r.html;
+    if (!html.includes('__NEXT_DATA__')) html = await fetchDirectoConReintentos(url).catch(() => html);
+  } catch (e) {
+    lineas.push(`error: ${e.message}`);
+    return lineas;
+  }
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) { lineas.push('La página de planes no trae datos internos.'); return lineas; }
+  const pp = JSON.parse(m[1])?.props?.pageProps || {};
+  lineas.push(`pageProps: ${Object.keys(pp).join(', ').slice(0, 300)}`);
+
+  // Listas cuyos elementos nombran una compañía: probablemente los planes.
+  const RE_COMP = /\b(entel|movistar|wom|claro)\b/i;
+  const listas = [];
+  let n = 0;
+  (function visitar(v, ruta, prof) {
+    if (!v || typeof v !== 'object' || prof > 14 || n++ > 50000) return;
+    if (Array.isArray(v) && v.length && v.some(x => x && typeof x === 'object' && RE_COMP.test(JSON.stringify(x).slice(0, 4000)))) {
+      if (!ruta.startsWith('appCtx')) listas.push({ ruta, v });
+    }
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'textDictionary') continue;
+      visitar(x, Array.isArray(v) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k), prof + 1);
+    }
+  })(pp, '', 0);
+
+  if (!listas.length) {
+    lineas.push('No hay listas con compañías en la página. Textos con compañías:');
+    let c = 0;
+    (function textos(v, ruta, prof) {
+      if (v == null || prof > 14 || c >= 15) return;
+      if (typeof v === 'string') { if (RE_COMP.test(v) && v.length < 200 && !ruta.includes('textDictionary')) { lineas.push(`  ${ruta}: ${v.slice(0, 100)}`); c++; } return; }
+      if (typeof v !== 'object') return;
+      for (const [k, x] of Object.entries(v)) textos(x, Array.isArray(v) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k), prof + 1);
+    })(pp, '', 0);
+  }
+  // Las listas más internas primero (son los planes en sí, no sus contenedores).
+  listas.sort((a, b) => b.ruta.length - a.ruta.length);
+  for (const { ruta, v } of listas.slice(0, 3)) {
+    lineas.push('', `lista en ${ruta} (${v.length} elementos)`);
+    lineas.push(`  campos: ${Object.keys(v[0] || {}).join(', ').slice(0, 300)}`);
+    lineas.push(`  primero: ${JSON.stringify(v[0]).slice(0, 700)}`);
+  }
+
+  // Configuración con direcciones de planes, por si hay que usar el servicio.
+  const config = [...new Set((html.match(/"[A-Za-z_]*(?:PLAN|plan|CONNECT|connect)[A-Za-z_]*(?:URL|Url|url|BASE|Base|base|API|Api)[A-Za-z_]*"\s*:\s*"[^"]{4,160}"/g) || []))].slice(0, 8);
+  if (config.length) lineas.push('', 'configuración:', ...config.map(c => `  ${c}`));
+  return lineas;
+}
+
 async function diagnosticoApiConnect(sku) {
   const html = await fetchDirectoConReintentos(urlDirecta(sku));
   const base = env.falabellaBaseUrl;
@@ -954,6 +1020,7 @@ module.exports = {
   diagnosticoColeccionConnect,
   diagnosticoEquipoConnect,
   diagnosticoApiConnect,
+  diagnosticoPlanesConnect,
   fetchPagina,
   hayInternet,
   diagnostico,

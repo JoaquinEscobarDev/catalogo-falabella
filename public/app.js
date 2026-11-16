@@ -17,7 +17,12 @@ function esc(str) {
 const fmtPesos = n => `$${Number(n).toLocaleString('es-CL')}`;
 
 // ── Categorías ──
+// Categoría especial: los equipos con plan de la colección Falabella Connect
+// (no son SKUs del catálogo; se leen de /api/connect/planes).
+const CAT_CONNECT = 'Equipos con plan';
+
 const CATEGORIAS = [
+  { nombre: CAT_CONNECT,          icono: '📶', especial: true },
   { nombre: 'Computadores',       icono: '💻' },
   { nombre: 'Tablets',            icono: '📱' },
   { nombre: 'Impresoras',         icono: '🖨️' },
@@ -84,6 +89,8 @@ async function init() {
   skusGuardados = await r.json();
   renderCategorias();
   cargarEstadoRefresh();
+  // El conteo de "Equipos con plan" llega aparte.
+  cargarPlanesConnect().then(() => { if (!categoriaActiva) renderCategorias(); });
   await cargarTodo();
   // Refresca el ToDo cada 20s para que los cambios de otros dispositivos
   // (agregar, quitar, limpiar) se vean sin tener que recargar la página.
@@ -136,7 +143,9 @@ async function cargarTodo() {
 
 function renderCategorias() {
   categoriasGrid.innerHTML = CATEGORIAS.map((c, i) => {
-    const count = skusGuardados.filter(s => s.categoria === c.nombre).length;
+    const count = c.especial
+      ? (connectDatos?.ofertas?.length ?? 0)
+      : skusGuardados.filter(s => s.categoria === c.nombre).length;
     return `
       <div class="categoria-card" data-cat="${c.nombre}" style="--i:${i}">
         <span class="categoria-count ${count === 0 ? 'empty' : ''}">${count}</span>
@@ -174,6 +183,20 @@ async function mostrarVistaProductos(nombre) {
   filtroMarca.value = '';
   gridPrimeraVez = true;
   actualizarFab();
+
+  // "Equipos con plan" no es una categoría del catálogo: sin agregar SKU,
+  // sin "Actualizar precios" ni lista de cambios.
+  const esConnect = nombre === CAT_CONNECT;
+  document.getElementById('addPanel').style.display = esConnect ? 'none' : '';
+  document.getElementById('todoSidebar').style.display = esConnect ? 'none' : '';
+  headerActions.style.display = esConnect ? 'none' : 'flex';
+  filtroInput.placeholder = esConnect ? '🔍 Buscar equipo o marca…' : '🔍 Filtrar por nombre, SKU o alias…';
+  if (esConnect) {
+    renderGrid();
+    await cargarPlanesConnect();
+    if (categoriaActiva === CAT_CONNECT) renderGrid();
+    return;
+  }
   renderGrid();
 
   const skusCat = skusGuardados.filter(s => s.categoria === nombre);
@@ -380,6 +403,7 @@ function actualizarFiltroMarca(skusCat) {
 
 function renderGrid() {
   if (!categoriaActiva) return;
+  if (categoriaActiva === CAT_CONNECT) { renderGridConnect(); return; }
   const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
   const skusCat  = skusGuardados.filter(s => s.categoria === categoriaActiva);
   actualizarFiltroMarca(skusCat);
@@ -1547,8 +1571,7 @@ const connectTabs    = document.getElementById('connectTabs');
 const btnConnect     = document.getElementById('btnConnect');
 
 let connectDatos = null;          // { manuales, detectados }
-let connectTab   = 'equipos';
-let equiposFiltro = '';
+let connectTab   = 'planes';
 let simEstado    = { equipo: '', sku: '', precio: '', planKey: '', mensual: '', compania: '', plan: '', meses: '12', cuotas: '1' };
 let ventaPrefill = null;
 let ventasMes    = null;
@@ -1577,7 +1600,7 @@ async function cargarPlanesConnect() {
   }
 }
 
-function abrirConnect(tab = 'equipos') {
+function abrirConnect(tab = 'planes') {
   if (!connectOverlay) return;
   connectTab = tab;
   connectOverlay.classList.add('open');
@@ -1587,8 +1610,7 @@ function abrirConnect(tab = 'equipos') {
 
 function renderConnect() {
   connectTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === connectTab));
-  if (connectTab === 'equipos') renderEquiposConnect();
-  else if (connectTab === 'planes') renderPlanesConnect();
+  if (connectTab === 'planes') renderPlanesConnect();
   else if (connectTab === 'simulador') renderSimulador();
   else renderVentas();
 }
@@ -2091,7 +2113,11 @@ if (cuponProdOverlay) {
 }
 
 
-// ── Pestaña Equipos: cada teléfono con su valor en cada compañía ──
+// ══════════════════════════════════════════
+// CATEGORÍA "EQUIPOS CON PLAN" (colección Falabella Connect)
+// ══════════════════════════════════════════
+
+const ORDEN_COMPANIAS = ['WOM', 'Entel', 'Movistar', 'Claro'];
 
 // Plan más barato de una compañía entre los conocidos (detectados + cargados a mano).
 function planMasBarato(compania) {
@@ -2100,100 +2126,88 @@ function planMasBarato(compania) {
     .sort((a, b) => a.mensual - b.mensual)[0] || null;
 }
 
-function renderEquiposConnect() {
-  if (!connectDatos) { connectBody.innerHTML = '<p class="cupones-vacio">Cargando…</p>'; return; }
-  const ofertas = connectDatos.ofertas || [];
-  connectBody.innerHTML = `
-    <p class="cupones-ayuda">Equipos con plan de falabella.com. El pie es lo que se paga por el equipo al contratar; el mensual es el valor del plan de cada compañía.</p>
-    <input type="text" id="equiposFiltro" class="cupon-prod-filtro" placeholder="Buscar equipo o marca…" value="${esc(equiposFiltro)}" autocomplete="off" />
-    <div id="equiposLista" class="equipos-lista"></div>`;
-  const input = document.getElementById('equiposFiltro');
-  input.addEventListener('input', () => { equiposFiltro = input.value; pintarEquipos(); });
-  pintarEquipos();
+function gigasTxt(g) {
+  if (g == null) return null;
+  return g === 'Libres' ? 'gigas libres' : `${g} GB`;
+}
 
-  function pintarEquipos() {
-    const q = normalizarTexto(equiposFiltro).trim();
-    const lista = ofertas.filter(o => !q || normalizarTexto(`${o.nombre || ''} ${o.marca || ''}`).includes(q));
-    const cont = document.getElementById('equiposLista');
-    if (!ofertas.length) {
-      cont.innerHTML = '<p class="cupones-vacio">Todavía no se leyó la colección Falabella Connect. Se lee en cada actualización completa de precios.</p>';
-      return;
-    }
-    if (!lista.length) { cont.innerHTML = '<p class="cupones-vacio">Sin equipos que coincidan.</p>'; return; }
-
-    cont.innerHTML = lista.map(o => {
-      const i = ofertas.indexOf(o);
-      const specs = (o.specs || []).slice(0, 4).map(s =>
-        `<span class="equipo-spec">${s.nombre ? `${esc(s.nombre)}: ` : ''}<strong>${esc(s.valor)}</strong></span>`).join('');
-      // En el orden en que las piden en tienda.
-      const filas = ['WOM', 'Entel', 'Movistar', 'Claro'].map(comp => {
-        const op = o.operadores?.[comp] || null;
-        const plan = op?.mensual ? null : planMasBarato(comp);
-        const pie = op?.pie ?? o.precioConPlan;
-        const mensual = op?.mensual ?? plan?.mensual ?? null;
-        const gb = g => (g == null ? null : (g === 'Libres' ? 'GB libres' : `${g} GB`));
-        // Nombre del plan: el de Falabella (con sus gigas) o el que cargaste.
-        const fuente = op?.plan
-          ? [op.plan, gb(op.gigas) && !String(op.plan).includes(String(op.gigas)) ? gb(op.gigas) : null].filter(Boolean).join(' · ')
-          : (op ? 'falabella.com' : (plan ? (plan.nombre || 'tu plan') : null));
-        const pieTxt = pie != null ? `${op?.pie != null ? '' : 'desde '}${fmtPesos(pie)}` : '—';
-        const mensualTxt = mensual ? `<span class="equipo-valor">${fmtPesos(mensual)}<span class="equipo-mes">/mes</span></span>` : '<span class="equipo-falta">sin plan cargado</span>';
-        // Total del contrato (si Falabella dice cuántos meses) o de 12 meses.
-        const meses = op?.meses || 12;
-        const total = pie != null && mensual ? `${meses} meses: ${fmtPesos(pie + mensual * meses)}` : '';
-        const tipos = (op?.tipos || []).map(t => ({ portabilidad: 'Portabilidad', linea_nueva: 'Línea nueva', migracion: 'Migración' }[t])).filter(Boolean).join(' · ');
-        // Todos los planes de la compañía para este equipo.
-        const otros = (op?.planes || []).length > 1 ? `
-          <details class="equipo-planes">
-            <summary>Ver ${op.planes.length} planes de ${comp}</summary>
-            ${op.planes.map(pl => `
-              <div class="equipo-plan">
-                <span>${esc(pl.nombre || 'Plan')}${gb(pl.gigas) ? ` · ${gb(pl.gigas)}` : ''}</span>
-                <span><strong>${fmtPesos(pl.mensual)}</strong>/mes${pl.pie != null ? ` · equipo ${fmtPesos(pl.pie)}` : ''}</span>
-              </div>`).join('')}
-          </details>` : '';
-        return `
-          <div class="equipo-fila equipo-${comp.toLowerCase()}">
-            <span class="equipo-comp">${comp}</span>
-            <span class="equipo-pie"><span class="equipo-etq">Pie</span>${pieTxt}</span>
-            <span class="equipo-mensual">${mensualTxt}${fuente ? `<span class="equipo-fuente">${esc(fuente)}</span>` : ''}${total ? `<span class="equipo-fuente">${total}</span>` : ''}${tipos ? `<span class="equipo-fuente">${tipos}</span>` : ''}</span>
-            <button class="btn-simular" data-equipo="${i}" data-comp="${comp}" title="Simular con ${comp}">🧮</button>
-            ${otros}
-          </div>`;
-      }).join('');
-      return `
-        <div class="equipo">
-          <div class="equipo-cabecera">
-            ${o.imagen ? `<img class="equipo-img" src="${esc(o.imagen)}" alt="" loading="lazy" />` : '<div class="equipo-img equipo-img-vacia">📱</div>'}
-            <div class="equipo-info">
-              <div class="equipo-nombre">${esc(o.nombre || 'Equipo')}</div>
-              ${o.marca ? `<div class="equipo-marca">${esc(o.marca)}${o.enCatalogo ? ' · <span class="equipo-catalogo">en tu catálogo</span>' : ''}</div>` : ''}
-              ${specs ? `<div class="equipo-specs">${specs}</div>` : ''}
-              <div class="equipo-precios">
-                ${o.precioSinPlan ? `<span>Sin plan <strong>${fmtPesos(o.precioSinPlan)}</strong></span>` : ''}
-                <span>Pie inicial desde <strong class="equipo-pie-destacado">${fmtPesos(o.precioConPlan)}</strong>${TIPO_PRECIO[o.tipoPrecio] ? ` (${TIPO_PRECIO[o.tipoPrecio]})` : ''}</span>
-              </div>
-            </div>
-          </div>
-          <div class="equipo-companias">${filas}</div>
-        </div>`;
-    }).join('');
-
-    cont.querySelectorAll('[data-equipo]').forEach(btn => btn.addEventListener('click', () => {
-      const o = ofertas[Number(btn.dataset.equipo)];
-      const comp = btn.dataset.comp;
-      const op = o.operadores?.[comp] || null;
-      const plan = planMasBarato(comp);
-      simEstado = {
-        ...simEstado, equipo: o.nombre || '', sku: o.skuCatalogo || '',
-        precio: String(op?.pie ?? o.precioConPlan ?? ''),
-        mensual: String(op?.mensual ?? plan?.mensual ?? ''),
-        compania: comp, plan: op?.plan || plan?.nombre || '', planKey: op?.mensual ? '' : (plan?.key || ''),
-        // Los meses del contrato de Falabella, si coinciden con una opción del simulador.
-        ...(['6', '12', '18', '24'].includes(String(op?.meses)) ? { meses: String(op.meses) } : {}),
-      };
-      connectTab = 'simulador';
-      renderConnect();
-    }));
+// Una línea por compañía: "WOM · equipo $259.990 · $19.990 al mes".
+function lineaCompania(o, comp) {
+  const op = o.operadores?.[comp] || null;
+  const clase = `connect-comp connect-${comp.toLowerCase()}`;
+  if (op?.mensual) {
+    const detalle = [op.plan, gigasTxt(op.gigas) && !String(op.plan || '').includes(String(op.gigas)) ? gigasTxt(op.gigas) : null, op.meses ? `${op.meses} meses` : null]
+      .filter(Boolean).join(' · ');
+    return `
+      <div class="${clase}">
+        <span class="connect-comp-nombre">${comp}</span>
+        <span class="connect-comp-valor">${op.pie != null ? `Equipo <strong>${fmtPesos(op.pie)}</strong> · ` : ''}<strong>${fmtPesos(op.mensual)}</strong> al mes</span>
+        ${detalle ? `<span class="connect-comp-plan">${esc(detalle)}</span>` : ''}
+      </div>`;
   }
+  // Falabella no publica planes de esta compañía para el equipo: el plan cargado a mano, si hay.
+  const plan = planMasBarato(comp);
+  if (plan) {
+    return `
+      <div class="${clase}">
+        <span class="connect-comp-nombre">${comp}</span>
+        <span class="connect-comp-valor">Equipo desde <strong>${fmtPesos(o.precioConPlan)}</strong> · <strong>${fmtPesos(plan.mensual)}</strong> al mes</span>
+        <span class="connect-comp-plan">${esc(plan.nombre || 'Plan cargado a mano')} (cargado a mano)</span>
+      </div>`;
+  }
+  return `
+    <div class="${clase} connect-comp-sin">
+      <span class="connect-comp-nombre">${comp}</span>
+      <span class="connect-comp-valor">Sin planes publicados para este equipo</span>
+    </div>`;
+}
+
+function tarjetaConnect(o) {
+  const specs = (o.specs || []).slice(0, 4).map(sp => esc(sp.nombre ? `${sp.nombre}: ${sp.valor}` : sp.valor)).join(' · ');
+  return `
+    <div class="card card-connect">
+      ${o.imagen ? `<img class="card-img" src="${esc(o.imagen)}" alt="${esc(o.nombre || '')}" loading="lazy" />` : '<div class="card-img-placeholder">📱</div>'}
+      <div class="card-content">
+        <div class="card-body">
+          ${o.marca ? `<span class="card-alias">${esc(o.marca)}</span>` : ''}
+          <span class="card-nombre" title="${esc(o.nombre || '')}">${esc(o.nombre || 'Equipo')}</span>
+          ${specs ? `<span class="connect-specs">${specs}</span>` : ''}
+          ${o.enCatalogo ? '<span class="connect-en-catalogo">✓ En tu catálogo</span>' : ''}
+          <div class="card-precios">
+            ${o.precioSinPlan ? `<div class="precio-fila"><span class="precio-label">Sin plan</span><span class="precio-normal">${fmtPesos(o.precioSinPlan)}</span></div>` : ''}
+            <div class="precio-fila"><span class="precio-label">Pie inicial desde${TIPO_PRECIO[o.tipoPrecio] ? ` (${TIPO_PRECIO[o.tipoPrecio]})` : ''}</span><span class="precio-oferta">${fmtPesos(o.precioConPlan)}</span></div>
+          </div>
+          <div class="connect-companias">${ORDEN_COMPANIAS.map(c => lineaCompania(o, c)).join('')}</div>
+        </div>
+        <div class="card-footer">
+          ${o.url ? `<a class="card-link" href="${esc(o.url)}" target="_blank" rel="noopener">Ver en falabella.com →</a>` : '<span></span>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderGridConnect() {
+  const ofertas = connectDatos?.ofertas;
+  if (!ofertas) { grid.innerHTML = '<div class="empty-state">Cargando equipos…</div>'; return; }
+
+  // Filtro de marca con las marcas de los equipos.
+  const marcas = [...new Set(ofertas.map(o => o.marca).filter(Boolean))].sort();
+  const seleccion = filtroMarca.value;
+  filtroMarca.innerHTML = '<option value="">Todas las marcas</option>' + marcas.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  if (marcas.includes(seleccion)) filtroMarca.value = seleccion;
+
+  const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
+  const lista = ofertas.filter(o => {
+    if (filtroMarca.value && o.marca !== filtroMarca.value) return false;
+    const texto = normalizarTexto(`${o.nombre || ''} ${o.marca || ''}`);
+    return palabras.every(p => texto.includes(p));
+  });
+
+  if (!ofertas.length) {
+    grid.innerHTML = '<div class="empty-state">Todavía no se leyeron los equipos con plan.<br>Se leen de falabella.com en cada actualización completa de precios.</div>';
+    return;
+  }
+  grid.innerHTML = lista.length
+    ? lista.map(tarjetaConnect).join('')
+    : '<div class="empty-state">Ningún equipo coincide con el filtro.</div>';
 }

@@ -1546,3 +1546,24 @@ main {
 .equipo-planes summary { cursor: pointer; color: var(--azul); font-weight: 600; padding: 2px 0; }
 .equipo-plan { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--borde); color: var(--texto-suave); }
 .equipo-plan strong { color: var(--texto); }
+
+/* ══════════════════════════════════════════
+   CATEGORÍA "EQUIPOS CON PLAN"
+══════════════════════════════════════════ */
+.card-connect .card-img { background: #fff; }
+.connect-specs { font-size: .72rem; color: var(--texto-suave); line-height: 1.35; }
+.connect-en-catalogo { font-size: .7rem; font-weight: 700; color: var(--verde); }
+.connect-companias { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--borde); }
+.connect-comp {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 6px 9px; border-radius: 8px; border-left: 3px solid var(--borde); background: var(--surface-2);
+}
+.connect-comp-nombre { font-size: .78rem; font-weight: 800; }
+.connect-comp-valor  { font-size: .8rem; color: var(--texto-suave); }
+.connect-comp-valor strong { color: var(--texto); font-size: .88rem; }
+.connect-comp-plan   { font-size: .68rem; color: var(--texto-suave); }
+.connect-comp-sin    { opacity: .55; }
+.connect-wom      { border-left-color: #a238b5; } .connect-wom .connect-comp-nombre      { color: #d27ce4; }
+.connect-entel    { border-left-color: #1f6fd6; } .connect-entel .connect-comp-nombre    { color: #6fa9ff; }
+.connect-movistar { border-left-color: #43a047; } .connect-movistar .connect-comp-nombre { color: #74c77a; }
+.connect-claro    { border-left-color: #e53935; } .connect-claro .connect-comp-nombre    { color: #ff7a72; }

@@ -41,7 +41,7 @@
     <!-- ── Vista: Productos de una categoría ── -->
     <section id="viewProductos" style="display:none">
 
-      <div class="add-panel">
+      <div class="add-panel" id="addPanel">
         <h2>Agregar producto</h2>
         <form id="formAgregar">
           <input type="text" id="inputSku" placeholder="SKU (ej: 17461845)" required />
@@ -250,8 +250,7 @@
         <button class="cuotas-close" id="connectClose">✕</button>
       </div>
       <div class="connect-tabs" id="connectTabs">
-        <button type="button" data-tab="equipos" class="active">Equipos</button>
-        <button type="button" data-tab="planes">Planes</button>
+        <button type="button" data-tab="planes" class="active">Planes</button>
         <button type="button" data-tab="simulador">Simulador</button>
         <button type="button" data-tab="ventas">Ventas</button>
       </div>

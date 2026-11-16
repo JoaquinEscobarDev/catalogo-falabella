@@ -2131,16 +2131,34 @@ function renderEquiposConnect() {
         const plan = op?.mensual ? null : planMasBarato(comp);
         const pie = op?.pie ?? o.precioConPlan;
         const mensual = op?.mensual ?? plan?.mensual ?? null;
-        const fuente = op ? 'falabella.com' : (plan ? (plan.nombre || 'tu plan') : null);
+        const gb = g => (g == null ? null : (g === 'Libres' ? 'GB libres' : `${g} GB`));
+        // Nombre del plan: el de Falabella (con sus gigas) o el que cargaste.
+        const fuente = op?.plan
+          ? [op.plan, gb(op.gigas) && !String(op.plan).includes(String(op.gigas)) ? gb(op.gigas) : null].filter(Boolean).join(' · ')
+          : (op ? 'falabella.com' : (plan ? (plan.nombre || 'tu plan') : null));
         const pieTxt = pie != null ? `${op?.pie != null ? '' : 'desde '}${fmtPesos(pie)}` : '—';
         const mensualTxt = mensual ? `<span class="equipo-valor">${fmtPesos(mensual)}<span class="equipo-mes">/mes</span></span>` : '<span class="equipo-falta">sin plan cargado</span>';
-        const total12 = pie != null && mensual ? `12 meses: ${fmtPesos(pie + mensual * 12)}` : '';
+        // Total del contrato (si Falabella dice cuántos meses) o de 12 meses.
+        const meses = op?.meses || 12;
+        const total = pie != null && mensual ? `${meses} meses: ${fmtPesos(pie + mensual * meses)}` : '';
+        const tipos = (op?.tipos || []).map(t => ({ portabilidad: 'Portabilidad', linea_nueva: 'Línea nueva', migracion: 'Migración' }[t])).filter(Boolean).join(' · ');
+        // Todos los planes de la compañía para este equipo.
+        const otros = (op?.planes || []).length > 1 ? `
+          <details class="equipo-planes">
+            <summary>Ver ${op.planes.length} planes de ${comp}</summary>
+            ${op.planes.map(pl => `
+              <div class="equipo-plan">
+                <span>${esc(pl.nombre || 'Plan')}${gb(pl.gigas) ? ` · ${gb(pl.gigas)}` : ''}</span>
+                <span><strong>${fmtPesos(pl.mensual)}</strong>/mes${pl.pie != null ? ` · equipo ${fmtPesos(pl.pie)}` : ''}</span>
+              </div>`).join('')}
+          </details>` : '';
         return `
           <div class="equipo-fila equipo-${comp.toLowerCase()}">
             <span class="equipo-comp">${comp}</span>
             <span class="equipo-pie"><span class="equipo-etq">Pie</span>${pieTxt}</span>
-            <span class="equipo-mensual">${mensualTxt}${fuente ? `<span class="equipo-fuente">${esc(fuente)}</span>` : ''}${total12 ? `<span class="equipo-fuente">${total12}</span>` : ''}</span>
+            <span class="equipo-mensual">${mensualTxt}${fuente ? `<span class="equipo-fuente">${esc(fuente)}</span>` : ''}${total ? `<span class="equipo-fuente">${total}</span>` : ''}${tipos ? `<span class="equipo-fuente">${tipos}</span>` : ''}</span>
             <button class="btn-simular" data-equipo="${i}" data-comp="${comp}" title="Simular con ${comp}">🧮</button>
+            ${otros}
           </div>`;
       }).join('');
       return `
@@ -2170,7 +2188,9 @@ function renderEquiposConnect() {
         ...simEstado, equipo: o.nombre || '', sku: o.skuCatalogo || '',
         precio: String(op?.pie ?? o.precioConPlan ?? ''),
         mensual: String(op?.mensual ?? plan?.mensual ?? ''),
-        compania: comp, plan: plan?.nombre || '', planKey: op?.mensual ? '' : (plan?.key || ''),
+        compania: comp, plan: op?.plan || plan?.nombre || '', planKey: op?.mensual ? '' : (plan?.key || ''),
+        // Los meses del contrato de Falabella, si coinciden con una opción del simulador.
+        ...(['6', '12', '18', '24'].includes(String(op?.meses)) ? { meses: String(op.meses) } : {}),
       };
       connectTab = 'simulador';
       renderConnect();

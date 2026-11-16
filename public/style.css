@@ -1540,3 +1540,9 @@ main {
 @media (max-width: 380px) { .equipo-fila { grid-template-columns: 62px 1fr 1.2fr auto; gap: 6px; padding: 8px 10px; } }
 
 .equipo-valor { white-space: nowrap; }
+
+/* Lista de planes de una compañía para un equipo */
+.equipo-planes { grid-column: 1 / -1; font-size: .74rem; }
+.equipo-planes summary { cursor: pointer; color: var(--azul); font-weight: 600; padding: 2px 0; }
+.equipo-plan { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px dashed var(--borde); color: var(--texto-suave); }
+.equipo-plan strong { color: var(--texto); }

@@ -41,11 +41,26 @@ function precioDe(v, prof = 0) {
 
 // Valor del equipo con este plan: el menor entre los campos con nombre de
 // precio del equipo. Se descartan los del plan (mensual, minutos, velocidad).
+// Formato visto en la página real (16-11-2026): cada plan trae
+//   prices: [{ priceType: 'internet', priceGroup: 'default', value: 22999000, ... }]
+// con el valor del equipo en centavos (22999000 → $229.990).
+function pieDePrecios(prices) {
+  if (!Array.isArray(prices)) return null;
+  const vals = prices
+    .filter(p => p && typeof p === 'object' && p.priceType != null && p.value != null)
+    .map(p => Math.round(Number(p.value) / 100))
+    .filter(n => Number.isFinite(n) && n > 0);
+  return vals.length ? Math.min(...vals) : null;
+}
+
 function pieDe(plan) {
+  const enCentavos = pieDePrecios(plan?.prices);
+  if (enCentavos) return enCentavos;
   const candidatos = [];
   for (const [k, v] of Object.entries(plan || {})) {
     if (!/price|precio|equipo|device|pie|downpayment|terminal|cuota.?inicial/i.test(k)) continue;
-    if (/monthly|mensual|minute|speed|sms|mms|internet/i.test(k)) continue;
+    // "lowestPrepaidPrice" es el precio del equipo SIN plan (prepago): no es el pie.
+    if (/monthly|mensual|minute|speed|sms|mms|internet|prepaid|prepago/i.test(k)) continue;
     const n = precioDe(v);
     // Un equipo con plan puede costar desde $1 hasta varios millones.
     if (n && n < 5000000) candidatos.push(n);
@@ -98,17 +113,19 @@ function extraerPlanesConnect(html) {
   const cd = pp.connectData || {};
   const planes = planesDeLista(cd.plans || cd.planes || []);
 
-  // Si el valor del equipo no viene en cada plan, puede venir a nivel de
-  // connectData (un solo valor del equipo con plan).
-  const pieGeneral = pieDe(cd);
-  for (const p of planes) if (p.pie == null && pieGeneral) p.pie = pieGeneral;
+  // (No se usa ningún precio de connectData como pie: ahí viene
+  // lowestPrepaidPrice, que es el equipo sin plan.)
+  const sinPlan = precioDe(cd.lowestPrepaidPrice);
 
   const porCompania = {};
   for (const p of planes) {
     (porCompania[p.compania] ||= []).push(p);
   }
   for (const c of Object.keys(porCompania)) {
-    const lista = porCompania[c].sort((a, b) => a.mensual - b.mensual);
+    // "Más barato" = menor costo total del contrato (equipo + mensual × meses):
+    // el plan de mensual más bajo a veces trae el equipo bastante más caro.
+    const total = p => (p.pie != null ? p.pie + p.mensual * (p.meses || 12) : Infinity);
+    const lista = porCompania[c].sort((a, b) => total(a) - total(b) || a.mensual - b.mensual);
     const masBarato = lista[0];
     porCompania[c] = {
       pie: masBarato.pie, mensual: masBarato.mensual, plan: masBarato.nombre,
@@ -122,6 +139,7 @@ function extraerPlanesConnect(html) {
     porCompania: Object.keys(porCompania).length ? porCompania : null,
     camposConnectData: Object.keys(cd),
     camposPlan: Object.keys((cd.plans || [])[0] || {}),
+    sinPlan,
   };
 }
 

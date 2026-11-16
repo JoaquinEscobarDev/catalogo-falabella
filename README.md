@@ -38,6 +38,7 @@ Corre 100% en la nube (PWA instalable + PostgreSQL): el propio servidor actualiz
 ### Planes Connect (`📶`)
 - **Plan en la tarjeta**: al actualizar precios se lee la ficha de cada equipo; si se vende con plan (Entel, Movistar, WOM o Claro), la tarjeta muestra compañía, portabilidad o línea nueva, el valor mensual y el precio del equipo
 - **Precio del equipo con plan**: en cada actualización completa se lee la colección "Falabella Connect · Celulares con Plan" de falabella.com (precio más bajo del equipo llevándolo con plan) y se muestra en la tarjeta de cada equipo del catálogo que aparezca ahí
+- **Equipos**: cada teléfono de la colección Falabella Connect con foto, características, precio sin plan, pie inicial y una fila por compañía (WOM, Entel, Movistar, Claro) con el pie, lo que pagaría al mes y el total en 12 meses; el valor mensual sale de falabella.com si lo publica o, si no, del plan más barato cargado de esa compañía
 - **Planes**: catálogo con los planes detectados en las fichas (con qué equipos), los agregados a mano y los equipos con plan de falabella.com
 - **Simulador**: precio del equipo (al contado o en cuotas) + plan mensual → pago mensual, total y promedio en 6, 12, 18 o 24 meses
 - **Ventas**: registro de portabilidades y líneas nuevas (compañía, plan, equipo, cliente, vendedor), resumen del mes y exportación a CSV para Excel
@@ -92,7 +93,7 @@ Sistema de registro de reservas para el lanzamiento del iPhone 18. Los datos se 
 - Actualización de precios manual por producto o refresh masivo de toda la categoría
 
 ### PWA instalable
-- Manifest y service worker incluidos (`catalogo-v15`)
+- Manifest y service worker incluidos (`catalogo-v16`)
 - Instalable en iOS (Safari) y Android (Chrome) como app de pantalla de inicio
 - Caché de assets estáticos para funcionamiento offline básico; datos de API siempre desde la red
 

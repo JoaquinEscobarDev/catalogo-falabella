@@ -47,11 +47,12 @@ async function reemplazarOfertas(ofertas) {
     for (const o of ofertas) {
       for (const id of o.ids) {
         await q(`
-          INSERT INTO connect_ofertas (id_falabella, nombre, marca, precio_con_plan, tipo_precio, precio_sin_plan, url, plan)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          INSERT INTO connect_ofertas (id_falabella, nombre, marca, precio_con_plan, tipo_precio, precio_sin_plan, url, plan, imagen, specs, operadores)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
           ON CONFLICT (id_falabella) DO UPDATE SET
             precio_con_plan = LEAST(connect_ofertas.precio_con_plan, EXCLUDED.precio_con_plan)
-        `, [id, o.nombre, o.marca, o.precioConPlan, o.tipoPrecio, o.precioSinPlan, o.url, o.plan ? JSON.stringify(o.plan) : null]);
+        `, [id, o.nombre, o.marca, o.precioConPlan, o.tipoPrecio, o.precioSinPlan, o.url, o.plan ? JSON.stringify(o.plan) : null,
+            o.imagen || null, o.specs?.length ? JSON.stringify(o.specs) : null, o.operadores ? JSON.stringify(o.operadores) : null]);
       }
     }
   });
@@ -63,7 +64,10 @@ async function ofertasResumen() {
     SELECT o.nombre, MIN(o.marca) AS marca, MIN(o.precio_con_plan) AS precio_con_plan,
            MIN(o.tipo_precio) AS tipo_precio, MIN(o.precio_sin_plan) AS precio_sin_plan,
            MIN(o.url) AS url, bool_or(p.sku IS NOT NULL) AS en_catalogo,
-           MIN(p.sku) AS sku_catalogo
+           MIN(p.sku) AS sku_catalogo,
+           (array_agg(o.imagen) FILTER (WHERE o.imagen IS NOT NULL))[1] AS imagen,
+           (array_agg(o.specs) FILTER (WHERE o.specs IS NOT NULL))[1] AS specs,
+           (array_agg(o.operadores) FILTER (WHERE o.operadores IS NOT NULL))[1] AS operadores
     FROM connect_ofertas o
     LEFT JOIN products p ON p.sku = o.id_falabella
     WHERE o.detectado_en > NOW() - INTERVAL '3 days'
@@ -73,6 +77,7 @@ async function ofertasResumen() {
   return rows.map(r => ({
     nombre: r.nombre, marca: r.marca, precioConPlan: r.precio_con_plan, tipoPrecio: r.tipo_precio,
     precioSinPlan: r.precio_sin_plan, url: r.url, enCatalogo: r.en_catalogo, skuCatalogo: r.sku_catalogo,
+    imagen: r.imagen || null, specs: r.specs || [], operadores: r.operadores || null,
   }));
 }
 

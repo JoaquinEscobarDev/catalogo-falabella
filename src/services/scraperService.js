@@ -857,6 +857,47 @@ async function diagnosticoColeccionConnect() {
   return lineas;
 }
 
+// Diagnóstico: en la ficha de un equipo de la colección Connect, muestra todo
+// lo que tenga que ver con planes y compañías (en toda la página, no solo en
+// los datos del producto), para encontrar los valores por compañía.
+async function diagnosticoEquipoConnect(sku) {
+  const html = await fetchDirectoConReintentos(urlDirecta(sku));
+  const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return ['La página no trae datos internos.'];
+  const pp = JSON.parse(m[1])?.props?.pageProps || {};
+  const lineas = [
+    `${pp.productData?.name || sku}`,
+    `pageProps: ${Object.keys(pp).join(', ').slice(0, 300)}`,
+    `productData: ${Object.keys(pp.productData || {}).join(', ').slice(0, 400)}`,
+  ];
+  const RE_CLAVE = /plan|operator|operador|carrier|telco|portab|mensual|monthly|cuota|installment|\bpie\b|downpayment|connect/i;
+  const RE_VALOR = /\b(entel|movistar|wom|claro)\b|portabilidad|l[ií]nea nueva|\/mes|mensual/i;
+  const corto = v => {
+    if (v == null) return String(v);
+    if (typeof v === 'object') return Array.isArray(v) ? `[lista de ${v.length}]` : `{${Object.keys(v).slice(0, 8).join(', ')}}`;
+    return String(v).replace(/\s+/g, ' ').slice(0, 90);
+  };
+  let n = 0;
+  (function visitar(v, ruta, prof) {
+    if (v == null || prof > 14 || n >= 45) return;
+    if (typeof v !== 'object') {
+      if (typeof v === 'string' && RE_VALOR.test(v) && v.length < 300) { lineas.push(`  ${ruta}: ${corto(v)}`); n++; }
+      return;
+    }
+    for (const [k, x] of Object.entries(v)) {
+      if (/^(medias|mediaUrls|reviews|breadCrumb|description|longDescription)$/.test(k)) continue;
+      const r = Array.isArray(v) ? `${ruta}[${k}]` : (ruta ? `${ruta}.${k}` : k);
+      if (RE_CLAVE.test(k) && n < 45 && (typeof x !== 'object' || x === null || (Array.isArray(x) ? x.length : Object.keys(x).length))) {
+        lineas.push(`  ${r}: ${corto(x)}`); n++;
+      }
+      visitar(x, r, prof + 1);
+    }
+  })(pp, '', 0);
+  const apis = [...new Set((html.match(/https?:\/\/[^"'\s<>]*(?:plan|connect|telco|operator)[^"'\s<>]*/gi) || []))].slice(0, 6);
+  if (apis.length) lineas.push('', 'direcciones en la página que mencionan planes:', ...apis.map(a => `  ${a.slice(0, 140)}`));
+  return lineas;
+}
+
 function contextoPlan(sku, fetchFn) {
   return contextoFicha(sku, {
     reTexto: /\b(entel|movistar|wom|claro)\b|portabilidad|l[ií]nea nueva|\/mes|mensual|\bplan\b/i,
@@ -869,6 +910,7 @@ module.exports = {
   contextoCupon,
   contextoPlan,
   diagnosticoColeccionConnect,
+  diagnosticoEquipoConnect,
   fetchPagina,
   hayInternet,
   diagnostico,

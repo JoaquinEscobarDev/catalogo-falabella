@@ -42,6 +42,60 @@ function idsDe(item) {
   return [...ids].filter(id => /^\d{4,12}$/.test(id));
 }
 
+const COMPANIAS = [['Entel', /\bentel\b/i], ['Movistar', /\bmovistar\b/i], ['WOM', /\bwom\b/i], ['Claro', /\bclaro\b/i]];
+
+// Primera imagen del producto, en un tamaño razonable para la lista.
+function imagenDe(item) {
+  let url = item.mediaUrls?.[0] || item.media?.[0]?.url || item.media?.url || item.mediaUrl || null;
+  if (url && typeof url === 'object') url = url.url || null;
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('//')) url = `https:${url}`;
+  return url.includes('?') ? url : `${url}?width=300&height=300&fit=inside`;
+}
+
+// Características principales: topSpecifications viene como lista de
+// { name, value } (o variantes de esos nombres) o de textos sueltos.
+function specsDe(item) {
+  const lista = item.topSpecifications || item.specifications || [];
+  const out = [];
+  for (const s of Array.isArray(lista) ? lista : []) {
+    if (typeof s === 'string') { out.push({ nombre: null, valor: s }); continue; }
+    const nombre = s?.name ?? s?.label ?? s?.key ?? null;
+    const valor = s?.value ?? s?.values?.[0] ?? s?.text ?? null;
+    if (valor != null && String(valor).trim()) out.push({ nombre: nombre ? String(nombre) : null, valor: String(valor) });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+// Valores por compañía, si el producto los trae: busca objetos que nombran
+// una compañía y lee el precio del equipo (pie) y el valor mensual.
+function operadoresDe(nodo) {
+  const res = {};
+  let n = 0;
+  (function visitar(v, prof) {
+    if (!v || typeof v !== 'object' || prof > 8 || n++ > 5000) return;
+    if (!Array.isArray(v)) {
+      const textos = Object.values(v).filter(x => typeof x === 'string').join(' ');
+      const comp = (COMPANIAS.find(([, re]) => re.test(textos)) || [null])[0];
+      if (comp && !res[comp]) {
+        let pie = null, mensual = null;
+        for (const [k, x] of Object.entries(v)) {
+          const num = Array.isArray(x) ? aNumero(x[0]?.rawPrice ?? x[0]?.price ?? x[0]) : (typeof x === 'object' ? null : aNumero(x));
+          if (/mensual|monthly|month|cuota|fee|cargo/i.test(k) && num) mensual = num;
+          else if (/pie|equipo|device|price|precio/i.test(k)) {
+            const p = Array.isArray(x) ? (menorPrecio(x)?.precio ?? num) : num;
+            if (p) pie = p;
+          }
+        }
+        if (pie || mensual) res[comp] = { pie, mensual };
+      }
+    }
+    for (const x of Object.values(v)) visitar(x, prof + 1);
+  })(nodo, 0);
+  return Object.keys(res).length ? res : null;
+}
+
 // Función pura: HTML de una página de la colección → ofertas + total.
 function extraerOfertasConnect(html) {
   const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -64,6 +118,9 @@ function extraerOfertasConnect(html) {
       precioSinPlan: sinPlan ? sinPlan.precio : null,
       url,
       plan: item.lowestPlan,
+      imagen: imagenDe(item),
+      specs: specsDe(item),
+      operadores: operadoresDe(item),
     });
   }
   return { ofertas, total: pp.pagination?.count ?? null, hayDatos: true };
@@ -102,4 +159,4 @@ async function buscar({ log = () => {} } = {}) {
   return { resumen, ofertas };
 }
 
-module.exports = { buscar, extraerOfertasConnect, menorPrecio };
+module.exports = { buscar, extraerOfertasConnect, menorPrecio, operadoresDe, specsDe };

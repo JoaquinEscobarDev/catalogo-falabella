@@ -1502,3 +1502,41 @@ main {
 .cupones-titulo-ocultos { color: var(--texto-suave); padding-top: 8px; }
 .cupon-item-oculto { opacity: .6; }
 .cupon-item-ocultar, .cupon-item-mostrar { flex-shrink: 0; }
+
+/* ── Pestaña Equipos (Connect) ── */
+.connect-tabs button { max-width: 120px; font-size: .78rem; padding: 8px 4px; }
+.equipos-lista { display: flex; flex-direction: column; gap: 12px; }
+.equipo { background: var(--surface-2); border: 1px solid var(--borde); border-radius: 12px; overflow: hidden; }
+.equipo-cabecera { display: flex; gap: 12px; padding: 12px; }
+.equipo-img { width: 84px; height: 84px; object-fit: contain; background: #fff; border-radius: 8px; flex-shrink: 0; }
+.equipo-img-vacia { display: flex; align-items: center; justify-content: center; font-size: 2rem; background: var(--surface); }
+.equipo-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.equipo-nombre { font-size: .9rem; font-weight: 700; line-height: 1.3; }
+.equipo-marca { font-size: .7rem; color: var(--texto-suave); font-weight: 600; letter-spacing: .3px; }
+.equipo-catalogo { color: var(--verde); }
+.equipo-specs { display: flex; flex-wrap: wrap; gap: 4px; }
+.equipo-spec { font-size: .66rem; color: var(--texto-suave); background: var(--surface); border: 1px solid var(--borde); border-radius: 6px; padding: 1px 6px; }
+.equipo-spec strong { color: var(--texto); font-weight: 600; }
+.equipo-precios { display: flex; flex-direction: column; gap: 1px; font-size: .76rem; color: var(--texto-suave); }
+.equipo-precios strong { color: var(--texto); }
+.equipo-pie-destacado { color: var(--amarillo) !important; font-size: .95rem; }
+.equipo-companias { border-top: 1px solid var(--borde); }
+.equipo-fila {
+  display: grid; grid-template-columns: 74px 1fr 1.25fr auto; align-items: center; gap: 8px;
+  padding: 8px 12px; border-top: 1px solid var(--borde); border-left: 3px solid transparent;
+}
+.equipo-fila:first-child { border-top: none; }
+.equipo-comp { font-weight: 800; font-size: .8rem; }
+.equipo-wom      { border-left-color: #a238b5; } .equipo-wom .equipo-comp      { color: #d27ce4; }
+.equipo-entel    { border-left-color: #1f6fd6; } .equipo-entel .equipo-comp    { color: #6fa9ff; }
+.equipo-movistar { border-left-color: #43a047; } .equipo-movistar .equipo-comp { color: #74c77a; }
+.equipo-claro    { border-left-color: #e53935; } .equipo-claro .equipo-comp    { color: #ff7a72; }
+.equipo-pie, .equipo-mensual { display: flex; flex-direction: column; font-size: .82rem; font-weight: 700; min-width: 0; }
+.equipo-etq { font-size: .62rem; font-weight: 600; color: var(--texto-suave); }
+.equipo-mes { font-size: .68rem; font-weight: 600; color: var(--texto-suave); }
+.equipo-fuente { font-size: .62rem; font-weight: 500; color: var(--texto-suave); overflow-wrap: anywhere; }
+.equipo-falta { font-size: .7rem; font-weight: 500; color: var(--texto-suave); }
+.equipo-fila .btn-simular { margin-top: 0; }
+@media (max-width: 380px) { .equipo-fila { grid-template-columns: 62px 1fr 1.2fr auto; gap: 6px; padding: 8px 10px; } }
+
+.equipo-valor { white-space: nowrap; }

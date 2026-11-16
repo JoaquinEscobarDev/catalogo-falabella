@@ -1547,7 +1547,8 @@ const connectTabs    = document.getElementById('connectTabs');
 const btnConnect     = document.getElementById('btnConnect');
 
 let connectDatos = null;          // { manuales, detectados }
-let connectTab   = 'planes';
+let connectTab   = 'equipos';
+let equiposFiltro = '';
 let simEstado    = { equipo: '', sku: '', precio: '', planKey: '', mensual: '', compania: '', plan: '', meses: '12', cuotas: '1' };
 let ventaPrefill = null;
 let ventasMes    = null;
@@ -1576,7 +1577,7 @@ async function cargarPlanesConnect() {
   }
 }
 
-function abrirConnect(tab = 'planes') {
+function abrirConnect(tab = 'equipos') {
   if (!connectOverlay) return;
   connectTab = tab;
   connectOverlay.classList.add('open');
@@ -1586,7 +1587,8 @@ function abrirConnect(tab = 'planes') {
 
 function renderConnect() {
   connectTabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === connectTab));
-  if (connectTab === 'planes') renderPlanesConnect();
+  if (connectTab === 'equipos') renderEquiposConnect();
+  else if (connectTab === 'planes') renderPlanesConnect();
   else if (connectTab === 'simulador') renderSimulador();
   else renderVentas();
 }
@@ -2086,4 +2088,92 @@ if (cuponProdOverlay) {
   cuponProdOverlay.addEventListener('click', e => { if (e.target === cuponProdOverlay) cerrar(); });
   document.getElementById('cuponProdFiltro').addEventListener('input', () => { if (cuponProdDatos) renderProductosCupon(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+}
+
+
+// ── Pestaña Equipos: cada teléfono con su valor en cada compañía ──
+
+// Plan más barato de una compañía entre los conocidos (detectados + cargados a mano).
+function planMasBarato(compania) {
+  return todosLosPlanes()
+    .filter(p => p.compania === compania && p.mensual)
+    .sort((a, b) => a.mensual - b.mensual)[0] || null;
+}
+
+function renderEquiposConnect() {
+  if (!connectDatos) { connectBody.innerHTML = '<p class="cupones-vacio">Cargando…</p>'; return; }
+  const ofertas = connectDatos.ofertas || [];
+  connectBody.innerHTML = `
+    <p class="cupones-ayuda">Equipos con plan de falabella.com. El pie es lo que se paga por el equipo al contratar; el mensual es el valor del plan de cada compañía.</p>
+    <input type="text" id="equiposFiltro" class="cupon-prod-filtro" placeholder="Buscar equipo o marca…" value="${esc(equiposFiltro)}" autocomplete="off" />
+    <div id="equiposLista" class="equipos-lista"></div>`;
+  const input = document.getElementById('equiposFiltro');
+  input.addEventListener('input', () => { equiposFiltro = input.value; pintarEquipos(); });
+  pintarEquipos();
+
+  function pintarEquipos() {
+    const q = normalizarTexto(equiposFiltro).trim();
+    const lista = ofertas.filter(o => !q || normalizarTexto(`${o.nombre || ''} ${o.marca || ''}`).includes(q));
+    const cont = document.getElementById('equiposLista');
+    if (!ofertas.length) {
+      cont.innerHTML = '<p class="cupones-vacio">Todavía no se leyó la colección Falabella Connect. Se lee en cada actualización completa de precios.</p>';
+      return;
+    }
+    if (!lista.length) { cont.innerHTML = '<p class="cupones-vacio">Sin equipos que coincidan.</p>'; return; }
+
+    cont.innerHTML = lista.map(o => {
+      const i = ofertas.indexOf(o);
+      const specs = (o.specs || []).slice(0, 4).map(s =>
+        `<span class="equipo-spec">${s.nombre ? `${esc(s.nombre)}: ` : ''}<strong>${esc(s.valor)}</strong></span>`).join('');
+      // En el orden en que las piden en tienda.
+      const filas = ['WOM', 'Entel', 'Movistar', 'Claro'].map(comp => {
+        const op = o.operadores?.[comp] || null;
+        const plan = op?.mensual ? null : planMasBarato(comp);
+        const pie = op?.pie ?? o.precioConPlan;
+        const mensual = op?.mensual ?? plan?.mensual ?? null;
+        const fuente = op ? 'falabella.com' : (plan ? (plan.nombre || 'tu plan') : null);
+        const pieTxt = pie != null ? `${op?.pie != null ? '' : 'desde '}${fmtPesos(pie)}` : '—';
+        const mensualTxt = mensual ? `<span class="equipo-valor">${fmtPesos(mensual)}<span class="equipo-mes">/mes</span></span>` : '<span class="equipo-falta">sin plan cargado</span>';
+        const total12 = pie != null && mensual ? `12 meses: ${fmtPesos(pie + mensual * 12)}` : '';
+        return `
+          <div class="equipo-fila equipo-${comp.toLowerCase()}">
+            <span class="equipo-comp">${comp}</span>
+            <span class="equipo-pie"><span class="equipo-etq">Pie</span>${pieTxt}</span>
+            <span class="equipo-mensual">${mensualTxt}${fuente ? `<span class="equipo-fuente">${esc(fuente)}</span>` : ''}${total12 ? `<span class="equipo-fuente">${total12}</span>` : ''}</span>
+            <button class="btn-simular" data-equipo="${i}" data-comp="${comp}" title="Simular con ${comp}">🧮</button>
+          </div>`;
+      }).join('');
+      return `
+        <div class="equipo">
+          <div class="equipo-cabecera">
+            ${o.imagen ? `<img class="equipo-img" src="${esc(o.imagen)}" alt="" loading="lazy" />` : '<div class="equipo-img equipo-img-vacia">📱</div>'}
+            <div class="equipo-info">
+              <div class="equipo-nombre">${esc(o.nombre || 'Equipo')}</div>
+              ${o.marca ? `<div class="equipo-marca">${esc(o.marca)}${o.enCatalogo ? ' · <span class="equipo-catalogo">en tu catálogo</span>' : ''}</div>` : ''}
+              ${specs ? `<div class="equipo-specs">${specs}</div>` : ''}
+              <div class="equipo-precios">
+                ${o.precioSinPlan ? `<span>Sin plan <strong>${fmtPesos(o.precioSinPlan)}</strong></span>` : ''}
+                <span>Pie inicial desde <strong class="equipo-pie-destacado">${fmtPesos(o.precioConPlan)}</strong>${TIPO_PRECIO[o.tipoPrecio] ? ` (${TIPO_PRECIO[o.tipoPrecio]})` : ''}</span>
+              </div>
+            </div>
+          </div>
+          <div class="equipo-companias">${filas}</div>
+        </div>`;
+    }).join('');
+
+    cont.querySelectorAll('[data-equipo]').forEach(btn => btn.addEventListener('click', () => {
+      const o = ofertas[Number(btn.dataset.equipo)];
+      const comp = btn.dataset.comp;
+      const op = o.operadores?.[comp] || null;
+      const plan = planMasBarato(comp);
+      simEstado = {
+        ...simEstado, equipo: o.nombre || '', sku: o.skuCatalogo || '',
+        precio: String(op?.pie ?? o.precioConPlan ?? ''),
+        mensual: String(op?.mensual ?? plan?.mensual ?? ''),
+        compania: comp, plan: plan?.nombre || '', planKey: op?.mensual ? '' : (plan?.key || ''),
+      };
+      connectTab = 'simulador';
+      renderConnect();
+    }));
+  }
 }

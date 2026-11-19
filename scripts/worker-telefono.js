@@ -312,6 +312,17 @@ async function main() {
     detalle: os.hostname(),
     // Con la hora adelante: sirve para ver el ritmo y cuándo se detuvo.
     log: msg => console.log(String(msg).replace(/^(\s*)(OK|FAIL|\.\.\.)/, `$1${hora()} $2`)),
+    // Al terminar cada actualización: resumen ordenado por categoría y marca.
+    // REFRESH_EN_VIVO=1 vuelve a mostrar una línea por producto.
+    ...(process.env.REFRESH_EN_VIVO === '1' ? {} : {
+      reporte: async (datos) => {
+        const skus = (datos.r.detalle || []).map(d => d.sku);
+        const { rows } = await db.query(
+          `SELECT p.sku, p.marca, p.nombre, c.nombre AS categoria
+           FROM products p JOIN categories c ON c.id = p.category_id WHERE p.sku = ANY($1)`, [skus]);
+        require('./lib/consola').reporteActualizacion(datos, Object.fromEntries(rows.map(x => [x.sku, x])));
+      },
+    }),
   });
 }
 

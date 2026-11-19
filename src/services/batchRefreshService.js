@@ -52,8 +52,15 @@ const CONCURRENCIA = Math.min(8, Math.max(1,
   parseInt(process.env.REFRESH_CONCURRENCIA, 10) || (env.workerOrigen === 'remoto' ? 4 : 1)
 ));
 
-async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk, onAvance, log = () => {} } = {}) {
-  const r = { ok: 0, fail: 0, cambios: 0, viaDirecta: 0, bloqueado: false };
+// Precio que paga el cliente (el más bajo disponible).
+const precioFinal = p => p ? (p.precioCMR || p.precioOferta || p.precio || p.precio_cmr || p.precio_oferta || p.precio_normal || null) : null;
+
+// enVivo=false: en vez de una línea por producto (que con varios carriles
+// salen desordenadas), una línea de avance cada tanto; el detalle ordenado
+// queda en r.detalle para el reporte final.
+async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk, onAvance, log = () => {}, enVivo = true } = {}) {
+  const r = { ok: 0, fail: 0, cambios: 0, viaDirecta: 0, bloqueado: false, detalle: [] };
+  const cadaCuanto = Math.max(10, Math.round(skus.length / 20));
   let fallosSeguidos = 0;
   let siguiente = 0;   // próximo índice a tomar
   let hechos = 0;      // productos terminados (bien o mal)
@@ -92,14 +99,25 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
         fallosSeguidos = 0;
         if (res.viaDirecta) r.viaDirecta++;
         if (res.cambio) r.cambios++;
-        log(`  OK   ${sku} - ${res.producto.nombre} - $${res.producto.precio || res.producto.precioOferta || '?'}${res.cambio ? ' (precio cambió)' : ''}${res.producto.cupon ? ' (cupón)' : ''}`);
+        r.detalle.push({
+          sku, ok: true, cambio: !!res.cambio, cupon: !!res.producto.cupon,
+          nombre: res.producto.nombre, marca: res.producto.marca,
+          ahora: precioFinal(res.producto), antes: res.cambio ? precioFinal(res.previo) : null,
+        });
+        if (enVivo) log(`  OK   ${sku} - ${res.producto.nombre} - $${res.producto.precio || res.producto.precioOferta || '?'}${res.cambio ? ' (precio cambió)' : ''}${res.producto.cupon ? ' (cupón)' : ''}`);
         if (conStock) await stockService.refreshStock(sku).catch(() => {});
       } catch (e) {
         r.fail++;
         if (!db.esErrorDeConexion(e)) fallosSeguidos++;
-        log(`  FAIL ${sku} - ${e.message}`);
+        r.detalle.push({ sku, ok: false, error: e.message });
+        if (enVivo) log(`  FAIL ${sku} - ${e.message}`);
       }
       hechos++;
+      if (!enVivo && (hechos % cadaCuanto === 0 || hechos === skus.length)) {
+        const pct = Math.round(hechos * 100 / skus.length);
+        const barra = '█'.repeat(Math.round(pct / 5)).padEnd(20, '░');
+        log(`  ...  ${barra} ${String(pct).padStart(3)}%  ${hechos}/${skus.length} · ${r.cambios} cambios · ${r.fail} sin respuesta`);
+      }
       if (onAvance) await Promise.resolve(onAvance(hechos, r)).catch(() => {});
       if (fallosSeguidos >= FALLOS_SEGUIDOS_PARA_CORTAR && !cortar) {
         cortar = true;
@@ -126,7 +144,7 @@ async function refrescarSkus(skus, { fetchFn, conStock = true, antesDelPrimerOk,
 //            ToDo, para que la lista muestre solo los cambios de hoy. Recién
 //            se hace cuando el primer producto se leyó bien, así un bloqueo
 //            no borra la lista sin traer nada nuevo.
-async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = () => {} } = {}) {
+async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = () => {}, enVivo = true, reporte } = {}) {
   const skus = await productsRepository.findAllSkus();
   log(`[${ahora()}] Refrescando ${skus.length} SKUs (${tipo})...`);
   const runId = await refreshRunsRepository.start(tipo, null, skus.length, env.workerOrigen);
@@ -142,7 +160,7 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
     await connectColeccionService.buscar({ log, ...(fetchFn ? { fetchFn } : {}) }).catch(e => log(`Connect: error (${e.message}).`));
 
     r = await refrescarSkus(skus, {
-      fetchFn, log,
+      fetchFn, log, enVivo,
       antesDelPrimerOk: limpiar ? async () => {
         await db.query('UPDATE price_history SET visto = TRUE WHERE visto = FALSE');
         await db.query('DELETE FROM todo_items');
@@ -157,12 +175,13 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
     enCurso = null;
     await refreshRunsRepository.finish(runId, { ...r, estado }).catch(() => {});
   }
-  log(`[${ahora()}] Listo: ${r.ok} OK (${r.viaDirecta} vía página directa, ${r.cambios} con cambio de precio) / ${r.fail} FAIL de ${skus.length}${r.bloqueado ? ' — BLOQUEADO' : ''}`);
+  if (reporte) await Promise.resolve(reporte({ titulo: `Actualización ${tipo}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
+  else log(`[${ahora()}] Listo: ${r.ok} OK (${r.viaDirecta} vía página directa, ${r.cambios} con cambio de precio) / ${r.fail} FAIL de ${skus.length}${r.bloqueado ? ' — BLOQUEADO' : ''}`);
   return r;
 }
 
 // Atiende las solicitudes del botón "Actualizar precios" de una categoría.
-async function procesarSolicitudesPendientes({ fetchFn, log = () => {} } = {}) {
+async function procesarSolicitudesPendientes({ fetchFn, log = () => {}, enVivo = true, reporte } = {}) {
   const solicitudes = await refreshRequestsRepository.findPending();
 
   for (const { id, categoria } of solicitudes) {
@@ -178,7 +197,7 @@ async function procesarSolicitudesPendientes({ fetchFn, log = () => {} } = {}) {
     let estado = 'error';
     try {
       r = await refrescarSkus(skus, {
-        fetchFn, log,
+        fetchFn, log, enVivo,
         onAvance: async (hechos, parcial) => {
           Object.assign(enCurso, { hechos, ok: parcial.ok, fail: parcial.fail });
           // Se guarda seguido: la web lee el avance desde la base cuando el
@@ -192,7 +211,8 @@ async function procesarSolicitudesPendientes({ fetchFn, log = () => {} } = {}) {
       await refreshRunsRepository.finish(runId, { ...r, estado }).catch(() => {});
       await refreshRequestsRepository.markFinished(id, r.ok, r.fail).catch(() => {});
     }
-    log(`  Listo: ${r.ok} OK / ${r.fail} FAIL de ${skus.length}`);
+    if (reporte) await Promise.resolve(reporte({ titulo: `Actualización de ${categoria}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
+    else log(`  Listo: ${r.ok} OK / ${r.fail} FAIL de ${skus.length}`);
   }
   return solicitudes.length;
 }

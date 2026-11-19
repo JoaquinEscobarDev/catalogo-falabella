@@ -2,14 +2,15 @@
 // pulgadas, columnas alineadas, nombres acortados al ancho de la pantalla y
 // colores (se apagan con NO_COLOR=1 o si la salida no es una terminal).
 
-const color = process.stdout.isTTY && !process.env.NO_COLOR;
+// FORCE_COLOR=1: colores aunque la salida pase por tee (lo pone iniciar.sh).
+const color = (process.stdout.isTTY || process.env.FORCE_COLOR === '1') && !process.env.NO_COLOR;
 const c = (cod) => (t) => (color ? `\x1b[${cod}m${t}\x1b[0m` : String(t));
 const estilo = {
   negrita: c('1'), tenue: c('2'),
   verde: c('32'), rojo: c('31'), cian: c('36'), amarillo: c('33'),
 };
 
-const ancho = () => Math.max(40, Math.min(process.stdout.columns || 60, 100));
+const ancho = () => Math.max(40, Math.min(process.stdout.columns || parseInt(process.env.COLUMNS, 10) || 60, 100));
 
 const MARCAS = ['samsung', 'hisense', 'xiaomi', 'philips', 'lg', 'tcl', 'jbl', 'sony'];
 

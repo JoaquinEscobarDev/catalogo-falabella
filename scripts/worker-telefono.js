@@ -167,11 +167,14 @@ async function main() {
         WHERE lower(c.nombre) = lower($1)
         ORDER BY p.marca NULLS LAST, p.nombre NULLS LAST, p.sku
       `, [categoria]);
-      console.log(`${categoria}: ${rows.length} productos\n`);
-      rows.forEach((r, n) => {
-        const nombre = (r.nombre || r.alias || '(sin nombre todavía)').replace(/\s+/g, ' ').slice(0, 70);
-        console.log(`${String(n + 1).padStart(2)}. ${r.sku} · ${r.marca || '?'} · ${nombre}${r.upc ? ` · UPC ${r.upc}` : ''}`);
-      });
+      const fmt = require('./lib/consola');
+      fmt.titulo(`${categoria} · ${rows.length} productos`);
+      fmt.grupo('PRODUCTOS', fmt.estilo.cian, rows.map(r => ({
+        sku: r.sku, marca: r.marca,
+        nombre: r.nombre || r.alias || '(sin nombre todavía)',
+        extra: r.upc ? `UPC ${r.upc}` : '',
+      })));
+      console.log('');
     };
 
     // Eliminar SKUs: sin --confirmar solo muestra qué se eliminaría.
@@ -239,7 +242,6 @@ async function main() {
         [cat.rows[0].id]
       );
       const enPagina = new Set(rows.map(r => r.sku));
-      const nombre = r => `${r.marca || '?'} · ${(r.nombre || r.alias || '(sin nombre todavía)').replace(/\s+/g, ' ').slice(0, 60)}`;
 
       const quedan = rows.filter(r => tienda.has(r.sku));
       const sobran = rows.filter(r => !tienda.has(r.sku));
@@ -251,20 +253,35 @@ async function main() {
       const enOtra = new Map(otra.map(r => [r.sku, r.categoria]));
       const agregar = faltan.filter(s => !enOtra.has(s));
 
-      console.log(`${cat.rows[0].nombre}: ${rows.length} en la página · ${tienda.size} en tienda\n`);
-      console.log(`1) SE QUEDAN (en página y en tienda): ${quedan.length}`);
-      quedan.forEach(r => console.log(`   ${r.sku} · ${nombre(r)}`));
-      console.log(`\n2) SE ELIMINAN (en página, no en tienda): ${sobran.length}`);
-      sobran.forEach(r => console.log(`   ${r.sku} · ${nombre(r)}`));
-      console.log(`\n3) SE AGREGAN (en tienda, no en página): ${agregar.length}`);
-      agregar.forEach(s => console.log(`   ${s} · ${tienda.get(s) || ''}`));
+      const fmt = require('./lib/consola');
+      const deFila = r => ({ sku: r.sku, marca: r.marca, nombre: r.nombre || r.alias || '(sin nombre todavía)' });
+      // La referencia de tienda empieza con la marca: "Hisense 65U6ESV".
+      const deTienda = s => {
+        const ref = (tienda.get(s) || '').replace(/\(.*?\)/g, '').trim();
+        const [marca, ...resto] = ref.split(/\s+/);
+        return { sku: s, marca: marca || '?', nombre: resto.join(' ') || ref };
+      };
+      const aplicar = process.argv.includes('--aplicar');
+
+      fmt.titulo(`${cat.rows[0].nombre} · comparación con tienda`);
+      fmt.grupo('✔ SE QUEDAN', fmt.estilo.verde, quedan.map(deFila));
+      fmt.grupo(aplicar ? '✖ SE ELIMINAN' : '✖ SE ELIMINARÍAN', fmt.estilo.rojo, sobran.map(deFila));
+      fmt.grupo(aplicar ? '＋ SE AGREGAN' : '＋ SE AGREGARÍAN', fmt.estilo.cian, agregar.map(deTienda));
       if (enOtra.size) {
-        console.log('\n   Están en otra categoría (no se tocan):');
-        for (const [s, c] of enOtra) console.log(`   ${s} · ${tienda.get(s) || ''} → ${c}`);
+        fmt.grupo('⚠ EN OTRA CATEGORÍA (no se tocan)', fmt.estilo.amarillo,
+          [...enOtra].map(([s, cat]) => ({ ...deTienda(s), extra: `→ ${cat}` })));
       }
 
-      if (!process.argv.includes('--aplicar')) {
-        console.log('\nNo se cambió nada. Si la lista está bien, repetí el comando agregando --aplicar');
+      if (!aplicar) {
+        fmt.resumen([
+          ['En la página', rows.length],
+          ['En tienda', tienda.size],
+          ['Se quedan', quedan.length, fmt.estilo.verde],
+          ['Se eliminarían', sobran.length, fmt.estilo.rojo],
+          ['Se agregarían', agregar.length, fmt.estilo.cian],
+        ]);
+        console.log(fmt.estilo.amarillo('  No se cambió nada. Para aplicarlo, repetí el comando con --aplicar'));
+        console.log('');
         return;
       }
       const del = sobran.length
@@ -273,7 +290,14 @@ async function main() {
       const ins = agregar.length
         ? await db.query('INSERT INTO products (sku, category_id) SELECT unnest($1::text[]), $2 ON CONFLICT (sku) DO NOTHING', [agregar, cat.rows[0].id])
         : { rowCount: 0 };
-      console.log(`\nListo: ${del.rowCount} eliminados, ${ins.rowCount} agregados. Los nuevos muestran precio en la próxima actualización.`);
+      fmt.resumen([
+        ['Se quedaron', quedan.length, fmt.estilo.verde],
+        ['Eliminados', del.rowCount, fmt.estilo.rojo],
+        ['Agregados', ins.rowCount, fmt.estilo.cian],
+        ['Total en la página', quedan.length + ins.rowCount],
+      ]);
+      console.log(fmt.estilo.verde('  ✔ Listo. Los nuevos muestran precio en la próxima actualización.'));
+      console.log('');
     };
 
     await ({ '--comparar': comparar, '--agregar': agregar, '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();

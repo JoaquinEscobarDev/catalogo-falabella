@@ -25,6 +25,8 @@
 //   node scripts/worker-telefono.js --connect-equipo SKU   muestra dónde publica la ficha de un equipo con plan los valores por compañía
 //   node scripts/worker-telefono.js --connect-api SKU      busca en el JavaScript de la página el servicio que entrega los planes
 //   node scripts/worker-telefono.js --connect-planes SKU   abre la página de planes del equipo y muestra cómo vienen
+//   node scripts/worker-telefono.js --listar TV            lista los productos de una categoría (SKU, marca, nombre, UPC)
+//   node scripts/worker-telefono.js --eliminar SKU SKU...  muestra qué se eliminaría; con --confirmar, los elimina
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -117,7 +119,7 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes', '--listar', '--eliminar'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
@@ -151,7 +153,45 @@ async function main() {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a)) || '17765908';
       for (const l of await scraperService.diagnosticoEquipoConnect(sku)) console.log(l);
     };
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo })[modo]();
+    // Lista compacta de una categoría, para comparar con lo que hay en tienda.
+    const listar = async () => {
+      const i = process.argv.indexOf('--listar');
+      const categoria = process.argv.slice(i + 1).filter(a => !a.startsWith('--')).join(' ') || 'TV';
+      const { rows } = await db.query(`
+        SELECT p.sku, p.marca, p.nombre, p.alias, p.upc
+        FROM products p JOIN categories c ON c.id = p.category_id
+        WHERE lower(c.nombre) = lower($1)
+        ORDER BY p.marca NULLS LAST, p.nombre NULLS LAST, p.sku
+      `, [categoria]);
+      console.log(`${categoria}: ${rows.length} productos\n`);
+      rows.forEach((r, n) => {
+        const nombre = (r.nombre || r.alias || '(sin nombre todavía)').replace(/\s+/g, ' ').slice(0, 70);
+        console.log(`${String(n + 1).padStart(2)}. ${r.sku} · ${r.marca || '?'} · ${nombre}${r.upc ? ` · UPC ${r.upc}` : ''}`);
+      });
+    };
+
+    // Eliminar SKUs: sin --confirmar solo muestra qué se eliminaría.
+    const eliminar = async () => {
+      const skus = [...new Set(process.argv.filter(a => /^\d{4,12}$/.test(a)))];
+      if (!skus.length) { console.log('Indicá los SKU, por ejemplo: --eliminar 17461845 17461846'); return; }
+      const { rows } = await db.query(`
+        SELECT p.sku, p.nombre, c.nombre AS categoria
+        FROM products p JOIN categories c ON c.id = p.category_id
+        WHERE p.sku = ANY($1) ORDER BY p.nombre
+      `, [skus]);
+      const noEstan = skus.filter(s => !rows.some(r => r.sku === s));
+      console.log(`${rows.length} producto(s) a eliminar:`);
+      for (const r of rows) console.log(`  ${r.sku} · ${r.categoria} · ${(r.nombre || '').slice(0, 70)}`);
+      if (noEstan.length) console.log(`No están en la página (se ignoran): ${noEstan.join(', ')}`);
+      if (!process.argv.includes('--confirmar')) {
+        console.log('\nNo se eliminó nada. Para eliminarlos, repetí el comando agregando --confirmar');
+        return;
+      }
+      const r = await db.query('DELETE FROM products WHERE sku = ANY($1)', [rows.map(x => x.sku)]);
+      console.log(`\nEliminados: ${r.rowCount}.`);
+    };
+
+    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();
     await db.end();
     return;
   }

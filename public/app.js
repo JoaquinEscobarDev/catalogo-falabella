@@ -21,6 +21,41 @@ const fmtPesos = n => `$${Number(n).toLocaleString('es-CL')}`;
 // (no son SKUs del catálogo; se leen de /api/connect/planes).
 const CAT_CONNECT = 'Equipos con plan';
 
+// Subcategorías dentro de una categoría. Un producto va a la primera cuyo
+// patrón calza con su nombre (o alias); si ninguna calza, a la que no tiene patrón.
+const SUBCATEGORIAS = {
+  'TV': [
+    { nombre: 'Sonido',      icono: '🔊', patron: /soundbar|sound bar|barra de sonido|home ?theat|subwoofer/i },
+    { nombre: 'Televisores', icono: '📺' },
+  ],
+};
+let subcatActiva = '';
+
+function subcategoriaDe(s) {
+  const subs = SUBCATEGORIAS[s.categoria];
+  if (!subs) return null;
+  const texto = `${productosCache[s.sku]?.nombre || ''} ${s.alias || ''}`;
+  return (subs.find(x => x.patron && x.patron.test(texto)) || subs.find(x => !x.patron)).nombre;
+}
+
+function renderSubcats(skusCat) {
+  const cont = document.getElementById('subcats');
+  const subs = SUBCATEGORIAS[categoriaActiva];
+  if (!subs) { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  const n = nombre => skusCat.filter(s => subcategoriaDe(s) === nombre).length;
+  const chip = (valor, texto, cuenta) =>
+    `<button type="button" class="subcat-chip${subcatActiva === valor ? ' active' : ''}" data-subcat="${esc(valor)}">${texto} <span class="subcat-n">${cuenta}</span></button>`;
+  // Orden de los botones: Todos, luego la subcategoría por defecto (sin patrón), luego el resto.
+  const orden = [...subs.filter(x => !x.patron), ...subs.filter(x => x.patron)];
+  cont.innerHTML = chip('', 'Todos', skusCat.length) +
+    orden.map(x => chip(x.nombre, `${x.icono} ${esc(x.nombre)}`, n(x.nombre))).join('');
+  cont.style.display = 'flex';
+  cont.querySelectorAll('.subcat-chip').forEach(b => b.addEventListener('click', () => {
+    subcatActiva = b.dataset.subcat;
+    renderGrid();
+  }));
+}
+
 const CATEGORIAS = [
   { nombre: CAT_CONNECT,          icono: '📶', especial: true },
   { nombre: 'Computadores',       icono: '💻' },
@@ -181,6 +216,7 @@ async function mostrarVistaProductos(nombre) {
   headerTitle.textContent = `${cat.icono} ${nombre}`;
   filtroInput.value = '';
   filtroMarca.value = '';
+  subcatActiva = '';
   gridPrimeraVez = true;
   actualizarFab();
 
@@ -403,13 +439,15 @@ function actualizarFiltroMarca(skusCat) {
 
 function renderGrid() {
   if (!categoriaActiva) return;
-  if (categoriaActiva === CAT_CONNECT) { renderGridConnect(); return; }
+  if (categoriaActiva === CAT_CONNECT) { renderSubcats([]); renderGridConnect(); return; }
   const palabras = normalizarTexto(filtroInput.value).trim().split(/\s+/).filter(Boolean);
   const skusCat  = skusGuardados.filter(s => s.categoria === categoriaActiva);
+  renderSubcats(skusCat);
   actualizarFiltroMarca(skusCat);
   const marcaSeleccionada = filtroMarca.value;
   const lista    = skusCat.filter(s => {
     const prod = productosCache[s.sku];
+    if (subcatActiva && subcategoriaDe(s) !== subcatActiva) return false;
     if (marcaSeleccionada && prod?.marca !== marcaSeleccionada) return false;
     if (!palabras.length) return true;
     const nombre  = prod?.nombre || '';

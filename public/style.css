@@ -1567,3 +1567,14 @@ main {
 .connect-entel    { border-left-color: #1f6fd6; } .connect-entel .connect-comp-nombre    { color: #6fa9ff; }
 .connect-movistar { border-left-color: #43a047; } .connect-movistar .connect-comp-nombre { color: #74c77a; }
 .connect-claro    { border-left-color: #e53935; } .connect-claro .connect-comp-nombre    { color: #ff7a72; }
+
+/* ══════════════════════════════════════════
+   SUBCATEGORÍAS (ej. TV → Televisores / Sonido)
+══════════════════════════════════════════ */
+.subcats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.subcat-chip {
+  border: 1px solid var(--borde); background: var(--surface-2); color: var(--texto);
+  border-radius: 999px; padding: 6px 14px; font-size: .85rem; font-weight: 600; cursor: pointer;
+}
+.subcat-chip.active { background: var(--amarillo); border-color: var(--amarillo); color: #1a1a1a; }
+.subcat-n { opacity: .7; font-weight: 700; margin-left: 2px; }

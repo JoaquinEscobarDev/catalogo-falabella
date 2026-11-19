@@ -27,6 +27,7 @@
 //   node scripts/worker-telefono.js --connect-planes SKU   abre la página de planes del equipo y muestra cómo vienen
 //   node scripts/worker-telefono.js --listar TV            lista los productos de una categoría (SKU, marca, nombre, UPC)
 //   node scripts/worker-telefono.js --eliminar SKU SKU...  muestra qué se eliminaría; con --confirmar, los elimina
+//   node scripts/worker-telefono.js --agregar TV SKU SKU... agrega SKUs a una categoría (los que ya están se saltan)
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -119,7 +120,7 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes', '--listar', '--eliminar'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes', '--listar', '--eliminar', '--agregar'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
@@ -191,7 +192,27 @@ async function main() {
       console.log(`\nEliminados: ${r.rowCount}.`);
     };
 
-    await ({ '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();
+    // Agregar SKUs a una categoría. Los precios se leen en la próxima actualización.
+    const agregar = async () => {
+      const i = process.argv.indexOf('--agregar');
+      const args = process.argv.slice(i + 1).filter(a => !a.startsWith('--'));
+      const categoria = args.filter(a => !/^\d{4,12}$/.test(a)).join(' ') || 'TV';
+      const skus = [...new Set(args.filter(a => /^\d{4,12}$/.test(a)))];
+      if (!skus.length) { console.log('Indicá la categoría y los SKU, por ejemplo: --agregar TV 80811105 80598126'); return; }
+      const cat = await db.query('SELECT id, nombre FROM categories WHERE lower(nombre) = lower($1)', [categoria]);
+      if (!cat.rows[0]) { console.log(`No existe la categoría "${categoria}".`); return; }
+      const r = await db.query(
+        'INSERT INTO products (sku, category_id) SELECT unnest($1::text[]), $2 ON CONFLICT (sku) DO NOTHING RETURNING sku',
+        [skus, cat.rows[0].id]
+      );
+      const nuevos = r.rows.map(x => x.sku);
+      console.log(`Agregados a ${cat.rows[0].nombre}: ${nuevos.length}${nuevos.length ? ` (${nuevos.join(', ')})` : ''}`);
+      const ya = skus.filter(s => !nuevos.includes(s));
+      if (ya.length) console.log(`Ya estaban en la página (no se tocaron): ${ya.join(', ')}`);
+      if (nuevos.length) console.log('Sus precios aparecen en la próxima actualización de precios.');
+    };
+
+    await ({ '--agregar': agregar, '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();
     await db.end();
     return;
   }

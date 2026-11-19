@@ -28,6 +28,9 @@
 //   node scripts/worker-telefono.js --listar TV            lista los productos de una categoría (SKU, marca, nombre, UPC)
 //   node scripts/worker-telefono.js --eliminar SKU SKU...  muestra qué se eliminaría; con --confirmar, los elimina
 //   node scripts/worker-telefono.js --agregar TV SKU SKU... agrega SKUs a una categoría (los que ya están se saltan)
+//   node scripts/worker-telefono.js --comparar TV scripts/tienda/tv.txt
+//        compara la categoría con lo que hay en tienda; con --aplicar elimina
+//        lo que no está en tienda y agrega lo que falta
 
 process.env.WORKER_ORIGEN = 'remoto';
 
@@ -120,7 +123,7 @@ async function main() {
     console.error('Falta DATABASE_URL. Creá el archivo .env en la raíz del proyecto (ver scripts/termux/instalar.sh).');
     process.exit(1);
   }
-  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes', '--listar', '--eliminar', '--agregar'].find(m => process.argv.includes(m));
+  const modo = ['--probar', '--diagnostico', '--cupones', '--cupon-producto', '--plan-producto', '--connect-coleccion', '--connect-equipo', '--connect-api', '--connect-planes', '--listar', '--eliminar', '--agregar', '--comparar'].find(m => process.argv.includes(m));
   if (modo) {
     const cuponProducto = async () => {
       const sku = process.argv.find(a => /^\d{5,12}$/.test(a));
@@ -212,7 +215,68 @@ async function main() {
       if (nuevos.length) console.log('Sus precios aparecen en la próxima actualización de precios.');
     };
 
-    await ({ '--agregar': agregar, '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();
+    // Comparar una categoría con la lista de tienda (archivo o SKUs sueltos).
+    const comparar = async () => {
+      const fs = require('fs');
+      const i = process.argv.indexOf('--comparar');
+      const args = process.argv.slice(i + 1).filter(a => !a.startsWith('--'));
+      const archivos = args.filter(a => fs.existsSync(a));
+      const categoria = args.filter(a => !archivos.includes(a) && !/^\d{4,12}$/.test(a)).join(' ') || 'TV';
+      const tienda = new Map();  // sku -> referencia
+      for (const a of archivos) {
+        for (const linea of fs.readFileSync(a, 'utf8').split('\n')) {
+          const m = linea.match(/^\s*(\d{4,12})\b\s*(.*)$/);
+          if (m) tienda.set(m[1], m[2].trim());
+        }
+      }
+      for (const a of args) if (/^\d{4,12}$/.test(a)) tienda.set(a, '');
+      if (!tienda.size) { console.log('Indicá la lista de tienda, por ejemplo: --comparar TV scripts/tienda/tv.txt'); return; }
+
+      const cat = await db.query('SELECT id, nombre FROM categories WHERE lower(nombre) = lower($1)', [categoria]);
+      if (!cat.rows[0]) { console.log(`No existe la categoría "${categoria}".`); return; }
+      const { rows } = await db.query(
+        'SELECT sku, marca, nombre, alias FROM products WHERE category_id = $1 ORDER BY marca NULLS LAST, nombre NULLS LAST, sku',
+        [cat.rows[0].id]
+      );
+      const enPagina = new Set(rows.map(r => r.sku));
+      const nombre = r => `${r.marca || '?'} · ${(r.nombre || r.alias || '(sin nombre todavía)').replace(/\s+/g, ' ').slice(0, 60)}`;
+
+      const quedan = rows.filter(r => tienda.has(r.sku));
+      const sobran = rows.filter(r => !tienda.has(r.sku));
+      const faltan = [...tienda.keys()].filter(s => !enPagina.has(s));
+      // SKUs de tienda que existen pero en otra categoría: no se agregan, se avisan.
+      const otra = faltan.length ? (await db.query(
+        'SELECT p.sku, c.nombre AS categoria FROM products p JOIN categories c ON c.id = p.category_id WHERE p.sku = ANY($1)', [faltan]
+      )).rows : [];
+      const enOtra = new Map(otra.map(r => [r.sku, r.categoria]));
+      const agregar = faltan.filter(s => !enOtra.has(s));
+
+      console.log(`${cat.rows[0].nombre}: ${rows.length} en la página · ${tienda.size} en tienda\n`);
+      console.log(`1) SE QUEDAN (en página y en tienda): ${quedan.length}`);
+      quedan.forEach(r => console.log(`   ${r.sku} · ${nombre(r)}`));
+      console.log(`\n2) SE ELIMINAN (en página, no en tienda): ${sobran.length}`);
+      sobran.forEach(r => console.log(`   ${r.sku} · ${nombre(r)}`));
+      console.log(`\n3) SE AGREGAN (en tienda, no en página): ${agregar.length}`);
+      agregar.forEach(s => console.log(`   ${s} · ${tienda.get(s) || ''}`));
+      if (enOtra.size) {
+        console.log('\n   Están en otra categoría (no se tocan):');
+        for (const [s, c] of enOtra) console.log(`   ${s} · ${tienda.get(s) || ''} → ${c}`);
+      }
+
+      if (!process.argv.includes('--aplicar')) {
+        console.log('\nNo se cambió nada. Si la lista está bien, repetí el comando agregando --aplicar');
+        return;
+      }
+      const del = sobran.length
+        ? await db.query('DELETE FROM products WHERE sku = ANY($1) AND category_id = $2', [sobran.map(r => r.sku), cat.rows[0].id])
+        : { rowCount: 0 };
+      const ins = agregar.length
+        ? await db.query('INSERT INTO products (sku, category_id) SELECT unnest($1::text[]), $2 ON CONFLICT (sku) DO NOTHING', [agregar, cat.rows[0].id])
+        : { rowCount: 0 };
+      console.log(`\nListo: ${del.rowCount} eliminados, ${ins.rowCount} agregados. Los nuevos muestran precio en la próxima actualización.`);
+    };
+
+    await ({ '--comparar': comparar, '--agregar': agregar, '--probar': probar, '--diagnostico': diagnostico, '--cupones': cupones, '--cupon-producto': cuponProducto, '--plan-producto': planProducto, '--connect-coleccion': coleccion, '--connect-equipo': equipo, '--connect-api': api, '--connect-planes': planesEquipo, '--listar': listar, '--eliminar': eliminar })[modo]();
     await db.end();
     return;
   }

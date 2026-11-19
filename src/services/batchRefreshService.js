@@ -175,7 +175,7 @@ async function refreshTotal({ tipo = 'diario', limpiar = false, fetchFn, log = (
     enCurso = null;
     await refreshRunsRepository.finish(runId, { ...r, estado }).catch(() => {});
   }
-  if (reporte) await Promise.resolve(reporte({ titulo: `Actualización ${tipo}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
+  if (reporte) await Promise.resolve(reporte({ titulo: ({ diario: 'Actualización diaria', manual: 'Actualizar todo ahora' })[tipo] || `Actualización ${tipo}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
   else log(`[${ahora()}] Listo: ${r.ok} OK (${r.viaDirecta} vía página directa, ${r.cambios} con cambio de precio) / ${r.fail} FAIL de ${skus.length}${r.bloqueado ? ' — BLOQUEADO' : ''}`);
   return r;
 }
@@ -211,7 +211,7 @@ async function procesarSolicitudesPendientes({ fetchFn, log = () => {}, enVivo =
       await refreshRunsRepository.finish(runId, { ...r, estado }).catch(() => {});
       await refreshRequestsRepository.markFinished(id, r.ok, r.fail).catch(() => {});
     }
-    if (reporte) await Promise.resolve(reporte({ titulo: `Actualización de ${categoria}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
+    if (reporte) await Promise.resolve(reporte({ titulo: `Actualizar precios · ${categoria}`, total: skus.length, r })).catch(e => log(`Reporte: ${e.message}`));
     else log(`  Listo: ${r.ok} OK / ${r.fail} FAIL de ${skus.length}`);
   }
   return solicitudes.length;

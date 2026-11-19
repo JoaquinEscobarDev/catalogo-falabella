@@ -65,8 +65,15 @@ function grupo(encabezado, pintar, items, { vacio = 'ninguno' } = {}) {
     console.log(`  ${estilo.negrita(m)} ${estilo.tenue(`· ${lista.length}`)}`);
     for (const it of lista) {
       const extra = it.extra ? `  ${it.extra}` : '';
-      const espacio = w - 4 - 10 - 2 - extra.length;
-      console.log(`    ${estilo.amarillo(String(it.sku).padEnd(10))}${recortar(it.corto, Math.max(12, espacio))}${estilo.tenue(extra)}`);
+      const visible = extra.replace(/\x1b\[[0-9;]*m/g, '').length;
+      const espacio = w - 4 - 10 - visible;
+      if (visible && espacio < 24) {
+        // No cabe en una línea: el nombre completo arriba y el dato abajo.
+        console.log(`    ${estilo.amarillo(String(it.sku).padEnd(10))}${recortar(it.corto, w - 14)}`);
+        console.log(`    ${' '.repeat(10)}${estilo.tenue(extra.trim())}`);
+      } else {
+        console.log(`    ${estilo.amarillo(String(it.sku).padEnd(10))}${recortar(it.corto, Math.max(12, espacio))}${estilo.tenue(extra)}`);
+      }
     }
   }
 }
@@ -81,4 +88,60 @@ function resumen(filas) {
   console.log(estilo.negrita('─'.repeat(w)));
 }
 
-module.exports = { estilo, titulo, grupo, resumen, nombreCorto };
+const pesos = n => (n == null ? '?' : `$${Number(n).toLocaleString('es-CL')}`);
+
+// Reporte final de una actualización de precios, ordenado por categoría y
+// marca. info: { sku -> { categoria, marca, nombre } } para los que fallaron
+// (no traen nombre) y para ordenar por categoría.
+function reporteActualizacion({ titulo: t, total, r }, info = {}) {
+  const det = r.detalle || [];
+  const cat = d => info[d.sku]?.categoria || 'Sin categoría';
+  const conInfo = d => ({ ...d, marca: d.marca || info[d.sku]?.marca, nombre: d.nombre || info[d.sku]?.nombre || '(sin nombre)' });
+
+  console.log('');
+  titulo(`${t} · ${new Date().toLocaleString('es-CL')}`);
+
+  const porCategoria = (lista, encabezado, pintar, extra) => {
+    if (!lista.length) return;
+    const cats = [...new Set(lista.map(cat))].sort((a, b) => a.localeCompare(b));
+    console.log('');
+    console.log(pintar(estilo.negrita(`${encabezado} (${lista.length})`)));
+    for (const c of cats) {
+      grupo(`  ${c}`, estilo.negrita, lista.filter(d => cat(d) === c).map(d => ({ ...conInfo(d), extra: extra(d) })));
+    }
+  };
+
+  const cambios = det.filter(d => d.ok && d.cambio);
+  const fallos = det.filter(d => !d.ok);
+  porCategoria(cambios, '💲 CAMBIOS DE PRECIO', estilo.amarillo, d => {
+    const flecha = d.antes != null && d.ahora != null ? (d.ahora < d.antes ? estilo.verde('▼') : estilo.rojo('▲')) : '';
+    return `${pesos(d.antes)} → ${pesos(d.ahora)} ${flecha}`;
+  });
+  porCategoria(fallos, '✖ SIN RESPUESTA', estilo.rojo, () => '');
+  if (!cambios.length && !fallos.length) console.log(estilo.verde('\n  Sin cambios de precio y sin fallos.'));
+
+  // Totales por categoría.
+  const cats = [...new Set(det.map(cat))].sort((a, b) => a.localeCompare(b));
+  if (cats.length > 1) {
+    console.log('');
+    console.log(estilo.negrita('POR CATEGORÍA'));
+    console.log(estilo.tenue(`  ${'Categoría'.padEnd(22)}${'OK'.padStart(5)}${'Cambios'.padStart(9)}${'Fallos'.padStart(8)}`));
+    for (const c of cats) {
+      const d = det.filter(x => cat(x) === c);
+      const ok = d.filter(x => x.ok).length, cam = d.filter(x => x.cambio).length, f = d.length - ok;
+      console.log(`  ${recortar(c, 21).padEnd(22)}${String(ok).padStart(5)}${(cam ? estilo.amarillo : estilo.tenue)(String(cam).padStart(9))}${(f ? estilo.rojo : estilo.tenue)(String(f).padStart(8))}`);
+    }
+  }
+
+  resumen([
+    ['Productos', total],
+    ['Leídos bien', r.ok, estilo.verde],
+    ['Cambios de precio', r.cambios, estilo.amarillo],
+    ['Sin respuesta', r.fail, r.fail ? estilo.rojo : estilo.tenue],
+  ]);
+  if (r.bloqueado) console.log(estilo.rojo('  ✖ Cortado: Falabella no respondió (posible bloqueo). Se reintenta en la próxima vuelta.'));
+  else console.log(estilo.verde('  ✔ Actualización terminada.'));
+  console.log('');
+}
+
+module.exports = { estilo, titulo, grupo, resumen, nombreCorto, reporteActualizacion };

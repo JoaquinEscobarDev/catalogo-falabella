@@ -30,6 +30,8 @@ const LATIDO_MS = 45 * 1000;
 
 let log = msg => console.log(msg);
 let fetchFn; // undefined = el default de productService (curl + browser)
+let enVivo = true;    // una línea por producto (false: avance + reporte final)
+let reporte;          // función que imprime el resumen ordenado al terminar
 let activo = false;
 let ocupado = false;
 let timer = null;
@@ -79,17 +81,17 @@ async function tick() {
     // El servidor se hace a un lado mientras el worker remoto esté vivo.
     if (!esRemoto && (await workerStateRepository.remoto()).activo) return;
 
-    await batch.procesarSolicitudesPendientes({ fetchFn, log });
+    await batch.procesarSolicitudesPendientes({ fetchFn, log, enVivo, reporte });
 
     if (await workerStateRepository.tomarTotal()) {
-      await batch.refreshTotal({ tipo: 'manual', fetchFn, log });
+      await batch.refreshTotal({ tipo: 'manual', fetchFn, log, enVivo, reporte });
     } else {
       const diario = await diarioPendiente();
-      if (diario) await batch.refreshTotal({ tipo: 'diario', limpiar: diario.limpiar, fetchFn, log });
+      if (diario) await batch.refreshTotal({ tipo: 'diario', limpiar: diario.limpiar, fetchFn, log, enVivo, reporte });
     }
 
     // Lo que haya entrado mientras corría el refresh completo.
-    await batch.procesarSolicitudesPendientes({ fetchFn, log });
+    await batch.procesarSolicitudesPendientes({ fetchFn, log, enVivo, reporte });
   } catch (e) {
     console.error(`Worker de refresh: ${e.message}`);
   } finally {
@@ -129,6 +131,7 @@ async function iniciar(opciones = {}) {
   }
   fetchFn = opciones.fetchFn;
   if (opciones.log) log = opciones.log;
+  if (opciones.reporte) { reporte = opciones.reporte; enVivo = false; }
 
   // Lo que quedó a medias de un proceso anterior (redeploy / reinicio).
   await refreshRunsRepository.closeOrphans(origen).catch(() => {});

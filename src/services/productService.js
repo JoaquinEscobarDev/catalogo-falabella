@@ -93,7 +93,7 @@ async function guardarPrecios(sku, producto) {
     : false;
   if (cambio) await priceHistoryRepository.recordChanges(sku, previo, producto);
   await productsRepository.setPriceData(sku, producto);
-  return cambio;
+  return { cambio, previo };
 }
 
 // Usado por el refresh masivo. `fetchFn` decide cómo se trae el HTML:
@@ -104,8 +104,8 @@ async function refreshSku(sku, fetchFn = scraperService.fetchConPlaywrightFallba
   const { producto, viaDirecta } = await scraperService.scrapeProducto(sku, fetchFn);
   if (!producto) return { ok: false };
 
-  const cambio = await guardarPrecios(sku, producto);
-  return { ok: true, viaDirecta, cambio, producto };
+  const { cambio, previo } = await guardarPrecios(sku, producto);
+  return { ok: true, viaDirecta, cambio, producto, previo };
 }
 
 async function search(q) {

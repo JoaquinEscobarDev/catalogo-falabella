@@ -19,6 +19,9 @@
 17413121  Lenovo R3 7
 80676157  HP i3 8GB 512GB 15-fd0331la
 16894286  Lenovo IdeaPad Slim 3 i3
+17028494  Lenovo LOQ i 83GS00G8GL
+80774618  Asus X1504 C7 16GB 512GB X1504VA-BQ4350W
+80642046  HP R7 16GB 1TB 15-FC0278LA
 
 [Tablets]
 80697821  Honor Pad X8b
@@ -31,4 +34,5 @@
 17425753  Samsung Galaxy Tab SM-X520N
 
 [Impresoras]
-# (faltan las fotos de impresoras)
+17370387  Canon Multifuncional G4170
+80774088  Epson Multifuncional 3350

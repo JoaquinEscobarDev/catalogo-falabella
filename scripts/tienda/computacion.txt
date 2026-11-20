@@ -16,6 +16,9 @@
 17461845  Lenovo IdeaPad 3 Gen10 i5 83K1006JCL
 17468863  Lenovo IdeaPad 3 Gen8 R5 82XM010XCL
 17302542  Samsung Galaxy Book4 i7
+17413121  Lenovo R3 7
+80676157  HP i3 8GB 512GB 15-fd0331la
+16894286  Lenovo IdeaPad Slim 3 i3
 
 [Tablets]
 80697821  Honor Pad X8b

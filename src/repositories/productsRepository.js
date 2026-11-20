@@ -22,7 +22,7 @@ function mapRowToProducto(row) {
 // Lista para la vista inicial (Agregar/Buscar SKU) — misma forma que la vieja tabla skus.
 async function findAll() {
   const { rows } = await db.query(`
-    SELECT p.sku, p.alias, c.nombre AS categoria, p.created_at
+    SELECT p.sku, p.alias, c.nombre AS categoria, p.subcategoria, p.created_at
     FROM products p
     JOIN categories c ON c.id = p.category_id
     ORDER BY p.created_at DESC
@@ -35,10 +35,10 @@ async function existsBySku(sku) {
   return r.rowCount > 0;
 }
 
-async function insert(sku, alias, categoryId) {
+async function insert(sku, alias, categoryId, subcategoria) {
   await db.query(
-    'INSERT INTO products (sku, alias, category_id) VALUES ($1, $2, $3)',
-    [sku, alias || null, categoryId]
+    'INSERT INTO products (sku, alias, category_id, subcategoria) VALUES ($1, $2, $3, $4)',
+    [sku, alias || null, categoryId, subcategoria || null]
   );
 }
 

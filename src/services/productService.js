@@ -9,14 +9,14 @@ async function listAll() {
   return productsRepository.findAll();
 }
 
-async function create(sku, alias, categoria) {
+async function create(sku, alias, categoria, subcategoria) {
   if (await productsRepository.existsBySku(sku)) {
     const err = new Error('El SKU ya existe');
     err.status = 409;
     throw err;
   }
   const categoryId = await categoriesRepository.findOrCreateIdByName(categoria);
-  await productsRepository.insert(sku, alias, categoryId);
+  await productsRepository.insert(sku, alias, categoryId, subcategoria);
 }
 
 async function remove(sku) {

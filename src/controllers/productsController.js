@@ -6,9 +6,9 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { sku, alias, categoria } = req.body;
+  const { sku, alias, categoria, subcategoria } = req.body;
   if (!sku) return res.status(400).json({ error: 'SKU requerido' });
-  await productService.create(sku.trim(), alias, categoria);
+  await productService.create(sku.trim(), alias, categoria, subcategoria);
   res.json({ ok: true });
 });
 

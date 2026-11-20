@@ -1,0 +1,31 @@
+# Computación en exhibición en Falabella Los Dominicos (fotos del 20-11-2026).
+# Un SKU por línea; lo que va después del SKU es solo referencia.
+# Las líneas [Tablets] / [Impresoras] indican la subcategoría de los SKUs que siguen.
+# Uso: node scripts/worker-telefono.js --comparar Computación scripts/tienda/computacion.txt
+
+[Computadores]
+16842113  Asus Vivobook Go 15 E1504FA-NJ695W
+17070601  Acer Core i3 AL14-31P
+80758824  Acer 14P Core i3 8GB AL14-31P-31TH-2
+80734095  Acer R5 12GB AL15-41P-R5JR-1
+80642047  HP U5-125 16GB 512GB 15-FD1255LA
+80800276  HP R7-7730U 16GB 15-fc0372la
+80726510  HP Ultra 5 8GB 15-fd2350la
+80726511  HP Core 5 8GB 14-hu0050la
+80724506  Lenovo IdeaPad 3 R7 7735HS 83K600E8CL
+17461845  Lenovo IdeaPad 3 Gen10 i5 83K1006JCL
+17468863  Lenovo IdeaPad 3 Gen8 R5 82XM010XCL
+17302542  Samsung Galaxy Book4 i7
+
+[Tablets]
+80697821  Honor Pad X8b
+17381913  Lenovo Tab 10 G ZAEH0132CL
+17381912  Lenovo Tab 10 G
+80668315  Lenovo IdeaTab Plus 11 ZAFR0125CL
+80668316  Lenovo IdeaTab Plus 12 ZAG70652CL
+80646762  Samsung Galaxy Tab A11 64GB
+80716785  Samsung Galaxy Tab A11+ 128GB
+17425753  Samsung Galaxy Tab SM-X520N
+
+[Impresoras]
+# (faltan las fotos de impresoras)

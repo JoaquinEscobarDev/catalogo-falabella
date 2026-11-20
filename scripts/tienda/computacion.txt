@@ -22,6 +22,7 @@
 17028494  Lenovo LOQ i 83GS00G8GL
 80774618  Asus X1504 C7 16GB 512GB X1504VA-BQ4350W
 80642046  HP R7 16GB 1TB 15-FC0278LA
+80778933  HP R5-7535HS 15-fb3000la
 
 [Tablets]
 80697821  Honor Pad X8b
@@ -32,7 +33,19 @@
 80646762  Samsung Galaxy Tab A11 64GB
 80716785  Samsung Galaxy Tab A11+ 128GB
 17425753  Samsung Galaxy Tab SM-X520N
+80781470  Xiaomi Redmi Pad 2 9P
+80653863  Xiaomi Redmi Pad 2
+80697819  Xiaomi Redmi Pad
+17415446  Xiaomi Pad 7 12
 
 [Impresoras]
 17370387  Canon Multifuncional G4170
 80774088  Epson Multifuncional 3350
+80774087  Epson Multifuncional L3310
+80616167  Epson Multifuncional L4360
+17451720  Canon Multifuncional G3180
+16741964  HP Multifuncional
+16893262  HP Multifuncional Smart Tank 520
+17297263  Brother Multifuncional
+17297262  Brother Multifuncional
+17470078  Brother Impresora

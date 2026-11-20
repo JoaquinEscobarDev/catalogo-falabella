@@ -21,12 +21,18 @@ const fmtPesos = n => `$${Number(n).toLocaleString('es-CL')}`;
 // (no son SKUs del catálogo; se leen de /api/connect/planes).
 const CAT_CONNECT = 'Equipos con plan';
 
-// Subcategorías dentro de una categoría. Un producto va a la primera cuyo
-// patrón calza con su nombre (o alias); si ninguna calza, a la que no tiene patrón.
+// Subcategorías dentro de una categoría. Si el producto tiene una guardada
+// (products.subcategoria) se usa esa; si no, la primera cuyo patrón calza con
+// su nombre (o alias); si ninguna calza, la que no tiene patrón.
 const SUBCATEGORIAS = {
   'TV': [
     { nombre: 'Sonido',      icono: '🔊', patron: /soundbar|sound bar|barra de sonido|home ?theat|subwoofer/i },
     { nombre: 'Televisores', icono: '📺' },
+  ],
+  'Computación': [
+    { nombre: 'Tablets',      icono: '📱', patron: /\btablet|\bipad\b|galaxy tab|\bmatepad|\bredmi pad|\bxiaomi pad/i },
+    { nombre: 'Impresoras',   icono: '🖨️', patron: /impresora|multifuncional|printer|ecotank|ink tank|smart tank/i },
+    { nombre: 'Computadores', icono: '💻' },
   ],
 };
 let subcatActiva = '';
@@ -34,6 +40,7 @@ let subcatActiva = '';
 function subcategoriaDe(s) {
   const subs = SUBCATEGORIAS[s.categoria];
   if (!subs) return null;
+  if (s.subcategoria && subs.some(x => x.nombre === s.subcategoria)) return s.subcategoria;
   const texto = `${productosCache[s.sku]?.nombre || ''} ${s.alias || ''}`;
   return (subs.find(x => x.patron && x.patron.test(texto)) || subs.find(x => !x.patron)).nombre;
 }
@@ -58,9 +65,7 @@ function renderSubcats(skusCat) {
 
 const CATEGORIAS = [
   { nombre: CAT_CONNECT,          icono: '📶', especial: true },
-  { nombre: 'Computadores',       icono: '💻' },
-  { nombre: 'Tablets',            icono: '📱' },
-  { nombre: 'Impresoras',         icono: '🖨️' },
+  { nombre: 'Computación',        icono: '💻' },
   { nombre: 'Connect',            icono: '📡' },
   { nombre: 'Isla',               icono: '🏝️' },
   { nombre: 'TV',                 icono: '📺' },
@@ -290,12 +295,13 @@ async function agregarSku(sku, alias) {
   const r = await fetch('/api/skus', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sku, alias, categoria: categoriaActiva }),
+    // Con un botón de subcategoría elegido (ej. Tablets), el SKU queda ahí.
+    body: JSON.stringify({ sku, alias, categoria: categoriaActiva, subcategoria: subcatActiva || null }),
   });
   const data = await r.json();
   if (!r.ok) { mostrarMsg(data.error || 'Error al agregar', 'err'); return false; }
-  mostrarMsg('SKU agregado ✓', 'ok');
-  skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva });
+  mostrarMsg(subcatActiva ? `SKU agregado a ${subcatActiva} ✓` : 'SKU agregado ✓', 'ok');
+  skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva, subcategoria: subcatActiva || null });
   renderGrid();
   await Promise.all([cargarProducto(sku), cargarStock(sku)]);
   return true;

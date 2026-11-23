@@ -1,0 +1,83 @@
+# Teléfonos de Falabella Los Dominicos (reporte de stock del 23-11-2026, jerarquía J1105 Telefonía).
+# Solo los que tienen 2 o más unidades disponibles. Un SKU por línea; "UPC n" se guarda si el producto no tiene.
+# Uso: node scripts/worker-telefono.js --comparar Connect scripts/tienda/telefonos.txt
+
+# Apple
+17273275  Apple iPhone 16 128GB Black            UPC 195949821813
+17564056  Apple iPhone 17 256GB Negro            UPC 195950643411
+17564061  Apple iPhone 17 512GB Negro            UPC 195950644418
+17564063  Apple iPhone 17 512GB Azul Niebla      UPC 195950644814
+17564064  Apple iPhone 17 512GB Lavanda          UPC 195950645019
+17564067  Apple iPhone 17 Pro 256GB Naranjo      UPC 195950627275
+17564068  Apple iPhone 17 Pro 256GB Azul         UPC 195950627473
+17564069  Apple iPhone 17 Pro 512GB Plata        UPC 195950627671
+17564075  Apple iPhone 17 Pro Max 256GB Plata    UPC 195950638721
+17564076  Apple iPhone 17 Pro Max 256GB Naranjo  UPC 195950638929
+17564077  Apple iPhone 17 Pro Max 256GB Azul     UPC 195950639124
+17564078  Apple iPhone 17 Pro Max 512GB Plata    UPC 195950639322
+17564079  Apple iPhone 17 Pro Max 512GB Naranjo  UPC 195950639520
+17564080  Apple iPhone 17 Pro Max 512GB Azul     UPC 195950639728
+17564087  Apple iPhone Air 256GB Negro           UPC 195950622492
+17564090  Apple iPhone Air 256GB Azul Cielo      UPC 195950623093
+17683637  Apple iPhone 17e 256GB Pink            UPC 195951030814
+17776863  Apple iPhone 18 Pro 256GB Black        UPC 195951415185
+17776865  Apple iPhone 18 Pro 256GB Burgundy     UPC 195951415208
+17776875  Apple iPhone 18 Pro Max 256GB Black    UPC 195951409542
+17776876  Apple iPhone 18 Pro Max 256GB Silver   UPC 195951409559
+17776877  Apple iPhone 18 Pro Max 256GB Burgundy UPC 195951409566
+
+# Samsung
+17354674  Samsung S25 256GB Azul                 UPC 8806095869001
+17354685  Samsung S25 Ultra 256GB Negro          UPC 8806095872223
+17409363  Samsung A36 128GB Negro                UPC 8806097106494
+17558930  Samsung S25 FE 5G 256GB Azul           UPC 8806097674337
+17558931  Samsung S25 FE 5G 256GB Negro          UPC 8806097674030
+17586082  Samsung A17 128GB LTE Negro            UPC 8806097696315
+17586083  Samsung A17 256GB 5G Azul              UPC 8806097696346
+17667490  Samsung S26 256GB Azul                 UPC 8806097848608
+17667491  Samsung S26 256GB Negro                UPC 8806097848387
+17667494  Samsung S26 Ultra 256GB Negro          UPC 8806097851301
+17684249  Samsung A37 256GB Verde                UPC 8806099056384
+17684251  Samsung A57 128GB Azul                 UPC 8806099057282
+17684254  Samsung A57 256GB Azul                 UPC 8806099057251
+17684257  Samsung A57 256GB Gris                 UPC 8806099057619
+17718487  Samsung A37 256GB Gris                 UPC 8806099056216
+17723152  Samsung S26 Ultra 256GB Negro          UPC 2017723152006
+17743539  Samsung A27 128GB Negro                UPC 8806099361204
+17743540  Samsung A27 256GB Negro                UPC 8806099361228
+17743541  Samsung A27 256GB Rosado               UPC 8806099361242
+17765907  Samsung S26 FE 256GB Negro             UPC 8806099425630
+17765908  Samsung S26 FE 256GB Violeta           UPC 8806099425463
+17798195  Samsung A08 128GB Verde                UPC 8806099451271
+
+# Xiaomi
+17731454  Xiaomi 17T Pro 512GB Negro             UPC 2017731454000
+17737234  Xiaomi Redmi A7 Pro 64GB Negro         UPC 6932554425326
+17740633  Xiaomi 17T 12+256GB Negro              UPC 2017740633007
+17740634  Xiaomi 17T 12+256GB Azul               UPC 2017740634004
+17757788  Xiaomi Redmi 17C 5G 128GB Negro        UPC 2017757788004
+17757793  Xiaomi Redmi 17 4G 256GB Negro         UPC 2017757793008
+17765258  Xiaomi Redmi Note 17 Pro 5G 256GB Azul UPC 6939093010624
+17767409  Xiaomi Redmi Note 17 128GB Negro       UPC 2017767409005
+17767410  Xiaomi Redmi Note 17 128GB Azul        UPC 6939093026045
+17767411  Xiaomi Redmi Note 17 Pro 256GB Negro   UPC 2017767411008
+17767412  Xiaomi Redmi Note 17 Pro Max Negro     UPC 2017767412005
+17767414  Xiaomi Redmi Note 17 Pro Max Blanco    UPC 2017767414009
+
+# Vivo
+17673032  Vivo Y31 5G 6+256GB Negro              UPC 6932204523105
+17673033  Vivo Y31 5G 6+256GB Blanco             UPC 6932204523112
+17711671  Vivo Y11d 4+256GB Negro                UPC 6932204520999
+17711672  Vivo Y11d 4+256GB Plata                UPC 6932204523549
+17711673  Vivo V70 FE 8+256GB Azul               UPC 6932204520630
+17711674  Vivo V70 FE 8+256GB Morado             UPC 6932204521217
+17722120  Vivo Y05 4+128GB Negro                 UPC 6932204520951
+17754938  Vivo V70 FE 8GB 512GB Lila             UPC 6932204521231
+17777218  Vivo Y11 5G 128GB Negro                UPC 6932204527226
+17777219  Vivo Y21 5G 256GB Negro                UPC 6932204523792
+
+# Motorola
+17441918  Motorola Edge 60 12+256 Verde          UPC 840023286261
+17714322  Motorola G67 4+256GB Gris              UPC 840493616773
+17714324  Motorola Edge 70 Fusion 8+256 Celeste  UPC 840493616940
+17714325  Motorola Edge 70 Fusion 8+256 Azul     UPC 840493616957

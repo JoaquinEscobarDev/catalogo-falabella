@@ -226,6 +226,7 @@ async function main() {
       const archivos = args.filter(a => fs.existsSync(a));
       const categoria = args.filter(a => !archivos.includes(a) && !/^\d{4,12}$/.test(a)).join(' ') || 'TV';
       const tienda = new Map();  // sku -> referencia
+      const upcDe = new Map();   // sku -> UPC (columna "UPC n" del archivo)
       const subDe = new Map();   // sku -> subcategoría (líneas "[Tablets]" en el archivo)
       for (const a of archivos) {
         let sub = null;
@@ -233,7 +234,13 @@ async function main() {
           const s = linea.match(/^\s*\[(.+?)\]\s*$/);
           if (s) { sub = s[1].trim() || null; continue; }
           const m = linea.match(/^\s*(\d{4,12})\b\s*(.*)$/);
-          if (m) { tienda.set(m[1], m[2].trim()); if (sub) subDe.set(m[1], sub); }
+          if (m) {
+            // "UPC 8806..." en la referencia: se guarda aparte y no se muestra en el nombre.
+            const u = m[2].match(/\bUPC\s*(\d{8,14})\b/i);
+            if (u) upcDe.set(m[1], u[1]);
+            tienda.set(m[1], m[2].replace(/\bUPC\s*\d{8,14}\b/i, '').trim());
+            if (sub) subDe.set(m[1], sub);
+          }
         }
       }
       for (const a of args) if (/^\d{4,12}$/.test(a)) tienda.set(a, '');
@@ -297,6 +304,13 @@ async function main() {
       // Subcategoría de cada SKU según la sección del archivo ([Tablets], [Impresoras]...).
       for (const [sku, sub] of subDe) {
         await db.query('UPDATE products SET subcategoria = $2 WHERE sku = $1 AND category_id = $3', [sku, sub, cat.rows[0].id]);
+      }
+      // UPC del archivo, solo donde el producto no tiene uno cargado.
+      if (upcDe.size) {
+        await db.query(
+          `UPDATE products p SET upc = v.upc FROM unnest($1::text[], $2::text[]) AS v(sku, upc)
+           WHERE p.sku = v.sku AND (p.upc IS NULL OR p.upc = '')`,
+          [[...upcDe.keys()], [...upcDe.values()]]);
       }
       fmt.resumen([
         ['Se quedaron', quedan.length, fmt.estilo.verde],

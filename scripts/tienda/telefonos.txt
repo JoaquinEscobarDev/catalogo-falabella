@@ -82,10 +82,14 @@
 17714324  Motorola Edge 70 Fusion 8+256 Celeste  UPC 840493616940
 17714325  Motorola Edge 70 Fusion 8+256 Azul     UPC 840493616957
 
-# Honor
+# Honor (todos, aunque tengan stock 1)
 17779071  Honor Play 20A Negro 128GB             UPC 6942785109445
 17779072  Honor Play 20A Azul 128GB              UPC 6942785109452
 17779073  Honor Play 20A Negro 64GB              UPC 6942785109384
+17506904  Honor 400 Pro 12+512GB Gris            UPC 6936520871612
+17559882  Honor 400 Smart 8+256GB Gris          UPC 6936520877713
+17586113  Honor X5c 4+128GB Negro                UPC 6936520878123
+17640869  Honor X7d 8+256GB Celeste             UPC 6936520879663
 
 # Otra marca (la marca real aparece al actualizar precios)
 17792855  Neo 5 Pro 256GB Black + Gamepad + Watch UPC 884095234058

@@ -81,3 +81,11 @@
 17714322  Motorola G67 4+256GB Gris              UPC 840493616773
 17714324  Motorola Edge 70 Fusion 8+256 Celeste  UPC 840493616940
 17714325  Motorola Edge 70 Fusion 8+256 Azul     UPC 840493616957
+
+# Honor
+17779071  Honor Play 20A Negro 128GB             UPC 6942785109445
+17779072  Honor Play 20A Azul 128GB              UPC 6942785109452
+17779073  Honor Play 20A Negro 64GB              UPC 6942785109384
+
+# Otra marca (la marca real aparece al actualizar precios)
+17792855  Neo 5 Pro 256GB Black + Gamepad + Watch UPC 884095234058

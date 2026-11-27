@@ -34,12 +34,17 @@ const SUBCATEGORIAS = {
     { nombre: 'Impresoras',   icono: '🖨️', patron: /impresora|multifuncional|printer|ecotank|ink tank|smart tank/i },
     { nombre: 'Computadores', icono: '💻' },
   ],
+  // Subcategorías "dinámicas": son las que cada producto trae guardadas
+  // (se cargan al comparar con la lista de tienda); sin una guardada va a "Otros".
+  'Electro y Línea Blanca': { dinamica: true, porDefecto: 'Otros' },
+  'Cuidado Personal':       { dinamica: true, porDefecto: 'Otros' },
 };
 let subcatActiva = '';
 
 function subcategoriaDe(s) {
   const subs = SUBCATEGORIAS[s.categoria];
   if (!subs) return null;
+  if (subs.dinamica) return s.subcategoria || subs.porDefecto;
   if (s.subcategoria && subs.some(x => x.nombre === s.subcategoria)) return s.subcategoria;
   const texto = `${productosCache[s.sku]?.nombre || ''} ${s.alias || ''}`;
   return (subs.find(x => x.patron && x.patron.test(texto)) || subs.find(x => !x.patron)).nombre;
@@ -52,10 +57,19 @@ function renderSubcats(skusCat) {
   const n = nombre => skusCat.filter(s => subcategoriaDe(s) === nombre).length;
   const chip = (valor, texto, cuenta) =>
     `<button type="button" class="subcat-chip${subcatActiva === valor ? ' active' : ''}" data-subcat="${esc(valor)}">${texto} <span class="subcat-n">${cuenta}</span></button>`;
-  // Orden de los botones: Todos, luego la subcategoría por defecto (sin patrón), luego el resto.
-  const orden = [...subs.filter(x => !x.patron), ...subs.filter(x => x.patron)];
-  cont.innerHTML = chip('', 'Todos', skusCat.length) +
-    orden.map(x => chip(x.nombre, `${x.icono} ${esc(x.nombre)}`, n(x.nombre))).join('');
+  let botones;
+  if (subs.dinamica) {
+    // Una por cada subcategoría que tenga productos, en orden alfabético ("Otros" al final).
+    const nombres = [...new Set(skusCat.map(subcategoriaDe))]
+      .sort((a, b) => (a === subs.porDefecto) - (b === subs.porDefecto) || a.localeCompare(b, 'es'));
+    if (subcatActiva && !nombres.includes(subcatActiva)) subcatActiva = '';
+    botones = nombres.map(nombre => chip(nombre, esc(nombre), n(nombre))).join('');
+  } else {
+    // Orden de los botones: la subcategoría por defecto (sin patrón) primero, luego el resto.
+    const orden = [...subs.filter(x => !x.patron), ...subs.filter(x => x.patron)];
+    botones = orden.map(x => chip(x.nombre, `${x.icono} ${esc(x.nombre)}`, n(x.nombre))).join('');
+  }
+  cont.innerHTML = chip('', 'Todos', skusCat.length) + botones;
   cont.style.display = 'flex';
   cont.querySelectorAll('.subcat-chip').forEach(b => b.addEventListener('click', () => {
     subcatActiva = b.dataset.subcat;
@@ -70,8 +84,7 @@ const CATEGORIAS = [
   { nombre: 'Isla',               icono: '🏝️' },
   { nombre: 'TV',                 icono: '📺' },
   { nombre: 'Consolas',           icono: '🎮' },
-  { nombre: 'Línea Blanca',       icono: '🫧' },
-  { nombre: 'Electrodomésticos',  icono: '⚡' },
+  { nombre: 'Electro y Línea Blanca', icono: '🫧' },
   { nombre: 'Relojes',            icono: '⌚' },
   { nombre: 'Audífonos',          icono: '🎧' },
   { nombre: 'Audífonos Cascos',   icono: '🎵' },
@@ -296,12 +309,12 @@ async function agregarSku(sku, alias) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // Con un botón de subcategoría elegido (ej. Tablets), el SKU queda ahí.
-    body: JSON.stringify({ sku, alias, categoria: categoriaActiva, subcategoria: subcatActiva || null }),
+    body: JSON.stringify({ sku, alias, categoria: categoriaActiva, subcategoria: subcatActiva && subcatActiva !== 'Otros' ? subcatActiva : null }),
   });
   const data = await r.json();
   if (!r.ok) { mostrarMsg(data.error || 'Error al agregar', 'err'); return false; }
-  mostrarMsg(subcatActiva ? `SKU agregado a ${subcatActiva} ✓` : 'SKU agregado ✓', 'ok');
-  skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva, subcategoria: subcatActiva || null });
+  mostrarMsg(subcatActiva && subcatActiva !== 'Otros' ? `SKU agregado a ${subcatActiva} ✓` : 'SKU agregado ✓', 'ok');
+  skusGuardados.unshift({ sku, alias: alias || null, categoria: categoriaActiva, subcategoria: subcatActiva && subcatActiva !== 'Otros' ? subcatActiva : null });
   renderGrid();
   await Promise.all([cargarProducto(sku), cargarStock(sku)]);
   return true;

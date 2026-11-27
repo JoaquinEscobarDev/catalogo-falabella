@@ -1,0 +1,108 @@
+# Cuidado Personal en Falabella Los Dominicos (fotos del 25-11-2026).
+# Un SKU por línea; lo que va después del SKU es solo referencia.
+# Las líneas [Sección] son la subcategoría de los SKUs que siguen.
+# Uso: node scripts/worker-telefono.js --comparar "Cuidado Personal" scripts/tienda/cuidado-personal.txt
+
+[Secadores]
+17107096  Gama Secador Eolic Mini
+80785645  Gama Secador UniQ Styl
+80872534  Secador de Pelo Travel (color 1)
+80872533  Secador de Pelo Travel (color 2)
+80872532  Siegen Secador SG-3012C74 (Travel, color 3)
+883918476 Ula Secador Airli
+883918478 Ula Secador Jet M
+3003862   Siegen Secador de Pelo
+5667191   Siegen Secador
+7245130   Gama Secador Sensi Tempo
+6855996   Gama Secador H Tempo ST220
+5696196   Siegen Secador
+4246708   Siegen Secador Pelo SI
+17526202  Gama Secador Mistral
+17387322  Siegen Secador SG 3031C01
+5799709   Gama Secador Diamond STD
+14630376  Gama Secador Bora Avocado
+4246706   Siegen Secador Pelo SG-3025S
+80635643  Gama Secador Eolic Mini
+883613030 Ula Secador Jet
+883930250 Ula Secador Airflow
+883930252 Ula Secador Evolution
+15212828  Philips Secador de Pelo
+15212829  Philips Secador de Pelo
+
+[Alisadores y onduladores]
+15791309  Gama Pack Alisador
+16190344  Gama Alisador CP14 Dual Plate
+80695012  Gama Ondulador X-Wave
+3668019   Siegen Alisador
+3668020   Siegen Alisador SG-4751
+5323669   Siegen Alisador SG-4755
+3162909   Siegen Alisador 3540 Purple
+17087755  Siegen Alisador Airflow SG B4704
+17087753  Siegen Waver SG B2601
+80617394  Gama Alisador IHT CP14
+14630370  Gama Alisador E
+14630367  Gama Alisador E Avocado
+17526205  Gama Alisador Elegance
+17408511  Gama Pack Alisador Alais
+17225087  Gama Alisador Alais
+17087754  Siegen Multistyler SG B2806
+15791317  Gama Tripack Alisador Avocado
+17292539  Gama Combo Alisador
+883613022 Ula Alisador y Secador
+17222215  Siegen Alisador
+883930254 Ula Ondulador Auto Curl Halo
+8179545   Philips Alisador
+16037828  Philips Alisador
+4788073   Siegen Ondulador
+16746388  Siegen Ondulador SG-2503
+
+[Cepillos]
+80617393  Gama Cepillo Secador
+16742748  Gama Cepillo Model ST 2300
+16595486  Siegen Cepillo SG-2803C03
+17087761  Siegen Cepillo Alisador SG 2805
+17205491  Remington Cepillo AS5805-220R
+17205490  Remington Cepillo AS15A 220R
+
+[Depiladoras]
+17293213  Braun Depiladora 5041
+17199010  Braun Depiladora IPL PL3230
+17102598  Gama Depiladora Skinpro Soft
+7245127   Gama Depiladora Skin
+17102597  Gama Depiladora Tinygo USB
+80707168  Gama Depiladora IPL Leia
+5640665   Siegen Depiladora SG-9004EX
+17281506  Siegen Depiladora
+17293198  Philips Depiladora Facial
+17406552  Philips Depiladora Satinelle
+7422391   Philips IPL Lumea
+
+[Afeitado y corte]
+80875796  Siegen SG-2808
+80728883  Gama Cortapelos GCX 630
+16900580  Gama Trimmer Afeitadora
+16746420  Philips Afeitadora QP2724/10
+80557670  Philips Multigroom MG3931/15
+80659213  Philips Recortador de Barba
+80695014  Braun Cortapelos AIO5560
+80880280  Gama Cortapelo GC Bravo Gear
+80728882  Gama Cortapelos GCX 630 (2do SKU)
+7444152   Gama Clipper GC 542
+6855998   Gama Corta Pelo
+14630387  Gama Corta Pelo GM596 19 ACC
+17292538  Gama Afeitadora 700
+17260123  Gama Afeitadora 1527
+80626524  Siegen Corta Pelo SG-8 (200C01)
+80626525  Siegen Corta Pelo SG-8555
+80626526  Siegen Corta Pelo SG-8700
+80626530  Siegen Corta Pelo SG-8
+80626533  Siegen Corta Pelo SG-8605
+80626534  Siegen Afeitadora SG-7205
+80626535  Siegen Afeitadora SG-7220
+80626527  Siegen Afeitadora SG-7215
+17080272  Remington Trimmer PG6125-R
+80724111  Philips Multigroom
+17138217  Philips Corta Pelo S30 HC3525/15
+16746426  Philips Afeitadora S788
+16746425  Philips Afeitadora S589 S5898/17
+883937576 Yoon Afeitadora Shavego

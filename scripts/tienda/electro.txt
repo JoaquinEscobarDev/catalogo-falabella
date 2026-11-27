@@ -1,0 +1,214 @@
+# Electrodomésticos pequeños en Falabella Los Dominicos (fotos del 25-11-2026).
+# Un SKU por línea; lo que va después del SKU es solo referencia.
+# Las líneas [Sección] son la subcategoría de los SKUs que siguen.
+# Uso: node scripts/worker-telefono.js --comparar <categoría> scripts/tienda/electro.txt
+
+[Cafeteras]
+80621448  Oster Cafetera BVSTEM6604B-052
+17324050  Oster Cafetera 5502
+883654505 Wurden Cafetera Espresso WCM-ESPRESSO3
+80849867  Philips Cafetera EP2331/10
+80834537  Ursus Trotter Cafetera Automática Kaffemelite
+17127308  Delonghi Cafetera
+80712124  Thomas Cafetera Filtro TH-145DMi
+80744824  Krups Cafetera Coffee Crush
+80617388  Thomas Molinillo Eléctrico
+17248354  Thomas Espumador de Leche
+883275754 Recco Cafetera Filtro
+17422356  Nescafe Dolce Gusto Piccolo XS
+17422357  Nescafe Dolce Gusto Genio S
+5809833   Thomas Cafetera (SKU leído de foto; confirmar al actualizar)
+
+[Freidoras]
+80744826  Moulinex Freidora Aire
+16254873  Thomas Freidora de Aire THAF60MI
+16457264  Oster Freidor CKSTAF90D-052
+80610856  Oster Freidora de Aire CKSTAF11MCD-052
+17224413  Oster Freidora de Aire
+17370408  Philips Freidor AI551/07
+17370407  Philips Freidora Aire NA231/00
+80873891  Oster Freidor 2248820
+17312980  Ninja Freidor SL400EU
+17249082  Ninja Freidora Aire
+883403546 Wurden Airfryer 4 L
+80833366  Thomas Freidor TH-AF60DNV
+17107467  Ursus Trotter Freidora de Aire
+
+[Licuadoras y batidoras]
+17312985  Ninja Licuadora Blend TB401EU
+17312984  Ninja Licuadora
+16973112  Ninja Licuadora 3en1 1200W
+880793173 Recco Licuadora 550W RL-BLS066D
+883095013 Wurden Licuadora Personal
+883825543 Recco Minipimer 600W
+880149729 Recco Minipimer 400W RMIN-989W
+883450748 Recco Batidora Manual
+17409261  Moulinex Licuadora
+16426157  Moulinex Licuadora Power LN289855
+17415032  Thomas Licuadora 6 Vel TH-410VI
+17248369  Thomas Licuadora 1.5LT
+17210776  Thomas Licuadora y Procesador
+883450760 Wurden Procesador de Alimentos
+883095015 Wurden Licuadora Inox WBL-TITAN
+15363411  Philips Licuadora HR2242/90
+80725348  Philips Licuadora ProBlend HR2291/41
+16973123  Ninja Licuadora Inalámbrica Passion Fruit
+16764470  Oster Licuadora Reversible BLSTPEG-NRT-052
+16894591  Oster Licuadora Reversible
+16764467  Oster Licuadora Gris BLSTPEG-GPB-052
+14724879  Oster Licuadora
+883539973 Wurden Exprimidor Eléctrico WEJ-60SS
+883450750 Wurden Exprimidor de Jugo WSL-SOMMER900
+881888162 Recco Batidora Pedestal RBP-BISCOTTO6B
+80753737  Thomas Batidora Planet TH-915PND
+17233046  Thomas Batidora Pedestal
+883322496 Wurden Batidora Manual WBA-350P
+17248349  Thomas Batidora TH-884
+80617387  Thomas Batidora Manual TH-8832M
+883403534 Wurden Minipimer Inox
+80744827  Moulinex Hand Blender
+16959037  Moulinex Minipimer
+14727663  Philips Hand Blender HR2626/80
+17248348  Thomas Minipimer 600W
+17248353  Thomas Picadora Stahl TH-9050I
+17111608  Thomas Picadora
+883335301 Wurden Picador Eléctrico
+4201095   Moulinex Picadora (SKU leído de foto; confirmar al actualizar)
+5184174   Ursus Trotter Picadora PETRUS320 (SKU leído de foto; confirmar al actualizar)
+5624713   Oster Minipimer 5102R (SKU leído de foto; confirmar al actualizar)
+883403522 Recco Máquina de Pan RMP-B700
+1736273   Oster Descorchador Eléctrico W.O 4207 (SKU leído de foto; confirmar al actualizar)
+6117954   Ursus Trotter Slow Juicer (SKU leído de foto; confirmar al actualizar)
+7240135   Thomas Exprimidor TH-1215 (SKU leído de foto; confirmar al actualizar)
+4678394   Thomas Extractor (SKU leído de foto; confirmar al actualizar)
+
+[Otros]
+80537194  Ninja Máquina de Granizado FS301EU
+80661928  Ninja Máquina de Helado
+17312982  Ninja Máquina de Helados NC501EU
+17123831  Ninja Máquina de Helados NC300EU
+16973121  Ninja Horno Eléctrico XL 10en1 Pro
+883403526 Wurden Horno WEO-60CS
+80621104  Aura Cuchara Térmica AU-003
+80621103  Aura Accesorio AU-002
+883495021 Wurden Máquina de Hielo
+883822587 Wurden Frigobar
+
+[Pequeños electro]
+883403518 Recco Exprimidor Eléctrico
+883403544 Wurden Tostador Inox WBT-BACKER2
+883540165 Recco Máquina de Algodón
+881985225 Recco Mini Wafflera
+883735656 Recco Plancha Vapor RP-3000C
+881621163 Recco Termohervidor
+80641500  Aura Máquina de Algodón COK-005
+80641505  Aura Churro y Waffle COK-003
+80641501  Aura Máquina de Hot Dog COK-006
+80641502  Aura Máquina COK-008
+
+[Aspiradoras robot]
+80643999  Eufy Aspiradora Robot T2267111
+80643998  Eufy Aspiradora Robot T2212J11
+80648937  Xiaomi Robot Vacuum S40C
+80648936  Xiaomi Robot Vacuum
+80648935  Xiaomi Robot Vacuum H40
+16912504  Ursus Trotter Aspiradora Robot UT-IMOPPRO-B
+883474541 Wurden Aspiradora Robot WRB-SMARTKLEAN2
+
+[Aspiradoras]
+17400028  Xiaomi Aspiradora XIAVCG20MA
+80744825  Rowenta Aspiradora Vertical XF
+883275750 Wurden Aspiradora Vertical
+883335299 Wurden Aspiradora Vertical
+17415027  Thomas Aspiradora TH-1022C
+16904019  Thomas Aspiradora
+80617389  Thomas Aspiradora TH-1640
+16835257  Thomas Aspiradora
+883275745 Wurden Aspiradora Tambor
+883275748 Wurden Aspiradora 2L
+883349956 Wurden Aspiradora 3L
+883403550 Wurden Aspiradora Ciclónica WVC-EASYCLEAN2
+80676156  Rowenta Aspiradora Ciclónica
+17243915  Electrolux Aspiradora Easy
+5744363   Ursus Trotter UT-PANZER1416 (SKU leído de foto; confirmar al actualizar)
+5184143   UT-S (SKU leído de foto; confirmar al actualizar)
+6514081   UT-K (SKU leído de foto; confirmar al actualizar)
+
+[Hornos eléctricos]
+883095005 Recco Horno Eléctrico
+883095003 Wurden Horno WEO-25-CL
+883450756 Wurden Horno WEO-36C
+883403530 Wurden Horno WEO-48C
+17251896  Ursus Trotter Horno Eléctrico
+17251897  Ursus Trotter Horno Backofen PRO48B
+17251969  Ursus Trotter Horno Backofen PRO60B
+16912985  Ursus Trotter Horno H PRO-B 25L
+13209689  Thomas Horno Eléctrico
+16835258  Thomas Horno TH-100I
+
+[Microondas]
+883730635 Wurden Microondas 20L WMW-DUNKEL21
+883094981 Wurden Microondas 25L WMW-HEIZEN25
+80831650  Ursus Trotter Microondas Mirrorwave
+80759256  Thomas Microondas TH-MW20DN
+17099207  Midea Microondas MMP-20M711
+7240124   Thomas Microondas (SKU leído de foto; confirmar al actualizar)
+
+[Planchas]
+16848205  Rowenta Plancha IS3420D1
+80735109  Rowenta Plancha a Vapor
+16848204  Rowenta Plancha DW7025D1
+16854965  Rowenta Plancha
+17409259  Rowenta Plancha Vertical DR2024D1
+17248347  Thomas Plancha Inalámbrica TH-7100
+16400050  Oster Vaporizador
+80716956  Oster Plancha GCSTAC7801-052
+15761542  Philips Plancha Vapor DST5020/20
+883335974 Wurden Plancha Portátil
+883335982 Wurden Plancha Vapor WIR-2000
+883335977 Wurden Plancha Vapor WIR-DAMPF
+5264654   Thomas Plancha (SKU leído de foto; confirmar al actualizar)
+6514091   Ursus Trotter Plancha UT-KER (SKU leído de foto; confirmar al actualizar)
+5424451   Ursus Trotter UT-PLATTEISEN (SKU leído de foto; confirmar al actualizar)
+
+[Ollas y arroceras]
+881736216 Wurden Olla Arrocera WRM-ESSEN18
+80551408  Oster Arrocera 12 Tazas
+883495160 Recco Olla Arrocera
+883495154 Wurden Olla Multicook WEC-SMARTKOCH8
+
+[Tostadores y sandwicheras]
+17415036  Thomas Tostador TH-126
+883730640 Wurden Tostador 4 Panes
+17254590  Philips Tostadora HD2510/90
+15170224  Moulinex Tostador Soleil
+11800826  Ursus Trotter Tostador Eléctrico
+883730648 Wurden Tostador Retro WBT-BREMENBROT
+883734283 Wurden Sandwichera 3 en 1
+883095007 Wurden Sandwichera Pan
+17254589  Philips Sandwichera HD2350/80
+17249057  Thomas Sandwichera 4 Panes
+5184173   Ursus Trotter Tostador ECKART4 (SKU leído de foto; confirmar al actualizar)
+
+[Parrillas y grills]
+14399853  Thomas Parrilla Eléctrica TH-224
+883450754 Recco Parrilla Eléctrica
+17415031  Thomas Panini Grill TH-980I
+881882810 Wurden Racletera WRA-RACLETTE8
+80528629  Oster Parrilla CKSTGR5085052
+5184214   Ursus Trotter Panini STUL (SKU leído de foto; confirmar al actualizar)
+
+[Hervidores]
+16973120  Ninja Hervidor
+15497750  Moulinex Hervidor Soleil BY320A10
+80735108  Moulinex Hervidor Morning
+11800827  Ursus Trotter Hervidor UT-STARK18
+883094987 Wurden Hervidor Madera
+883730620 Wurden Hervidor WKE-BREMEN2
+17201800  Thomas Hervidor Family
+17248344  Thomas Hervidor Steel
+16835272  Thomas Hervidor TH-4515N
+80712126  Thomas Hervidor TH-4343N
+5184152   Ursus Trotter Hervidor UT-DUN (SKU leído de foto; confirmar al actualizar)
+7240129   Thomas Hervidor TH-6505RT (SKU leído de foto; confirmar al actualizar)
+6104530   Philips Hervidor HD9350 (SKU leído de foto; confirmar al actualizar)

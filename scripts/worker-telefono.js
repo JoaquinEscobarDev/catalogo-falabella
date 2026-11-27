@@ -248,11 +248,17 @@ async function main() {
 
       const cat = await db.query('SELECT id, nombre FROM categories WHERE lower(nombre) = lower($1)', [categoria]);
       if (!cat.rows[0]) { console.log(`No existe la categoría "${categoria}".`); return; }
-      const { rows } = await db.query(
+      const todos = (await db.query(
         'SELECT sku, marca, nombre, alias, subcategoria FROM products WHERE category_id = $1 ORDER BY marca NULLS LAST, nombre NULLS LAST, sku',
         [cat.rows[0].id]
-      );
-      const enPagina = new Set(rows.map(r => r.sku));
+      )).rows;
+      // Si el archivo tiene secciones [..], solo se comparan los productos sin
+      // subcategoría o de esas secciones: lo de otras subcategorías (ej. la
+      // Línea Blanca que no está en el archivo) no se toca.
+      const secciones = new Set(subDe.values());
+      const rows = secciones.size ? todos.filter(r => !r.subcategoria || secciones.has(r.subcategoria)) : todos;
+      const fuera = todos.length - rows.length;
+      const enPagina = new Set(todos.map(r => r.sku));
 
       const quedan = rows.filter(r => tienda.has(r.sku));
       const sobran = rows.filter(r => !tienda.has(r.sku));
@@ -275,6 +281,7 @@ async function main() {
       const aplicar = process.argv.includes('--aplicar');
 
       fmt.titulo(`${cat.rows[0].nombre} · comparación con tienda`);
+      if (fuera) console.log(fmt.estilo.tenue(`  (${fuera} productos de otras subcategorías no se comparan ni se tocan)`));
       fmt.grupo('✔ SE QUEDAN', fmt.estilo.verde, quedan.map(deFila));
       fmt.grupo(aplicar ? '✖ SE ELIMINAN' : '✖ SE ELIMINARÍAN', fmt.estilo.rojo, sobran.map(deFila));
       fmt.grupo(aplicar ? '＋ SE AGREGAN' : '＋ SE AGREGARÍAN', fmt.estilo.cian, agregar.map(deTienda));
@@ -302,8 +309,11 @@ async function main() {
         ? await db.query('INSERT INTO products (sku, category_id) SELECT unnest($1::text[]), $2 ON CONFLICT (sku) DO NOTHING', [agregar, cat.rows[0].id])
         : { rowCount: 0 };
       // Subcategoría de cada SKU según la sección del archivo ([Tablets], [Impresoras]...).
-      for (const [sku, sub] of subDe) {
-        await db.query('UPDATE products SET subcategoria = $2 WHERE sku = $1 AND category_id = $3', [sku, sub, cat.rows[0].id]);
+      if (subDe.size) {
+        await db.query(
+          `UPDATE products p SET subcategoria = v.sub FROM unnest($1::text[], $2::text[]) AS v(sku, sub)
+           WHERE p.sku = v.sku AND p.category_id = $3`,
+          [[...subDe.keys()], [...subDe.values()], cat.rows[0].id]);
       }
       // UPC del archivo, solo donde el producto no tiene uno cargado.
       if (upcDe.size) {
@@ -316,7 +326,7 @@ async function main() {
         ['Se quedaron', quedan.length, fmt.estilo.verde],
         ['Eliminados', del.rowCount, fmt.estilo.rojo],
         ['Agregados', ins.rowCount, fmt.estilo.cian],
-        ['Total en la página', quedan.length + ins.rowCount],
+        ['Total en la página', quedan.length + ins.rowCount + fuera],
       ]);
       console.log(fmt.estilo.verde('  ✔ Listo. Los nuevos muestran precio en la próxima actualización.'));
       console.log('');
